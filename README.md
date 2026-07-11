@@ -37,10 +37,10 @@ qemu-system-x86_64 \
     -m 512M -nographic
 ```
 ## Links
--GitHub Repository - https://github.com/semen88pochuev-eng/RezzOS
--BusyBox - https://busybox.net/
--Linux kernel - https://kernel.org/
--Alpine Linux - https://alpinelinux.org/
+- GitHub Repository - https://github.com/semen88pochuev-eng/RezzOS
+- BusyBox - https://busybox.net/
+- Linux kernel - https://kernel.org/
+- Alpine Linux - https://alpinelinux.org/
 
 
 ## License
