@@ -11,7 +11,7 @@
 | nano | 8.0 |
 
 
-##Features
+## Features
 - Package manager (Alpine repos)
 - Persistent ext4 storage
 - Network with DHCP and DNS
