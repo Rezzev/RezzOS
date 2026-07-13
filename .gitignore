@@ -1,9 +1,9 @@
 *.img
 *.cpio.gz
-bzImage
 *.apk
 *.tar.*
 linux-*/
 busybox-*/
 tmp/
 _install/
+bzImage
