@@ -51,7 +51,7 @@ It will automatically download sources, compile the kernel and BusyBox, assemble
 ## Contributors
 Thanks to all contributors who help improve RezzOS!
 
-- [@neko_qt](https://github.com/neko_qt) — improved build system, added runit support, fixed init script, auto-download sources
+- [@neko-qt](https://github.com/neko-qt) — improved build system, added runit support, fixed init script, auto-download sources
 
 ## License
 GNU General Public License v3.0
