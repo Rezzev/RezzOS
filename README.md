@@ -18,6 +18,9 @@
 - Network with DHCP and DNS
 - File downloader (ghget)
 
+## Development
+- TCC (Tiny C Compiler) with full musl-dev headers
+- Write and compile C programs directly in RezzOS
 
 ## Usage
 ```bash
