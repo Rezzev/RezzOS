@@ -31,9 +31,8 @@ sv restart tty1
 See build.sh for detailed steps.
 ```
 ## Quick Start
-```bash
 To get launched, use ./start.sh or start-gui.sh
-```
+
 ## Build from Source
 The easiest way is to run the included build script:
 ```bash
