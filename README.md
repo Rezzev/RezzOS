@@ -26,7 +26,7 @@ pkg search python
 ghget https://url file
 sv status /etc/runit/runsvdir/default/*
 sv restart tty1
-
+```
 ## Manual build
 See build.sh for detailed steps.
 ```
