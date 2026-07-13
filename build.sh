@@ -105,7 +105,7 @@ cp -r lib/* "$ROOTFS_DIR/lib/"
 [ -d usr/lib ] && cp -r usr/lib/* "$ROOTFS_DIR/usr/lib/" || true
 
 log "Downloading Alpine packages"
-MAIN_PACKAGES="ncurses-terminfo-base-6.4_p20240420-r2.apk libncursesw-6.4_p20240420-r2.apk readline-8.2.10-r0.apk bash-5.2.26-r0.apk nano-8.0-r0.apk"
+MAIN_PACKAGES="ncurses-terminfo-base-6.4_p20240420-r2.apk libncursesw-6.4_p20240420-r2.apk readline-8.2.10-r0.apk bash-5.2.26-r0.apk nano-8.0-r0.apk dropbear-2024.85-r0.apk dropbear-ssh-2024.85-r0.apk"
 for pkg in $MAIN_PACKAGES; do
     wget -q "$ALPINE_MAIN/$pkg" -O "/tmp/$pkg"
     mkdir -p /tmp/p
