@@ -1,0 +1,2 @@
+#!/bin/sh
+exec runsvdir /etc/runit/runsvdir/default
