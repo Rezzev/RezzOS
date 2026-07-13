@@ -9,6 +9,7 @@
 | GNU Bash | 5.2 |
 | musl | 1.2.5 |
 | nano | 8.0 |
+| Xorg | 21.1 |
 
 
 ## Features
