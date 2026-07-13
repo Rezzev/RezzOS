@@ -24,25 +24,35 @@
 pkg install nano
 pkg search python
 ghget https://url file
+sv status /etc/runit/runsvdir/default/*
+sv restart tty1
 
+## Manual build
+See build.sh for detailed steps.
 ```
 ## Quick Start
-
 ```bash
-qemu-system-x86_64 \
-    -kernel bzImage \
-    -initrd rootfs.cpio.gz \
-    -append "console=ttyS0 quiet loglevel=0 root=/dev/ram0 init=/init" \
-    -netdev user,id=net0 -device virtio-net,netdev=net0 \
-    -drive file=disk.img,format=raw,if=virtio \
-    -m 512M -nographic
+To get launched, use ./start.sh or start-gui.sh
 ```
+## Build from Source
+The easiest way is to run the included build script:
+```bash
+./build.sh
+```
+It will automatically download sources, compile the kernel and BusyBox, assemble the rootfs, and create a disk image.
+
+
+
 ## Links
 - GitHub Repository - https://github.com/semen88pochuev-eng/RezzOS
 - BusyBox - https://busybox.net/
 - Linux kernel - https://kernel.org/
 - Alpine Linux - https://alpinelinux.org/
 
+## Contributors
+Thanks to all contributors who help improve RezzOS!
+
+- [@neko_qt](https://github.com/neko_qt) — improved build system, added runit support, fixed init script, auto-download sources
 
 ## License
 GNU General Public License v3.0
