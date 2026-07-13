@@ -29,7 +29,7 @@ sv restart tty1
 ```
 ## Manual build
 See build.sh for detailed steps.
-```
+
 ## Quick Start
 To get launched, use ./start.sh or start-gui.sh
 
