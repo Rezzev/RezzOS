@@ -11,6 +11,7 @@
 | musl | 1.2.5 |
 | nano | 8.0 |
 
+*These are just recommended versions, you can change them by editing build.sh!*
 
 ## Features
 - Package manager (Alpine repos)
@@ -50,7 +51,6 @@ It will automatically download sources, compile the kernel and BusyBox, assemble
 - BusyBox - https://busybox.net/
 - Linux kernel - https://kernel.org/
 - Alpine Linux - https://alpinelinux.org/
-- Tiny C Compiler - https://bellard.org/tcc/
 
 ## Contributors
 Thanks to all contributors who help improve RezzOS!
