@@ -1,5 +1,6 @@
 # RezzOS - open source linux distubition 
-<img width="351" height="342" alt="image" src="https://github.com/user-attachments/assets/53dd2f1d-352f-475c-938c-9bf36bea8aea" />
+<img width="715" height="246" alt="image" src="https://github.com/user-attachments/assets/5d3ac896-efd8-4164-9e9e-3dae0f7d2b99" />
+
 
 ## System
 | Component | Version |
