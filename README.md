@@ -1,4 +1,4 @@
-# RezzOS - open source linux distubition 
+# RezzOS - open source linux distribution 
 <img width="715" height="246" alt="image" src="https://github.com/user-attachments/assets/5d3ac896-efd8-4164-9e9e-3dae0f7d2b99" />
 
 
