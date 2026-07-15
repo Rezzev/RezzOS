@@ -1,4 +1,4 @@
-# RezzOS - open source linux distubition 
+# RezzOS - open source linux distribution 
 <img width="715" height="246" alt="image" src="https://github.com/user-attachments/assets/5d3ac896-efd8-4164-9e9e-3dae0f7d2b99" />
 
 
@@ -11,6 +11,7 @@
 | musl | 1.2.5 |
 | nano | 8.0 |
 
+*These are just recommended versions, you can change them by editing build.sh!*
 
 ## Features
 - Package manager (Alpine repos)
@@ -50,7 +51,6 @@ It will automatically download sources, compile the kernel and BusyBox, assemble
 - BusyBox - https://busybox.net/
 - Linux kernel - https://kernel.org/
 - Alpine Linux - https://alpinelinux.org/
-- Tiny C Compiler - https://bellard.org/tcc/
 
 ## Contributors
 Thanks to all contributors who help improve RezzOS!
