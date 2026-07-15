@@ -57,6 +57,11 @@ cd "$BUSYBOX_DIR"
 make defconfig
 sed -i 's/.*CONFIG_STATIC.*/CONFIG_STATIC=y/' .config
 sed -i 's/CONFIG_TC=y/# CONFIG_TC is not set/' .config
+sed -i 's/CONFIG_FEATURE_USAGE=y/# CONFIG_FEATURE_USAGE is not set/' .config
+sed -i 's/CONFIG_FEATURE_VERBOSE_USAGE=y/# CONFIG_FEATURE_VERBOSE_USAGE is not set/' .config
+sed -i 's/CONFIG_FEATURE_COMPRESS_USAGE=y/# CONFIG_FEATURE_COMPRESS_USAGE is not set/' .config
+sed -i 's/CONFIG_VI=y/# CONFIG_VI is not set/' .config
+sed -i 's/CONFIG_FEATURE_VI_.*/# & is not set/' .config
 yes "" | make oldconfig
 make -j"$JOBS"
 make install
@@ -87,7 +92,7 @@ make -j"$JOBS"
 cp arch/x86/boot/bzImage "$REPO_DIR/bzImage"
 cd "$REPO_DIR"
 
-stop "Assembling rootfs"
+step "Assembling rootfs"
 cp -r etc "$ROOTFS_DIR/"
 cp -r usr "$ROOTFS_DIR/"
 [ -d root ] && cp -r root "$ROOTFS_DIR/" || true
@@ -98,7 +103,7 @@ mkdir -p dev proc sys tmp mnt/disk var/log lib usr/lib usr/share/terminfo
 mkdir -p etc/runit/runsvdir/default
 chmod +x init
 
-stop "Downloading musl"
+step "Downloading musl"
 mkdir -p /tmp/m
 cd /tmp
 wget -q "$ALPINE_MAIN/musl-1.2.5-r3.apk"
@@ -123,7 +128,7 @@ for pkg in $MAIN_PACKAGES; do
     [ -d etc ] && cp -r etc/* "$ROOTFS_DIR/etc/" 2>/dev/null || true
 done
 
-COMMUNITY_PACKAGES="runit-2.1.2-r7.apk"
+COMMUNITY_PACKAGES="runit-2.1.2-r7.apk neatvi-15-r0.apk"
 for pkg in $COMMUNITY_PACKAGES; do
     wget -q "$ALPINE_COMMUNITY/$pkg" -O "/tmp/$pkg"
     mkdir -p /tmp/p
