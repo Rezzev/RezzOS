@@ -87,7 +87,7 @@ make -j"$JOBS"
 cp arch/x86/boot/bzImage "$REPO_DIR/bzImage"
 cd "$REPO_DIR"
 
-stop "Assembling rootfs"
+step "Assembling rootfs"
 cp -r etc "$ROOTFS_DIR/"
 cp -r usr "$ROOTFS_DIR/"
 [ -d root ] && cp -r root "$ROOTFS_DIR/" || true
@@ -98,7 +98,7 @@ mkdir -p dev proc sys tmp mnt/disk var/log lib usr/lib usr/share/terminfo
 mkdir -p etc/runit/runsvdir/default
 chmod +x init
 
-stop "Downloading musl"
+step "Downloading musl"
 mkdir -p /tmp/m
 cd /tmp
 wget -q "$ALPINE_MAIN/musl-1.2.5-r3.apk"
