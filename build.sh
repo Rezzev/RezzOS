@@ -57,6 +57,11 @@ cd "$BUSYBOX_DIR"
 make defconfig
 sed -i 's/.*CONFIG_STATIC.*/CONFIG_STATIC=y/' .config
 sed -i 's/CONFIG_TC=y/# CONFIG_TC is not set/' .config
+sed -i 's/CONFIG_FEATURE_USAGE=y/# CONFIG_FEATURE_USAGE is not set/' .config
+sed -i 's/CONFIG_FEATURE_VERBOSE_USAGE=y/# CONFIG_FEATURE_VERBOSE_USAGE is not set/' .config
+sed -i 's/CONFIG_FEATURE_COMPRESS_USAGE=y/# CONFIG_FEATURE_COMPRESS_USAGE is not set/' .config
+sed -i 's/CONFIG_VI=y/# CONFIG_VI is not set/' .config
+sed -i 's/CONFIG_FEATURE_VI_.*/# & is not set/' .config
 yes "" | make oldconfig
 make -j"$JOBS"
 make install
@@ -123,7 +128,7 @@ for pkg in $MAIN_PACKAGES; do
     [ -d etc ] && cp -r etc/* "$ROOTFS_DIR/etc/" 2>/dev/null || true
 done
 
-COMMUNITY_PACKAGES="runit-2.1.2-r7.apk"
+COMMUNITY_PACKAGES="runit-2.1.2-r7.apk neatvi-15-r0.apk"
 for pkg in $COMMUNITY_PACKAGES; do
     wget -q "$ALPINE_COMMUNITY/$pkg" -O "/tmp/$pkg"
     mkdir -p /tmp/p
