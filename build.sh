@@ -1,5 +1,9 @@
 #!/bin/bash
+# Stop the build immediately on any error.
 set -e
+
+# Treat unset variables as errors.
+set -u
 
 KERNEL_VERSION="6.6.40"
 BUSYBOX_VERSION="1.36.1"
