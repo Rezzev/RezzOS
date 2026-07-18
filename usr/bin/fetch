@@ -1,0 +1,25 @@
+#!/bin/sh
+#Redire the output to the log or to the desired TTY, if required
+# exec 2>&1
+
+while true; do
+    HOST="$(hostname)"
+    KERNEL="$(uname -r)"
+    UPTIME="$(cut -d. -f1 /proc/uptime 2>/dev/null)"
+
+    if [ -r /proc/meminfo ]; then
+        MEM_TOTAL="$(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo)"
+        MEM_FREE="$(awk '/MemAvailable/ {print int($2 / 1024)}' /proc/meminfo)"
+        [ -z "$MEM_FREE" ] && MEM_FREE="$(awk '/MemFree/ {print int($2 / 1024)}' /proc/meminfo)"
+    fi
+
+   #clear screen
+    clear
+    echo "RezzOS"
+    echo "Host   : $HOST"
+    echo "Kernel : $KERNEL"
+    echo "Uptime : ${UPTIME}s"
+    echo "Memory : ${MEM_FREE} MB / ${MEM_TOTAL} MB free"
+    echo "Shell  : /bin/sh"
+
+    sleep 5 #must have pause,if it doesn’t run with pause sustem will down.
