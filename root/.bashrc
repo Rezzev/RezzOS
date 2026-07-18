@@ -1,4 +1,4 @@
-PS1='\u@\h:\w\$ '
+PS1='\[\e[1;34m\]\u\[\e[0m\]@\h:\w\$> '
 alias ll='ls -la'
 alias ..='cd ..'
 clear
