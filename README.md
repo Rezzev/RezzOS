@@ -1,12 +1,20 @@
 $$
-\Huge\color{white}{\text{Rezz}} \Huge\color{blue}{\text{OS}}
+\Huge\color{white}{\text{Rezz}}\ \color{blue}{\text{OS}}
 $$
+
+
+
+
+
+
+
 
 ![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
 ![BusyBox](https://img.shields.io/badge/BusyBox-000000?style=for-the-badge&logo=busybox&logoColor=white)
 ![Shell](https://img.shields.io/badge/Shell-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)
 
 
+<img width="250" height="125" alt="image" src="https://github.com/user-attachments/assets/b71f0ff1-4181-48f7-a334-13ffe1439ee0" />
 
 
 
@@ -19,7 +27,7 @@ $$
 | Component | Version |
 |-----------|---------|
 | Linux | 6.6.40 LTS |
-| BusyBox | 1.36.1 |
+| BusyBox | 1.36.1 |                  
 | GNU Bash | 5.2 |
 | musl | 1.2.5 |
 | nano | 8.0 |
