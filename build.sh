@@ -159,6 +159,9 @@ for pkg in $EDGE_COMMUNITY_PACKAGES; do
     [ -d lib ] && cp -r lib/* "$ROOTFS_DIR/lib/" 2>/dev/null || true
     [ -d etc ] && cp -r etc/* "$ROOTFS_DIR/etc/" 2>/dev/null || true
 done
+
+chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
+
 step "Packing rootfs.cpio.gz"
 cd "$ROOTFS_DIR"
 find . | cpio -o -H newc | gzip > "$REPO_DIR/rootfs.cpio.gz"
