@@ -1,0 +1,76 @@
+bin/sh
+
+# Default service directory paths for runit
+SV_DIR="${SERVICE_DIR:-/etc/runit/runsvdir/default}"
+
+print_usage() {
+    echo "Runit Service Manager"
+    echo "Usage:"
+    echo "  rsv list                 - List all services and their current status"
+    echo "  rsv status [service]     - Show detailed status of a specific service"
+    echo "  rsv up [service]         - Start a service"
+    echo "  rsv down [service]       - Stop a service"
+    echo "  rsv restart [service]    - Restart a service"
+  
+}
+
+list_services() {
+    if [ ! -d "$SV_DIR" ]; then
+        echo "Error: Service directory '$SV_DIR' not found."
+        exit 1
+    fi
+
+    printf "%-20s | %-10s\n" "service" "status"
+
+    for d in "$SV_DIR"/*; do
+        if [ -d "$d" ] && [ -f "$d/run" ]; then
+            name=$(basename "$d")
+            status_out=$(sv status "$d" 2>&1)
+            
+            case "$status_out" in
+                run:*)    printf "%-20s | [ active ]\n" "$name" ;;
+                down:*)   printf "%-20s | [ down ]\n" "$name" ;;
+                *)        printf "%-20s | [ error ]\n" "$name" ;;
+            esac
+        fi
+    done
+    echo ""
+}
+
+control_service() {
+    action="$1"
+    name="$2"
+    
+    if [ -z "$name" ]; then
+        echo "Error: Please specify a service name."
+        exit 1
+    fi
+
+    if [ ! -d "$SV_DIR/$name" ]; then
+        echo "Error: Service '$name' does not exist."
+        exit 1
+    fi
+
+    echo "Sending command '$action' to service '$name'..."
+    sv "$action" "$SV_DIR/$name"
+}
+
+case "$1" in
+    list)
+        list_services
+        ;;
+    status)
+        if [ -z "$2" ]; then
+            echo "Error: Please specify a service name."
+            exit 1
+        fi
+        sv status "$SV_DIR/$2"
+        ;;
+    up|down|restart)
+        control_service "$1" "$2"
+        ;;
+    *)
+        print_usage
+        list_services
+        ;;
+esac
