@@ -78,6 +78,7 @@ Thanks to all contributors who help improve RezzOS!
 
 - [@neko_qt](https://github.com/neko-qt) — improved build system, added runit support, fixed init script, auto-download sources
 - [@wqreloxz](https://github.com/wqreloxz) - update init
+- [@valtrynx](https://github.com/d1mazaurus7) - TUI Installer developer
 
 ## License
 GNU General Public License v3.0
