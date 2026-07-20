@@ -1,4 +1,4 @@
-bin/sh
+#!/bin/sh
 
 # Default service directory paths for runit
 SV_DIR="${SERVICE_DIR:-/etc/runit/runsvdir/default}"
