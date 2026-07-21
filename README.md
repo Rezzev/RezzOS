@@ -16,6 +16,7 @@ $$
 
 <img width="250" height="125" alt="image" src="https://github.com/user-attachments/assets/b71f0ff1-4181-48f7-a334-13ffe1439ee0" />
 
+*more documentation in /docs*
 
 
 
