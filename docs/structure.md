@@ -1,3 +1,4 @@
+```bash
 RezzOS/
 ├── build.sh              # Main build script
 ├── start.sh              # Console mode launcher
