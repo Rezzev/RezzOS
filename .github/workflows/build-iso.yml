@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Install dependencies
-        run: sudo apt update && sudo apt install -y build-essential flex bison libncurses-dev libssl-dev libelf-dev bc cpio gzip wget tar grub-pc-bin xorriso
+        run: sudo apt install -y build-essential flex bison libncurses-dev libssl-dev libelf-dev bc cpio gzip wget tar grub-pc-bin xorriso qemu-utils
       
       - name: Build RezzOS
         run: ./build.sh
