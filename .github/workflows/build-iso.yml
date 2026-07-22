@@ -1,0 +1,50 @@
+name: Build ISO
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: sudo apt update && sudo apt install -y build-essential flex bison libncurses-dev libssl-dev libelf-dev bc cpio gzip wget tar grub-pc-bin xorriso
+      
+      - name: Build RezzOS
+        run: ./build.sh
+      
+      - name: Create ISO
+        run: |
+          mkdir -p iso/boot/grub
+          cp bzImage iso/boot/
+          cp rootfs.cpio.gz iso/boot/
+          cat > iso/boot/grub/grub.cfg << 'GRUB'
+          set timeout=5
+          menuentry "RezzOS" {
+              linux /boot/bzImage console=ttyS0 quiet loglevel=0
+              initrd /boot/rootfs.cpio.gz
+          }
+          GRUB
+          grub-mkrescue -o rezzos.iso iso/
+      
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rezzos-iso
+          path: rezzos.iso
+          
+      - name: Push ISO to iso branch
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git checkout --orphan iso
+          rm -rf *
+          cp "${{ github.workspace }}/rezzos.iso" .
+          date > BUILD_DATE
+          git add rezzos.iso BUILD_DATE
+          git commit -m "Auto-build $(date +%Y-%m-%d)"
+          git push origin iso --force
