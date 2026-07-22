@@ -18,7 +18,8 @@ fi
 
 clear
 printf "Welcome to \033[0;37mRezz\033[0;34mOS\033[0m!\n"
-echo "System Info: rezzfetch"
-echo "Packages:    pkg install <name> | pkg search <name> | pkg list"
-echo "Type 'help' for available commands and shortcuts."
+echo "Packages:"
+echo "pkg install <name>"
+echo "pkg search <name>"
+echo "pkg list"
 echo ""
