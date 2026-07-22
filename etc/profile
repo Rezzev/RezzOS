@@ -1,4 +1,8 @@
-export TERM=xterm
+export TERM="${TERM:-linux}"
 export PATH=/sbin:/bin:/usr/bin:/usr/sbin
 export LD_LIBRARY_PATH=/lib:/usr/lib
+export INPUTRC=/etc/inputrc
+export HISTFILE=/root/.bash_history
+export HISTSIZE=10000
+export HISTFILESIZE=10000
 export PS1='\u@\h:\w\$ '

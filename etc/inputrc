@@ -1,0 +1,30 @@
+# /etc/inputrc - Readline key bindings for RezzOS
+
+set meta-flag on
+set input-meta on
+set convert-meta off
+set output-meta on
+
+# Arrow keys for command history navigation
+"\e[A": previous-history
+"\e[B": next-history
+"\e[C": forward-char
+"\e[D": backward-char
+
+"\eOA": previous-history
+"\eOB": next-history
+"\eOC": forward-char
+"\eOD": backward-char
+
+# PageUp / PageDown for history search
+"\e[5~": history-search-backward
+"\e[6~": history-search-forward
+
+# Home / End / Delete
+"\e[1~": beginning-of-line
+"\e[4~": end-of-line
+"\e[7~": beginning-of-line
+"\e[8~": end-of-line
+"\e[H": beginning-of-line
+"\e[F": end-of-line
+"\e[3~": delete-char
