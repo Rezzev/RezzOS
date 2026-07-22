@@ -14,6 +14,7 @@ RezzOS/
 │
 ├── etc/                  # System configuration
 │   ├── profile           # Shell settings
+│   ├── tmux.conf         # Terminal multiplexer & scroll configuration
 │   ├── passwd            # Users
 │   ├── group             # Groups
 │   ├── motd              # Login greeting

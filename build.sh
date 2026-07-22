@@ -90,6 +90,8 @@ CONFIG_DEVTMPFS=y
 CONFIG_FB=y
 CONFIG_FB_VESA=y
 CONFIG_DRM=y
+CONFIG_UNIX98_PTYS=y
+CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
 KCONF
 yes "" | make oldconfig
 make -j"$JOBS"
@@ -119,7 +121,7 @@ cp -r lib/* "$ROOTFS_DIR/lib/"
 [ -d usr/lib ] && cp -r usr/lib/* "$ROOTFS_DIR/usr/lib/" || true
 # downloading packages
 step "Downloading Alpine packages"
-MAIN_PACKAGES="ncurses-terminfo-base-6.4_p20240420-r2.apk libncursesw-6.4_p20240420-r2.apk readline-8.2.10-r0.apk bash-5.2.26-r0.apk nano-8.0-r0.apk dropbear-2024.85-r0.apk dropbear-ssh-2024.85-r0.apk zlib-1.3.2-r0.apk musl-dev-1.2.5-r3.apk musl-1.2.5-r3.apk make-4.4.1-r2.apk lua5.3-5.3.6-r6.apk lua5.3-libs-5.3.6-r6.apk linenoise-1.0-r5.apk"
+MAIN_PACKAGES="ncurses-terminfo-base-6.4_p20240420-r2.apk libncursesw-6.4_p20240420-r2.apk libevent-2.1.12-r7.apk tmux-3.4-r1.apk readline-8.2.10-r0.apk bash-5.2.26-r0.apk nano-8.0-r0.apk dropbear-2024.85-r0.apk dropbear-ssh-2024.85-r0.apk zlib-1.3.2-r0.apk musl-dev-1.2.5-r3.apk musl-1.2.5-r3.apk make-4.4.1-r2.apk lua5.3-5.3.6-r6.apk lua5.3-libs-5.3.6-r6.apk linenoise-1.0-r5.apk"
 for pkg in $MAIN_PACKAGES; do
     wget -q "$ALPINE_MAIN/$pkg" -O "/tmp/$pkg"
     mkdir -p /tmp/p
