@@ -12,10 +12,14 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Install dependencies
-        run: sudo apt install -y build-essential flex bison libncurses-dev libssl-dev libelf-dev bc cpio gzip wget tar grub-pc-bin xorriso qemu-utils
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential flex bison libncurses-dev libssl-dev libelf-dev bc cpio gzip wget tar grub-pc-bin xorriso qemu-utils
       
       - name: Build RezzOS
-        run: ./build.sh
+        run: |
+          rm -f /tmp/musl-1.2.5-r3.apk
+          ./build.sh
       
       - name: Create ISO
         run: |
