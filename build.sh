@@ -67,8 +67,7 @@ if [ ! -f "busybox" ]; then
     sed -i 's/CONFIG_FEATURE_USAGE=y/# CONFIG_FEATURE_USAGE is not set/' .config
     sed -i 's/CONFIG_FEATURE_VERBOSE_USAGE=y/# CONFIG_FEATURE_VERBOSE_USAGE is not set/' .config
     sed -i 's/CONFIG_FEATURE_COMPRESS_USAGE=y/# CONFIG_FEATURE_COMPRESS_USAGE is not set/' .config
-    sed -i 's/CONFIG_VI=y/# CONFIG_VI is not set/' .config
-    sed -i 's/CONFIG_FEATURE_VI_.*/# & is not set/' .config
+    sed -i 's/CONFIG_VI=.*/CONFIG_VI=y/' .config
     yes "" | make oldconfig
     make -j"$JOBS"
 fi
@@ -180,6 +179,15 @@ for pkg in $EDGE_COMMUNITY_PACKAGES; do
 done
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
+chmod +x "$ROOTFS_DIR/bin/"* 2>/dev/null || true
+
+# Ensure editor executable symlinks exist
+[ -f "$ROOTFS_DIR/usr/bin/nano" ] && ln -sf /usr/bin/nano "$ROOTFS_DIR/bin/nano" 2>/dev/null || true
+[ -f "$ROOTFS_DIR/usr/bin/nano" ] && ln -sf /usr/bin/nano "$ROOTFS_DIR/bin/notepad" 2>/dev/null || true
+if [ -f "$ROOTFS_DIR/usr/bin/neatvi" ]; then
+    ln -sf /usr/bin/neatvi "$ROOTFS_DIR/bin/vi" 2>/dev/null || true
+    ln -sf /usr/bin/neatvi "$ROOTFS_DIR/usr/bin/vi" 2>/dev/null || true
+fi
 
 step "Packing rootfs.cpio.gz"
 cd "$ROOTFS_DIR"
