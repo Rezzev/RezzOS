@@ -21,4 +21,3 @@
 | `tcc <file.c>` | Compile C code |
 | `lua5.3 <file.lua>` | Run Lua script |
 | `make` | Build projects |
-EOF
