@@ -30,7 +30,7 @@
 | BusyBox | 1.36.1 |                  
 | GNU Bash | 5.2 |
 | musl | 1.2.5 |
-| nano | 8.0 |
+| runit | 2.1.2 |
 
 *These are just recommended versions, you can change them by editing build.sh!*
 
