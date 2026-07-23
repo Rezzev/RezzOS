@@ -45,6 +45,19 @@
 - Lua 5.3 
 - Write and compile C and Lua programs directly in RezzOS
 
+## Build from Source
+The easiest way is to run the included build script:
+```bash
+./build.sh
+```
+For NixOS:
+```bash
+./nixshell-run.sh
+```
+To build, you must have the dependencies installed.( dependencies in /docs/build dependencies.md)
+It will automatically download sources, compile the kernel and BusyBox, assemble the rootfs, and create a disk image.
+
+
 ## Usage
 ```bash
 pkg install nano
@@ -53,18 +66,11 @@ ghget https://url file
 sv status /etc/runit/runsvdir/default/*
 sv restart tty1
 ```
-## Manual build
-See build.sh for detailed steps.
 
 ## Quick Start
 To get launched, use ./start.sh or start-gui.sh
 
-## Build from Source
-The easiest way is to run the included build script:
-```bash
-./build.sh
-```
-It will automatically download sources, compile the kernel and BusyBox, assemble the rootfs, and create a disk image.
+
 
 
 
