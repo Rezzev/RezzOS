@@ -34,20 +34,26 @@ jobs:
           }
           GRUB
           grub-mkrescue -o rezzos.iso iso/
+          ls -la rezzos.iso
       
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
           name: rezzos-iso
           path: rezzos.iso
+
+      - name: Find ISO
+        run: find /home -name "rezzos.iso" 2>/dev/null
           
       - name: Push ISO to iso branch
         run: |
+          ISO_PATH=$(find /home -name "rezzos.iso" 2>/dev/null | head -1)
+          echo "Found ISO at: $ISO_PATH"
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git checkout --orphan iso
           rm -rf *
-          cp "${{ github.workspace }}/rezzos.iso" .
+          cp "$ISO_PATH" .
           date > BUILD_DATE
           git add rezzos.iso BUILD_DATE
           git commit -m "Auto-build $(date +%Y-%m-%d)"
