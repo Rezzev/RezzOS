@@ -1,7 +1,9 @@
-$$
-\Huge\color{white}{\text{Rezz}}\ \color{blue}{\text{OS}}
-$$
-
+    ██████╗ ███████╗███████╗███████╗ ██████╗ ███████╗
+    ██╔══██╗██╔════╝╚══███╔╝╚══███╔╝██╔═══██╗██╔════╝
+    ██████╔╝█████╗    ███╔╝   ███╔╝ ██║   ██║███████╗
+    ██╔══██╗██╔══╝   ███╔╝   ███╔╝  ██║   ██║╚════██║
+    ██║  ██║███████╗███████╗███████╗╚██████╔╝███████║
+    ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚══════╝
 
 
 
@@ -12,10 +14,6 @@ $$
 ![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
 ![BusyBox](https://img.shields.io/badge/BusyBox-000000?style=for-the-badge&logo=busybox&logoColor=white)
 ![Shell](https://img.shields.io/badge/Shell-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)
-
-
-<img width="250" height="125" alt="image" src="https://github.com/user-attachments/assets/b71f0ff1-4181-48f7-a334-13ffe1439ee0" />
-
 *more documentation in /docs*
 
 
