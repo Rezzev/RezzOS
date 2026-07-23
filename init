@@ -16,9 +16,10 @@ if ! grep -q "^user:" /etc/passwd 2>/dev/null; then
     chown -R 1000:1000 /home/user
 fi
 
+# Network - DHCP
 ifconfig lo 127.0.0.1 up
-ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up
-route add default gw 10.0.2.2 2>/dev/null
+ifconfig eth0 up
+udhcpc -b -i eth0
 echo "nameserver 8.8.8.8" > /etc/resolv.conf
 
 # Mount disk safely
