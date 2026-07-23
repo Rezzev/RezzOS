@@ -42,7 +42,8 @@
 
 ## Development
 - TCC (Tiny C Compiler) with full musl-dev headers
-- Write and compile C programs directly in RezzOS
+- Lua 5.3 
+- Write and compile C and Lua programs directly in RezzOS
 
 ## Usage
 ```bash
