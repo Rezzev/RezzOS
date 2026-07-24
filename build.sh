@@ -172,7 +172,7 @@ for pkg in $MAIN_PACKAGES; do
     [ -d etc ] && cp -r etc/* "$ROOTFS_DIR/etc/" 2>/dev/null || true
 done
 
-COMMUNITY_PACKAGES="runit-2.1.2-r7.apk neatvi-15-r0.apk"
+COMMUNITY_PACKAGES="runit-2.1.2-r7.apk neatvi-15-r0.apk sudo-1.9.15_p5-r0.apk"
 for pkg in $COMMUNITY_PACKAGES; do
     if [ ! -s "$CACHE_DIR/$pkg" ]; then
         rm -f "$CACHE_DIR/$pkg"
@@ -234,6 +234,13 @@ fi
 [ -f "$ROOTFS_DIR/usr/bin/font" ] && ln -sf /usr/bin/font "$ROOTFS_DIR/bin/font" 2>/dev/null || true
 [ -f "$ROOTFS_DIR/usr/bin/font" ] && ln -sf /usr/bin/font "$ROOTFS_DIR/usr/bin/rezzfont" 2>/dev/null || true
 [ -f "$ROOTFS_DIR/usr/bin/font" ] && ln -sf /usr/bin/font "$ROOTFS_DIR/bin/rezzfont" 2>/dev/null || true
+
+# Ensure sudo permissions and executable symlinks
+if [ -f "$ROOTFS_DIR/usr/bin/sudo" ]; then
+    chmod 4755 "$ROOTFS_DIR/usr/bin/sudo" 2>/dev/null || true
+    ln -sf /usr/bin/sudo "$ROOTFS_DIR/bin/sudo" 2>/dev/null || true
+    [ -f "$ROOTFS_DIR/etc/sudoers" ] && chmod 0440 "$ROOTFS_DIR/etc/sudoers" 2>/dev/null || true
+fi
 
 # Ensure power management command symlinks exist across sbin and bin
 ln -sf /usr/bin/shutdown "$ROOTFS_DIR/sbin/shutdown" 2>/dev/null || true
