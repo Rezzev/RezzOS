@@ -1,0 +1,22 @@
+#!/bin/sh
+# Runit Stage 3: System shutdown/reboot handler
+
+echo "[runit] Stage 3: Shutting down services..."
+if [ -d /etc/runit/runsvdir/default ]; then
+    for s in /etc/runit/runsvdir/default/*; do
+        if [ -d "$s" ]; then
+            sv stop "$s" 2>/dev/null || true
+        fi
+    done
+fi
+
+echo "[runit] Syncing filesystems..."
+sync
+
+echo "[runit] Disactivating swap..."
+swapoff -a 2>/dev/null || true
+
+echo "[runit] Unmounting filesystems..."
+umount -a -r 2>/dev/null || true
+
+echo "[runit] System shutdown stage complete."

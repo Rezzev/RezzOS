@@ -14,7 +14,7 @@ SWAPFILE="/mnt/disk/swapfile"
 usage() {
     echo -e "${BLUE}=== RezzOS Swap Manager (swap) ===${NC}"
     echo "Usage:"
-    echo "  swap create [size]   - Create & enable swap file (default: 512M, e.g. 256M, 1G)"
+    echo "  swap create [size]   - Create & enable swap file (default: 512M, e.g. 256M, 512M, 1G)"
     echo "  swap on              - Enable existing swap file"
     echo "  swap off             - Disable swap file"
     echo "  swap status          - Show memory & swap status"
@@ -30,22 +30,48 @@ create_swap() {
         return 1
     fi
 
-    echo -e "${YELLOW}Creating $SIZE swap file at $SWAPFILE...${NC}"
-    
-    # Try fallocate first, fallback to dd
-    if ! fallocate -l "$SIZE" "$SWAPFILE" 2>/dev/null; then
-        num=$(echo "$SIZE" | sed 's/[^0-9]//g')
-        unit=$(echo "$SIZE" | sed 's/[0-9]//g' | tr '[:lower:]' '[:upper:]')
-        [ -z "$num" ] && num=512
-        [ "$unit" = "G" ] && bs="1M" count=$(( num * 1024 )) || { bs="1M"; count="$num"; }
-        
-        dd if=/dev/zero of="$SWAPFILE" bs="$bs" count="$count" status=none 2>/dev/null || \
-        dd if=/dev/zero of="$SWAPFILE" bs=1M count=512 2>/dev/null
+    # Parse size into megabytes
+    num=$(echo "$SIZE" | sed 's/[^0-9]//g')
+    unit=$(echo "$SIZE" | sed 's/[0-9]//g' | tr '[:lower:]' '[:upper:]')
+    [ -z "$num" ] && num=512
+    [ "$unit" = "G" ] && req_mb=$(( num * 1024 )) || req_mb="$num"
+
+    # Check available disk space
+    TARGET_DIR=$(dirname "$SWAPFILE")
+    [ -d "$TARGET_DIR" ] || TARGET_DIR="/"
+    FREE_MB=$(df -m "$TARGET_DIR" 2>/dev/null | tail -n 1 | awk '{print $(NF-2)}')
+
+    if [ -n "$FREE_MB" ] && [ "$FREE_MB" -eq "$FREE_MB" ] 2>/dev/null; then
+        if [ "$req_mb" -gt "$FREE_MB" ]; then
+            if [ "$FREE_MB" -gt 64 ]; then
+                max_alloc=$(( FREE_MB - 16 ))
+                echo -e "${YELLOW}[Warning] Requested ${SIZE} but only ${FREE_MB}M free. Capping to ${max_alloc}M.${NC}"
+                req_mb="$max_alloc"
+                SIZE="${max_alloc}M"
+            else
+                echo -e "${RED}[Error] Not enough disk space (${FREE_MB}M free, need ${req_mb}M).${NC}"
+                return 1
+            fi
+        fi
     fi
 
+    echo -e "${YELLOW}Creating ${SIZE} swap file at $SWAPFILE...${NC}"
+    
+    # IMPORTANT: Always use dd, NOT fallocate!
+    # fallocate creates "unwritten extents" on ext4 which are incompatible
+    # with kernel hibernation (resume_offset fails, snapshot write fails).
+    # dd writes actual zeros, creating proper allocated blocks.
+    dd if=/dev/zero of="$SWAPFILE" bs=1M count="$req_mb" status=none 2>/dev/null
+    
     if [ ! -f "$SWAPFILE" ]; then
         echo -e "${RED}Failed to create swap file at $SWAPFILE.${NC}"
         return 1
+    fi
+
+    # Verify actual file size
+    ACTUAL_SIZE=$(du -m "$SWAPFILE" 2>/dev/null | awk '{print $1}')
+    if [ -n "$ACTUAL_SIZE" ] && [ "$ACTUAL_SIZE" -lt "$req_mb" ] 2>/dev/null; then
+        echo -e "${YELLOW}[Warning] Actual file size: ${ACTUAL_SIZE}M (requested ${req_mb}M, disk may be full).${NC}"
     fi
 
     chmod 600 "$SWAPFILE"
@@ -54,7 +80,7 @@ create_swap() {
 
     echo -e "${YELLOW}Enabling swap...${NC}"
     if swapon "$SWAPFILE" 2>/dev/null; then
-        echo -e "${GREEN}Swap file ($SIZE) successfully created and activated!${NC}"
+        echo -e "${GREEN}Swap file (${SIZE}) successfully created and activated!${NC}"
     else
         echo -e "${RED}Failed to activate swap file.${NC}"
         return 1

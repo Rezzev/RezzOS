@@ -1,0 +1,222 @@
+#!/bin/sh
+# RezzOS Power Management & Shutdown Controller
+
+RED='\033[1;31m'
+GREEN='\033[1;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[1;34m'
+CYAN='\033[1;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+ACTION="${1:-poweroff}"
+
+case "$ACTION" in
+    poweroff|halt|down|off)
+        MODE="poweroff"
+        TITLE="Powering Off System"
+        COLOR="$RED"
+        ;;
+    reboot|restart)
+        MODE="reboot"
+        TITLE="Rebooting System"
+        COLOR="$YELLOW"
+        ;;
+    suspend|sleep)
+        MODE="suspend"
+        TITLE="Suspending System"
+        COLOR="$CYAN"
+        ;;
+    hibernate)
+        MODE="hibernate"
+        TITLE="Hibernating System"
+        COLOR="$CYAN"
+        ;;
+    *)
+        echo -e "${RED}Unknown action: $ACTION${NC}"
+        echo ""
+        echo "Usage: system-shutdown {poweroff|reboot|suspend|hibernate}"
+        echo ""
+        echo "  poweroff   - Shut down system cleanly"
+        echo "  reboot     - Reboot system cleanly"
+        echo "  suspend    - Suspend system (freeze & wait for Enter)"
+        echo "  hibernate  - Save memory to swap & power off"
+        exit 1
+        ;;
+esac
+
+echo -e "\n${COLOR}=== [RezzOS] ${TITLE} ===${NC}"
+
+########################################
+# SUSPEND — visual pause with kernel freeze
+########################################
+if [ "$MODE" = "suspend" ]; then
+    echo -e "${CYAN}==> Preparing system for sleep...${NC}"
+    sync
+
+    clear
+    echo ""
+    echo -e "${BOLD}${CYAN}  ╔══════════════════════════════════════╗${NC}"
+    echo -e "${BOLD}${CYAN}  ║                                      ║${NC}"
+    echo -e "${BOLD}${CYAN}  ║      RezzOS — System Suspended       ║${NC}"
+    echo -e "${BOLD}${CYAN}  ║                                      ║${NC}"
+    echo -e "${BOLD}${CYAN}  ║    Press ${GREEN}Enter${CYAN} to wake up system     ║${NC}"
+    echo -e "${BOLD}${CYAN}  ║                                      ║${NC}"
+    echo -e "${BOLD}${CYAN}  ╚══════════════════════════════════════╝${NC}"
+    echo ""
+
+    # Try kernel freeze (s2idle) — puts CPUs in low power mode
+    if [ -f /sys/power/state ] && grep -q "freeze" /sys/power/state 2>/dev/null; then
+        echo freeze > /sys/power/state 2>/dev/null || true
+    fi
+
+    # Wait for user to press Enter to wake up
+    read -r DUMMY
+
+    clear
+    echo -e "${GREEN}[RezzOS] System resumed from suspend.${NC}"
+    echo ""
+    exit 0
+fi
+
+########################################
+# HIBERNATE — snapshot memory to swap
+########################################
+if [ "$MODE" = "hibernate" ]; then
+    echo -e "${CYAN}==> Preparing for hibernation...${NC}"
+
+    # 1. Ensure swap is active
+    if ! grep -q -v "^Filename" /proc/swaps 2>/dev/null; then
+        if [ -f /mnt/disk/swapfile ]; then
+            echo -e "${BLUE}  Activating swap /mnt/disk/swapfile...${NC}"
+            swapon /mnt/disk/swapfile 2>/dev/null || true
+        elif [ -f /swapfile ]; then
+            echo -e "${BLUE}  Activating swap /swapfile...${NC}"
+            swapon /swapfile 2>/dev/null || true
+        fi
+    fi
+
+    SWAP_LINE=$(grep -v "^Filename" /proc/swaps 2>/dev/null | head -n 1)
+    SWAP_TARGET=$(echo "$SWAP_LINE" | awk '{print $1}')
+    SWAP_TYPE=$(echo "$SWAP_LINE" | awk '{print $2}')
+
+    if [ -z "$SWAP_TARGET" ]; then
+        echo -e "${RED}[Error] No active swap found! Hibernation requires swap.${NC}"
+        echo -e "${YELLOW}  Run: swap create 512M${NC}"
+        exit 1
+    fi
+
+    echo -e "${BLUE}  Active swap: $SWAP_TARGET (type: ${SWAP_TYPE:-unknown})${NC}"
+
+    # 2. Check if kernel supports disk state
+    if [ ! -f /sys/power/state ] || ! grep -q "disk" /sys/power/state 2>/dev/null; then
+        echo -e "${RED}[Error] Kernel does not support hibernate.${NC}"
+        exit 1
+    fi
+
+    # 3. Set hibernation mode to 'shutdown'
+    if [ -f /sys/power/disk ]; then
+        echo shutdown > /sys/power/disk 2>/dev/null || true
+        echo -e "${BLUE}  Hibernate mode: $(cat /sys/power/disk 2>/dev/null)${NC}"
+    fi
+
+    # 4. Find the block device for resume
+    RESUME_DEV=""
+    if [ -f /sys/class/block/vda/dev ]; then
+        RESUME_DEV=$(cat /sys/class/block/vda/dev 2>/dev/null)
+    elif [ -f /sys/class/block/sda/dev ]; then
+        RESUME_DEV=$(cat /sys/class/block/sda/dev 2>/dev/null)
+    fi
+
+    if [ -n "$RESUME_DEV" ] && [ -f /sys/power/resume ]; then
+        echo -e "${BLUE}  Resume device: $RESUME_DEV${NC}"
+        echo "$RESUME_DEV" > /sys/power/resume 2>/dev/null || true
+    fi
+
+    # 5. Calculate resume_offset for swap files
+    if [ "$SWAP_TYPE" != "partition" ] && [ -f /sys/power/resume_offset ]; then
+        OFFSET=""
+        if [ -x /usr/bin/swap-offset ]; then
+            OFFSET=$(/usr/bin/swap-offset "$SWAP_TARGET" 2>/dev/null)
+        fi
+
+        if [ -n "$OFFSET" ] && [ "$OFFSET" != "0" ]; then
+            echo -e "${BLUE}  Resume offset: $OFFSET${NC}"
+            echo "$OFFSET" > /sys/power/resume_offset 2>/dev/null || true
+        fi
+    fi
+
+    # 6. Sync and hibernate
+    echo -e "${YELLOW}  Syncing filesystems...${NC}"
+    sync
+    sleep 1
+
+    echo -e "${CYAN}  Writing hibernation image...${NC}"
+
+    ERR_FILE="/tmp/.hibernate_err"
+    echo disk > /sys/power/state 2>"$ERR_FILE"
+    RET=$?
+
+    if [ "$RET" -ne 0 ]; then
+        KERR=$(cat "$ERR_FILE" 2>/dev/null)
+        rm -f "$ERR_FILE"
+        echo -e "${YELLOW}[Notice] Kernel hibernation snapshot couldn't lock mounted ext4 partition.${NC}"
+        echo -e "${YELLOW}         (In single-partition VMs, use 'suspend' for instant sleep mode).${NC}"
+        echo ""
+        echo -e "${GREEN}Switching to suspend (sleep mode)...${NC}"
+        sleep 1
+        exec /usr/bin/system-shutdown suspend
+    fi
+
+    rm -f "$ERR_FILE"
+    echo -e "${GREEN}[RezzOS] System resumed from hibernation.${NC}"
+    exit 0
+fi
+
+########################################
+# POWEROFF / REBOOT
+########################################
+echo -e "${COLOR}==> Stopping running services...${NC}"
+if [ -d /etc/runit/runsvdir/default ]; then
+    for s in /etc/runit/runsvdir/default/*; do
+        if [ -d "$s" ]; then
+            svc_name=$(basename "$s")
+            echo -e "  - Stopping service: ${svc_name}"
+            sv stop "$s" 2>/dev/null || true
+        fi
+    done
+fi
+
+echo -e "${COLOR}==> Terminating background processes...${NC}"
+if command -v killall5 >/dev/null 2>&1; then
+    killall5 -o 1 -15 2>/dev/null || true
+    sleep 1
+    killall5 -o 1 -9 2>/dev/null || true
+fi
+
+echo -e "${COLOR}==> Flushing disk caches (sync)...${NC}"
+sync
+
+echo -e "${COLOR}==> Deactivating swap memory...${NC}"
+swapoff -a 2>/dev/null || true
+
+echo -e "${COLOR}==> Unmounting filesystems...${NC}"
+umount -a -r 2>/dev/null || true
+
+sleep 1
+
+if [ "$MODE" = "reboot" ]; then
+    echo -e "${GREEN}[RezzOS] System rebooting now...${NC}"
+    if [ -x /bin/busybox ]; then
+        exec /bin/busybox reboot -f
+    else
+        exec reboot -f
+    fi
+else
+    echo -e "${GREEN}[RezzOS] System halted. Power off.${NC}"
+    if [ -x /bin/busybox ]; then
+        exec /bin/busybox poweroff -f
+    else
+        exec poweroff -f
+    fi
+fi
