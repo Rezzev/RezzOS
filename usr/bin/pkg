@@ -4,9 +4,12 @@ PKG_DIR="/mnt/disk/packages"
 INSTALLED_LIST="$PKG_DIR/installed.list"
 [ -d "$PKG_DIR" ] || INSTALLED_LIST="/var/log/installed.list"
 
-REPO_MAIN="https://dl-cdn.alpinelinux.org/alpine/v3.20/main/x86_64"
-REPO_COMMUNITY="https://dl-cdn.alpinelinux.org/alpine/v3.20/community/x86_64"
+ALPINE_VER="v3.20"
+ARCH="x86_64"
+REPO_MAIN="https://dl-cdn.alpinelinux.org/alpine/${ALPINE_VER}/main/${ARCH}"
+REPO_COMMUNITY="https://dl-cdn.alpinelinux.org/alpine/${ALPINE_VER}/community/${ARCH}"
 
+BLUE='\033[0;34m'
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
@@ -15,7 +18,14 @@ NC='\033[0m'
 mkdir -p "$CACHE_DIR" /tmp/pkg 2>/dev/null
 
 usage() {
-    echo "Usage: pkg <update|install|search|list|remove> [package]"
+    echo -e "${BLUE}=== RezzOS Package Manager (pkg) ===${NC}"
+    echo "Usage:"
+    echo "  pkg update                 - Refresh package indexes"
+    echo "  pkg install <package>      - Install package"
+    echo "  pkg search <query>         - Search for packages"
+    echo "  pkg info <package>         - Show package details"
+    echo "  pkg list                   - List installed packages"
+    echo "  pkg remove <package>       - Remove package"
 }
 
 update_index() {
@@ -43,6 +53,15 @@ search_pkg() {
     for idx in "$CACHE_DIR/APKINDEX_main" "$CACHE_DIR/APKINDEX_community"; do
         [ -f "$idx" ] || continue
         grep -i "P:$1" "$idx" | sed 's/P://'
+    done
+}
+
+info_pkg() {
+    NAME="$1"
+    [ -z "$NAME" ] && echo "Specify package" && return 1
+    for idx in "$CACHE_DIR/APKINDEX_main" "$CACHE_DIR/APKINDEX_community"; do
+        [ -f "$idx" ] || continue
+        grep -A10 "P:$NAME$" "$idx" | head -10
     done
 }
 
@@ -132,6 +151,7 @@ case "$1" in
     update)  update_index ;;
     install) install_pkg "$2" ;;
     search)  search_pkg "$2" ;;
+    info)    info_pkg "$2" ;;
     list)    cat "$INSTALLED_LIST" 2>/dev/null || echo "No packages" ;;
     remove)  remove_pkg "$2" ;;
     *)       usage ;;
