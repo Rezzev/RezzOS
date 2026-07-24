@@ -51,16 +51,17 @@ For NixOS:
 ./nixshell-run.sh
 ```
 To build, you must have the dependencies installed.( dependencies in /docs/build dependencies.md)
+
 It will automatically download sources, compile the kernel and BusyBox, assemble the rootfs, and create a disk image.
 
 ## Networking
 
 **QEMU (virtual machine):**
-Network is pre-configured with static IP:
-- IP: 10.0.2.15
-- Gateway: 10.0.2.2
-- DNS: 8.8.8.8
-
+```bash
+ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up
+route add default gw 10.0.2.2
+echo "nameserver 8.8.8.8" > /etc/resolv.conf
+```
 **Real hardware:**
 DHCP is used automatically. If network doesn't work:
 ```bash
