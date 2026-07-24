@@ -28,7 +28,7 @@ usage() {
     echo "  pkg search <query>         - Search for available packages"
     echo "  pkg info <package>         - Show detailed info about a package"
     echo "  pkg list                   - List installed packages"
-    echo "  pkg remove <package>       - Remove installed package record"
+    echo "  pkg remove <package>       - Uninstall package and remove files from disk"
 }
 
 update_index() {
@@ -246,11 +246,59 @@ remove_pkg() {
         echo "Please specify a package to remove."
         return 1
     fi
-    if [ -f "$INSTALLED_LIST" ]; then
-        sed -i "/${PKG_NAME}/d" "$INSTALLED_LIST"
-        echo -e "${GREEN}Removed ${PKG_NAME} from installed packages list.${NC}"
-    else
-        echo "No installed package record found."
+
+    PKG_BASE=$(echo "$PKG_NAME" | sed 's/\.apk$//')
+
+    found_apks=""
+    if [ -d "$PKG_DIR" ]; then
+        for f in "$PKG_DIR/${PKG_BASE}.apk" "$PKG_DIR/${PKG_BASE}"-[0-9]*.apk "$PKG_DIR/${PKG_BASE}"; do
+            if [ -f "$f" ]; then
+                found_apks="$found_apks $f"
+            fi
+        done
+    fi
+
+    removed_any=0
+
+    for apk_file in $found_apks; do
+        [ -f "$apk_file" ] || continue
+        echo -e "${YELLOW}Removing installed files for $(basename "$apk_file")...${NC}"
+        
+        for item in $(tar -tzf "$apk_file" 2>/dev/null || tar -tf "$apk_file" 2>/dev/null); do
+            clean_item=$(echo "$item" | sed 's/^\.\///; s/^\///')
+            case "$clean_item" in
+                .PKGINFO*|.SIGN*|.DIR*|"") continue ;;
+            esac
+            
+            target="/$clean_item"
+            if [ -f "$target" ] || [ -L "$target" ]; then
+                rm -f "$target"
+            fi
+        done
+
+        apk_filename=$(basename "$apk_file")
+        rm -f "$apk_file"
+
+        if [ -f "$INSTALLED_LIST" ]; then
+            sed -i "/^${apk_filename}$/d" "$INSTALLED_LIST"
+            sed -i "/^${PKG_BASE}$/d" "$INSTALLED_LIST"
+        fi
+
+        removed_any=1
+        echo -e "${GREEN}Successfully removed ${apk_filename} and deleted saved package from disk.${NC}"
+    done
+
+    if [ "$removed_any" -eq 0 ]; then
+        if [ -f "$INSTALLED_LIST" ] && grep -q -E "^(${PKG_BASE}|${PKG_BASE}-[0-9].*)$" "$INSTALLED_LIST" 2>/dev/null; then
+            sed -i "/^${PKG_BASE}/d" "$INSTALLED_LIST"
+            echo -e "${GREEN}Removed ${PKG_BASE} from installed packages record.${NC}"
+            removed_any=1
+        fi
+    fi
+
+    if [ "$removed_any" -eq 0 ]; then
+        echo -e "${RED}Package '$PKG_NAME' is not installed.${NC}"
+        return 1
     fi
 }
 

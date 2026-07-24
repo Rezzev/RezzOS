@@ -5,6 +5,7 @@
 | `pkg search <name>` | Search for packages |
 | `pkg list` | List installed packages |
 | `pkg upgrade` | Upgrade all packages |
+| `pkg remove <name>` | Remove package |
 | `pkg info <name>` | Package information |
 
 ## Services (runit)
