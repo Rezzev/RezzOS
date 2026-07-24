@@ -84,8 +84,8 @@ To get launched, use ./start.sh or start-gui.sh
 Thanks to all contributors who help improve RezzOS!
 
 - [@neko_qt](https://github.com/neko-qt) — improved build system, added runit support, fixed init script, auto-download sources
+- [@Kenyka kenykovich](https://github.com/keeniGithub) - terminal history, fetch, added rezzmon system monitor, swap manager, pkg remove and shell profile
 - [@wqreloxz](https://github.com/wqreloxz) - update init
-- [@Kenyka kenykovich](https://github.com/keeniGithub) - terminal history, fetch
 - [@valtrynx](https://github.com/d1mazaurus7) - TUI Installer developer
 
 ## License
