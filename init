@@ -11,7 +11,7 @@ echo 0 > /proc/sys/kernel/printk
 # Create group and user safely
 if ! grep -q "^user:" /etc/passwd 2>/dev/null; then
     echo "user:x:1000:" >> /etc/group
-    echo "user:x:1000:1000:User:/home/user:/bin/sh" >> /etc/passwd
+    echo "user:x:1000:1000:User:/home/user:/bin/bash" >> /etc/passwd
     mkdir -p /home/user
     chown -R 1000:1000 /home/user
 fi
