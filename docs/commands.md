@@ -16,9 +16,17 @@
 | `rsv down <name>` | Stop service |
 | `rsv restart <name>` | Restart service |
 
+## System & Monitoring
+| Command | Description |
+|---------|----------|
+| `rezzfetch` | System info banner & specs |
+| `rezzmon` | System resource monitor (CPU, RAM, Disks, Net) |
+| `rezzmon watch` | Live updating resource monitor |
+
 ## Development
 | Command | Description |
 |---------|----------|
 | `tcc <file.c>` | Compile C code |
 | `lua5.3 <file.lua>` | Run Lua script |
 | `make` | Build projects |
+

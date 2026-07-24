@@ -1,0 +1,158 @@
+#!/bin/sh
+# RezzOS System Monitor (rezzmon)
+
+BOLD='\033[1m'
+RED='\033[1;31m'
+GREEN='\033[1;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[1;34m'
+MAGENTA='\033[1;35m'
+CYAN='\033[1;36m'
+WHITE='\033[1;37m'
+NC='\033[0m'
+
+draw_bar() {
+    pct=$1
+    width=${2:-20}
+    
+    [ -z "$pct" ] && pct=0
+    [ "$pct" -gt 100 ] && pct=100
+    [ "$pct" -lt 0 ] && pct=0
+
+    filled=$(( (pct * width) / 100 ))
+    empty=$(( width - filled ))
+
+    bar=""
+    i=0
+    while [ $i -lt $filled ]; do
+        bar="${bar}█"
+        i=$((i + 1))
+    done
+    i=0
+    while [ $i -lt $empty ]; do
+        bar="${bar}░"
+        i=$((i + 1))
+    done
+
+    color="$GREEN"
+    if [ "$pct" -ge 85 ]; then
+        color="$RED"
+    elif [ "$pct" -ge 60 ]; then
+        color="$YELLOW"
+    fi
+
+    printf "${color}[%s]${NC} %3d%%" "$bar" "$pct"
+}
+
+render() {
+    clear
+    echo -e "${CYAN}${BOLD}=== RezzOS System Monitor (rezzmon) ===${NC}"
+    echo -e "${WHITE}Host:${NC} $(hostname 2>/dev/null || echo rezzos) | ${WHITE}Kernel:${NC} $(uname -r) (${CYAN}$(uname -m)${NC}) | ${WHITE}Time:${NC} $(date +'%H:%M:%S' 2>/dev/null || echo --:--:--)"
+    
+    UPTIME=$(awk '{print int($1/3600)"h "int(($1%3600)/60)"m "int($1%60)"s"}' /proc/uptime 2>/dev/null || uptime 2>/dev/null)
+    echo -e "${WHITE}Uptime:${NC} $UPTIME"
+    echo -e "${BLUE}-------------------------------------------------------------${NC}"
+
+    # CPU Section
+    CPU_MODEL=$(awk -F': ' '/model name/ {print $2; exit}' /proc/cpuinfo 2>/dev/null | sed 's/  */ /g')
+    [ -z "$CPU_MODEL" ] && CPU_MODEL="Generic CPU"
+    CPU_CORES=$(grep -c '^processor' /proc/cpuinfo 2>/dev/null || echo 1)
+    [ "$CPU_CORES" -eq 0 ] && CPU_CORES=1
+    LOADAVG=$(cat /proc/loadavg 2>/dev/null | awk '{print $1", "$2", "$3}')
+    LOAD_1=$(cat /proc/loadavg 2>/dev/null | awk '{print $1}')
+    
+    # Estimate CPU % from load average
+    CPU_PCT=0
+    if [ -n "$LOAD_1" ]; then
+        CPU_PCT=$(awk -v ld="$LOAD_1" -v cores="$CPU_CORES" 'BEGIN { pct=int((ld/cores)*100); if(pct>100) pct=100; print pct }')
+    fi
+
+    echo -e "${BOLD}${MAGENTA}CPU:${NC} $CPU_MODEL (${CYAN}${CPU_CORES} core(s)${NC})"
+    echo -n "  Load: ($LOADAVG) -> "
+    draw_bar "$CPU_PCT" 20
+    echo ""
+
+    # Memory Section
+    MEM_TOTAL=$(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null)
+    MEM_FREE=$(awk '/MemFree/ {print $2}' /proc/meminfo 2>/dev/null)
+    BUFFERS=$(awk '/Buffers/ {print $2}' /proc/meminfo 2>/dev/null)
+    CACHED=$(awk '/Cached/ {print $2}' /proc/meminfo 2>/dev/null)
+    [ -z "$BUFFERS" ] && BUFFERS=0
+    [ -z "$CACHED" ] && CACHED=0
+    
+    MEM_AVAIL=$(awk '/MemAvailable/ {print $2}' /proc/meminfo 2>/dev/null)
+    if [ -z "$MEM_AVAIL" ] && [ -n "$MEM_FREE" ]; then
+        MEM_AVAIL=$(( MEM_FREE + BUFFERS + CACHED ))
+    fi
+
+    if [ -n "$MEM_TOTAL" ] && [ "$MEM_TOTAL" -gt 0 ]; then
+        MEM_USED=$(( MEM_TOTAL - MEM_AVAIL ))
+        MEM_PCT=$(( (MEM_USED * 100) / MEM_TOTAL ))
+        
+        MEM_USED_MB=$(( MEM_USED / 1024 ))
+        MEM_TOTAL_MB=$(( MEM_TOTAL / 1024 ))
+        
+        echo -e "\n${BOLD}${GREEN}RAM Memory:${NC}"
+        echo -n "  Usage: ${MEM_USED_MB} MB / ${MEM_TOTAL_MB} MB -> "
+        draw_bar "$MEM_PCT" 20
+        echo ""
+    fi
+
+    # Swap Section
+    SWAP_TOTAL=$(awk '/SwapTotal/ {print $2}' /proc/meminfo 2>/dev/null)
+    SWAP_FREE=$(awk '/SwapFree/ {print $2}' /proc/meminfo 2>/dev/null)
+    if [ -n "$SWAP_TOTAL" ] && [ "$SWAP_TOTAL" -gt 0 ]; then
+        SWAP_USED=$(( SWAP_TOTAL - SWAP_FREE ))
+        SWAP_PCT=$(( (SWAP_USED * 100) / SWAP_TOTAL ))
+        SWAP_USED_MB=$(( SWAP_USED / 1024 ))
+        SWAP_TOTAL_MB=$(( SWAP_TOTAL / 1024 ))
+        echo -e "${BOLD}${YELLOW}Swap Memory:${NC}"
+        echo -n "  Usage: ${SWAP_USED_MB} MB / ${SWAP_TOTAL_MB} MB -> "
+        draw_bar "$SWAP_PCT" 20
+        echo ""
+    else
+        echo -e "${BOLD}${YELLOW}Swap Memory:${NC} Disabled"
+    fi
+
+    echo -e "${BLUE}-------------------------------------------------------------${NC}"
+
+    # Disk Section
+    echo -e "${BOLD}${CYAN}Disk Storage:${NC}"
+    df -h / /mnt/disk 2>/dev/null | awk '
+        NR==1 { printf "  %-12s %-8s %-8s %-8s %-6s\n", "Mount", "Size", "Used", "Avail", "Use%" }
+        NR>1 { printf "  %-12s %-8s %-8s %-8s %-6s\n", $6, $2, $3, $4, $5 }
+    '
+
+    echo -e "${BLUE}-------------------------------------------------------------${NC}"
+
+    # Network Section
+    echo -e "${BOLD}${YELLOW}Network Interfaces:${NC}"
+    if [ -f /proc/net/dev ]; then
+        awk 'NR>2 {
+            if ($1 != "lo:") {
+                gsub(":", "", $1)
+                printf "  %-10s RX: %-10s TX: %-10s\n", $1, $2" B", $10" B"
+            }
+        }' /proc/net/dev
+    fi
+
+    echo -e "${BLUE}-------------------------------------------------------------${NC}"
+
+    # Top processes
+    echo -e "${BOLD}${WHITE}Active Processes (Top 5):${NC}"
+    ps aux 2>/dev/null | head -n 6 || ps 2>/dev/null | head -n 6
+
+    echo -e "${BLUE}-------------------------------------------------------------${NC}"
+}
+
+if [ "$1" = "-w" ] || [ "$1" = "--watch" ] || [ "$1" = "watch" ]; then
+    trap 'echo -e "\n${NC}Exiting rezzmon."; exit 0' INT TERM
+    while true; do
+        render
+        echo -e "${WHITE}Press Ctrl+C to exit watch mode (Refreshing every 2s)...${NC}"
+        sleep 2
+    done
+else
+    render
+    echo -e "Tip: Run ${CYAN}rezzmon watch${NC} for live continuous updating."
+fi
