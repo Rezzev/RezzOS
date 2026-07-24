@@ -107,14 +107,32 @@ CONFIG_HIBERNATION=y
 CONFIG_HIBERNATION_SNAPSHOT_DEV=y
 CONFIG_ACPI=y
 CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT=y
+CONFIG_FONT_SUPPORT=y
+# CONFIG_FONT_AUTOSELECT is not set
+CONFIG_FONT_8x16=y
+CONFIG_FONT_8x8=y
+CONFIG_FONT_6x11=y
+CONFIG_FONT_7x14=y
+CONFIG_FONT_PEARL_8x8=y
+CONFIG_FONT_ACORN_8x8=y
+CONFIG_FONT_MINI_4x6=y
+CONFIG_FONT_6x10=y
+CONFIG_FONT_10x18=y
+CONFIG_FONT_SUN8x16=y
+CONFIG_FONT_SUN12x22=y
+CONFIG_FONT_TER16x32=y
+CONFIG_FONT_6x8=y
+CONFIG_FRAMEBUFFER_CONSOLE=y
+CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
 KCONF
-    yes "" | make oldconfig
+    make olddefconfig
     make -j"$JOBS"
     cp arch/x86/boot/bzImage "$REPO_DIR/bzImage"
     cd "$REPO_DIR"
 fi
 
 step "Assembling rootfs"
+rm -f "$ROOTFS_DIR/usr/bin/font" "$ROOTFS_DIR/usr/bin/rezzfont" "$ROOTFS_DIR/bin/font" "$ROOTFS_DIR/bin/rezzfont" 2>/dev/null || true
 cp -r etc "$ROOTFS_DIR/"
 cp -r usr "$ROOTFS_DIR/"
 [ -d root ] && cp -r root "$ROOTFS_DIR/" || true
@@ -193,8 +211,15 @@ chmod +x "$ROOTFS_DIR/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/etc/runit/3" 2>/dev/null || true
 
 # Re-copy repository custom scripts to ensure they overwrite package defaults
+rm -f "$ROOTFS_DIR/usr/bin/font" "$ROOTFS_DIR/usr/bin/rezzfont" "$ROOTFS_DIR/bin/font" "$ROOTFS_DIR/bin/rezzfont" 2>/dev/null || true
 cp -r "$REPO_DIR/usr/"* "$ROOTFS_DIR/usr/" 2>/dev/null || true
 cp -r "$REPO_DIR/etc/"* "$ROOTFS_DIR/etc/" 2>/dev/null || true
+
+# Compile setconsolefont helper if C source exists
+if [ -f "$REPO_DIR/usr/bin/setconsolefont.c" ]; then
+    gcc -O2 "$REPO_DIR/usr/bin/setconsolefont.c" -o "$ROOTFS_DIR/usr/bin/setconsolefont" 2>/dev/null || true
+fi
+
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 
 # Ensure editor executable symlinks exist
@@ -204,6 +229,11 @@ if [ -f "$ROOTFS_DIR/usr/bin/neatvi" ]; then
     ln -sf /usr/bin/neatvi "$ROOTFS_DIR/bin/vi" 2>/dev/null || true
     ln -sf /usr/bin/neatvi "$ROOTFS_DIR/usr/bin/vi" 2>/dev/null || true
 fi
+
+# Ensure font management tool symlinks exist
+[ -f "$ROOTFS_DIR/usr/bin/font" ] && ln -sf /usr/bin/font "$ROOTFS_DIR/bin/font" 2>/dev/null || true
+[ -f "$ROOTFS_DIR/usr/bin/font" ] && ln -sf /usr/bin/font "$ROOTFS_DIR/usr/bin/rezzfont" 2>/dev/null || true
+[ -f "$ROOTFS_DIR/usr/bin/font" ] && ln -sf /usr/bin/font "$ROOTFS_DIR/bin/rezzfont" 2>/dev/null || true
 
 # Ensure power management command symlinks exist across sbin and bin
 ln -sf /usr/bin/shutdown "$ROOTFS_DIR/sbin/shutdown" 2>/dev/null || true

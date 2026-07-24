@@ -11,6 +11,7 @@ RezzOS/
 │       ├── ghget         # File downloader
 │       ├── rsv           # Runit service manager
 │       ├── fetch         # System info
+│       ├── font          # Console font manager
 │
 ├── etc/                  # System configuration
 │   ├── profile           # Shell settings

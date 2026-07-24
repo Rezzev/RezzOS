@@ -26,6 +26,21 @@ echo "nameserver 8.8.8.8" > /etc/resolv.conf
 mkdir -p /mnt/disk
 mount /dev/vda /mnt/disk 2>/dev/null
 
+# Restore persistent font configuration
+if [ -f /mnt/disk/font.conf ]; then
+    cp /mnt/disk/font.conf /etc/font.conf 2>/dev/null || true
+    
+    FONT=$(grep -o 'FONT=[^ ]*' /etc/font.conf | cut -d= -f2)
+    if [ -n "$FONT" ]; then
+        if [ -w /sys/module/fbcon/parameters/font ]; then
+            echo "$FONT" > /sys/module/fbcon/parameters/font 2>/dev/null || true
+        fi
+        if [ -x /usr/bin/setconsolefont ]; then
+            /usr/bin/setconsolefont "$FONT" 2>/dev/null || true
+        fi
+    fi
+fi
+
 # Enable swap if present on disk
 if [ -f /mnt/disk/swapfile ]; then
     swapon /mnt/disk/swapfile 2>/dev/null || true
