@@ -1,8 +1,45 @@
-export TERM="${TERM:-linux}"
-export PATH=/sbin:/bin:/usr/bin:/usr/sbin
+# /etc/profile - RezzOS Environment & Shell Configuration
+
+export TERM="${TERM:-xterm-256color}"
+export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
 export LD_LIBRARY_PATH=/lib:/usr/lib
 export INPUTRC=/etc/inputrc
-export HISTFILE=/root/.bash_history
+export EDITOR=nano
+export PAGER=less
+
+# History Settings
+export HISTFILE="${HOME:-/root}/.bash_history"
 export HISTSIZE=10000
-export HISTFILESIZE=10000
-export PS1='\u@\h:\w\$ '
+export HISTFILESIZE=20000
+export HISTCONTROL=ignoreboth:erasedups
+
+# Colors for ls, grep, diff
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'
+alias egrep='egrep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias diff='diff --color=auto'
+
+# RezzOS Custom Aliases
+alias ll='ls -lAh'
+alias la='ls -A'
+alias l='ls -CF'
+alias c='clear'
+alias status='rsv list'
+alias mon='rezzmon'
+alias sysmon='rezzmon'
+alias fetch='rezzfetch'
+
+# Dynamic Prompt (PS1) with Colors
+if [ "$(id -u 2>/dev/null)" -eq 0 ]; then
+    # Root Prompt (Red)
+    export PS1='\[\033[1;31m\]\u@\h\[\033[0m\]:\[\033[1;34m\]\w\[\033[0m\]\[\033[1;31m\]#\[\033[0m\] '
+else
+    # User Prompt (Green)
+    export PS1='\[\033[1;32m\]\u@\h\[\033[0m\]:\[\033[1;34m\]\w\[\033[0m\]\[\033[1;32m\]\$\[\033[0m\] '
+fi
+
+# Auto-Welcome Banner for Interactive Login Shells
+if [ -t 0 ]; then
+    rezzfetch 2>/dev/null
+fi
