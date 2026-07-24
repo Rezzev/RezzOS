@@ -22,6 +22,8 @@
 | `rezzfetch` | System info banner & specs |
 | `rezzmon` | System resource monitor (CPU, RAM, Disks, Net) |
 | `rezzmon watch` | Live updating resource monitor |
+| `swap create [size]` | Create & activate swap file on persistent disk |
+| `swap status` | Check swap memory status |
 
 ## Development
 | Command | Description |

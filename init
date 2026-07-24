@@ -26,6 +26,11 @@ echo "nameserver 8.8.8.8" > /etc/resolv.conf
 mkdir -p /mnt/disk
 mount /dev/vda /mnt/disk 2>/dev/null
 
+# Enable swap if present on disk
+if [ -f /mnt/disk/swapfile ]; then
+    swapon /mnt/disk/swapfile 2>/dev/null || true
+fi
+
 # Restore packages from disk
 if [ -d /mnt/disk/packages ]; then
     mkdir -p /tmp/pkg
