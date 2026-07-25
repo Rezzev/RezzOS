@@ -1,0 +1,15 @@
+# /etc/sudoers - Sudoers configuration for RezzOS
+
+# Defaults
+Defaults env_keep += "PATH PS1 INPUTRC EDITOR PAGER TERM"
+Defaults secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# User privilege specification
+root ALL=(ALL:ALL) ALL
+user ALL=(ALL:ALL) NOPASSWD: ALL
+
+# Group privilege specification
+%wheel ALL=(ALL:ALL) NOPASSWD: ALL
+
+# Include files from /etc/sudoers.d
+#includedir /etc/sudoers.d
