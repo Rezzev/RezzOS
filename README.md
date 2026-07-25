@@ -99,6 +99,7 @@ Thanks to all contributors who help improve RezzOS!
 - [@Kenyka kenykovich](https://github.com/keeniGithub) - terminal history, fetch, added rezzmon system monitor, swap manager, pkg remove and shell profile
 - [@wqreloxz](https://github.com/wqreloxz) - update init
 - [@valtrynx](https://github.com/d1mazaurus7) - TUI Installer developer
+- [@TOPDATOP](https://github.com/topdatop01) - Add iwd and dhcpcd for wireless support
 
 ## License
 GNU General Public License v3.0
