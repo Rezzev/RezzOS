@@ -51,16 +51,16 @@ update_index() {
 search_pkg() {
     echo -e "${YELLOW}Searching for '$1'...${NC}"
     for idx in "$CACHE_DIR/APKINDEX_main" "$CACHE_DIR/APKINDEX_community"; do
-        [ -f "$idx" ] || continue
+        test -f "$idx" || continue
         grep -i "P:$1" "$idx" | sed 's/P://'
     done
 }
 
 info_pkg() {
     NAME="$1"
-    [ -z "$NAME" ] && echo "Specify package" && return 1
+    test -z "$NAME" && echo "Specify package" && return 1
     for idx in "$CACHE_DIR/APKINDEX_main" "$CACHE_DIR/APKINDEX_community"; do
-        [ -f "$idx" ] || continue
+        test -f "$idx" || continue
         grep -A10 "P:$NAME$" "$idx" | head -10
     done
 }
@@ -68,9 +68,9 @@ info_pkg() {
 find_pkg() {
     NAME="$1"
     for idx in "$CACHE_DIR/APKINDEX_main" "$CACHE_DIR/APKINDEX_community"; do
-        [ -f "$idx" ] || continue
+        test -f "$idx" || continue
         VER=$(grep -A1 "P:$NAME$" "$idx" | grep "^V:" | head -1 | sed 's/V://')
-        if [ -n "$VER" ]; then
+        if test -n "$VER"; then
             echo "${NAME}-${VER}.apk"
             return 0
         fi
@@ -79,80 +79,89 @@ find_pkg() {
 }
 
 install_pkg() {
-    PKG="$1"
-    [ -z "$PKG" ] && usage && return 1
-    
-    if echo "$PKG" | grep -q "\.apk$"; then
-        APK="$PKG"
-    else
-        APK=$(find_pkg "$PKG")
-    fi
-    
-    [ -z "$APK" ] && echo -e "${RED}Not found: $PKG${NC}" && return 1
-    
-    echo -e "${YELLOW}Installing $APK...${NC}"
-    mkdir -p "$PKG_DIR" /tmp/pkg_dl
-    
-    wget -q --no-check-certificate "$REPO_MAIN/$APK" -O "/tmp/pkg_dl/$APK" 2>/dev/null || \
-    wget -q --no-check-certificate "$REPO_COMMUNITY/$APK" -O "/tmp/pkg_dl/$APK" 2>/dev/null
-    
-    if [ ! -s "/tmp/pkg_dl/$APK" ]; then
-        echo -e "${RED}Download failed${NC}"
-        return 1
-    fi
-    
-    cd /tmp && rm -rf /tmp/pkg_extract && mkdir -p /tmp/pkg_extract
-    cd /tmp/pkg_extract
-    tar -xzf "/tmp/pkg_dl/$APK" 2>/dev/null
-    
-    [ -d usr ] && cp -r usr/* /usr/ 2>/dev/null
-    [ -d bin ] && cp -r bin/* /bin/ 2>/dev/null
-    [ -d lib ] && cp -r lib/* /lib/ 2>/dev/null
-    
-    cp "/tmp/pkg_dl/$APK" "$PKG_DIR/"
-    echo "$APK" >> "$INSTALLED_LIST"
-    echo -e "${GREEN}Done: $APK${NC}"
+    test -z "$1" && usage && return 1
+
+    for PKG in "$@"; do
+        if echo "$PKG" | grep -q "\.apk$"; then
+            APK="$PKG"
+        else
+            APK=$(find_pkg "$PKG")
+        fi
+
+        if test -z "$APK"; then
+            echo -e "${RED}Not found: $PKG${NC}"
+            continue
+        fi
+
+        echo -e "${YELLOW}Installing $APK...${NC}"
+        mkdir -p "$PKG_DIR" /tmp/pkg_dl
+
+        wget -q --no-check-certificate "$REPO_MAIN/$APK" -O "/tmp/pkg_dl/$APK" 2>/dev/null || \
+        wget -q --no-check-certificate "$REPO_COMMUNITY/$APK" -O "/tmp/pkg_dl/$APK" 2>/dev/null
+
+        if test ! -s "/tmp/pkg_dl/$APK"; then
+            echo -e "${RED}Download failed for $APK${NC}"
+            continue
+        fi
+
+        cd /tmp && rm -rf /tmp/pkg_extract && mkdir -p /tmp/pkg_extract
+        cd /tmp/pkg_extract
+        tar -xzf "/tmp/pkg_dl/$APK" 2>/dev/null
+
+        test -d usr && cp -r usr/* /usr/ 2>/dev/null
+        test -d bin && cp -r bin/* /bin/ 2>/dev/null
+        test -d lib && cp -r lib/* /lib/ 2>/dev/null
+
+        cp "/tmp/pkg_dl/$APK" "$PKG_DIR/"
+        echo "$APK" >> "$INSTALLED_LIST"
+        echo -e "${GREEN}Done: $APK${NC}"
+    done
 }
 
 remove_pkg() {
-    PKG="$1"
-    [ -z "$PKG" ] && echo "Specify package" && return 1
-    
-    if echo "$PKG" | grep -q "\.apk$"; then
-        APK="$PKG"
-    else
-        APK=$(grep "^${PKG}-" "$INSTALLED_LIST" 2>/dev/null | head -1)
-    fi
-    
-    [ -z "$APK" ] && echo -e "${RED}Not installed: $PKG${NC}" && return 1
-    
-    APK_FILE="$PKG_DIR/$APK"
-    if [ ! -f "$APK_FILE" ]; then
-        echo -e "${RED}Package file not found: $APK${NC}"
-        sed -i "/^${APK}$/d" "$INSTALLED_LIST" 2>/dev/null
-        return 1
-    fi
-    
-    echo -e "${YELLOW}Removing $APK...${NC}"
-    
-    for file in $(tar -tzf "$APK_FILE" 2>/dev/null); do
-        target="/$file"
-        if [ -f "$target" ] || [ -L "$target" ]; then
-            rm -f "$target"
+    test -z "$1" && echo "Specify package" && return 1
+
+    for PKG in "$@"; do
+        if echo "$PKG" | grep -q "\.apk$"; then
+            APK="$PKG"
+        else
+            APK=$(grep "^${PKG}-" "$INSTALLED_LIST" 2>/dev/null | head -1)
         fi
+
+        if test -z "$APK"; then
+            echo -e "${RED}Not installed: $PKG${NC}"
+            continue
+        fi
+
+        APK_FILE="$PKG_DIR/$APK"
+        if test ! -f "$APK_FILE"; then
+            echo -e "${RED}Package file not found: $APK${NC}"
+            sed -i "/^${APK}$/d" "$INSTALLED_LIST" 2>/dev/null
+            continue
+        fi
+
+        echo -e "${YELLOW}Removing $APK...${NC}"
+
+        for file in $(tar -tzf "$APK_FILE" 2>/dev/null); do
+            target="/$file"
+            if test -f "$target" || test -L "$target"; then
+                rm -f "$target"
+            fi
+        done
+
+        rm -f "$APK_FILE"
+        sed -i "/^${APK}$/d" "$INSTALLED_LIST" 2>/dev/null
+        echo -e "${GREEN}Removed: $APK${NC}"
     done
-    
-    rm -f "$APK_FILE"
-    sed -i "/^${APK}$/d" "$INSTALLED_LIST" 2>/dev/null
-    echo -e "${GREEN}Removed: $APK${NC}"
 }
 
-case "$1" in
+CMD="$1"
+case "$CMD" in
     update)  update_index ;;
-    install) install_pkg "$2" ;;
+    install) test -z "$2" && usage || { shift; install_pkg "$@"; } ;;
     search)  search_pkg "$2" ;;
     info)    info_pkg "$2" ;;
     list)    cat "$INSTALLED_LIST" 2>/dev/null || echo "No packages" ;;
-    remove)  remove_pkg "$2" ;;
+    remove)  test -z "$2" && echo "Specify package" || { shift; remove_pkg "$@"; } ;;
     *)       usage ;;
 esac
