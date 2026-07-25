@@ -172,7 +172,7 @@ for pkg in $MAIN_PACKAGES; do
     [ -d etc ] && cp -r etc/* "$ROOTFS_DIR/etc/" 2>/dev/null || true
 done
 
-COMMUNITY_PACKAGES="runit-2.1.2-r7.apk neatvi-15-r0.apk sudo-1.9.15_p5-r0.apk"
+COMMUNITY_PACKAGES="runit-2.1.2-r7.apk neatvi-15-r0.apk sudo-1.9.15_p5-r0.apk iwd-2.18-r0.apk dhcpcd-10.0.8-r0.apk""
 for pkg in $COMMUNITY_PACKAGES; do
     if [ ! -s "$CACHE_DIR/$pkg" ]; then
         rm -f "$CACHE_DIR/$pkg"
@@ -257,6 +257,11 @@ ln -sf /usr/bin/reboot "$ROOTFS_DIR/bin/reboot" 2>/dev/null || true
 ln -sf /usr/bin/hibernate "$ROOTFS_DIR/bin/hibernate" 2>/dev/null || true
 ln -sf /usr/bin/suspend "$ROOTFS_DIR/bin/suspend" 2>/dev/null || true
 ln -sf /usr/bin/poweroff "$ROOTFS_DIR/bin/halt" 2>/dev/null || true
+
+echo "Starting iwd and dhcpcd at boot..." >> "$ROOTFS_DIR/etc/init.d/rcS"
+echo "/usr/lib/iwd/iwd &" >> "$ROOTFS_DIR/etc/init.d/rcS"
+echo "/usr/sbin/dhcpcd -b" >> "$ROOTFS_DIR/etc/init.d/rcS"
+chmod +x "$ROOTFS_DIR/etc/init.d/rcS"
 
 step "Packing rootfs.cpio.gz"
 cd "$ROOTFS_DIR"
