@@ -221,6 +221,7 @@ if [ -f "$REPO_DIR/usr/bin/setconsolefont.c" ]; then
 fi
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
+chmod +x "$ROOTFS_DIR/usr/share/udhcpc/default.script" 2>/dev/null || true
 
 # Ensure editor executable symlinks exist
 [ -f "$ROOTFS_DIR/usr/bin/nano" ] && ln -sf /usr/bin/nano "$ROOTFS_DIR/bin/nano" 2>/dev/null || true
