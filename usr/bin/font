@@ -1,0 +1,116 @@
+#!/bin/sh
+# RezzOS Font Management Utility
+
+FONT_CYAN="\033[1;36m"
+FONT_GREEN="\033[1;32m"
+FONT_YELLOW="\033[1;33m"
+FONT_RED="\033[1;31m"
+FONT_RESET="\033[0m"
+
+CONF_FILE="/etc/font.conf"
+
+show_help() {
+    echo -e "${FONT_CYAN}RezzOS Font Manager${FONT_RESET}"
+    echo "Usage:"
+    echo "  font list              - List all available system console fonts"
+    echo "  font set <FONT_NAME>   - Set the OS console font (e.g. font set SUN12x22)"
+    echo "  font current           - Show currently active font"
+    echo "  font help              - Show this help message"
+}
+
+list_fonts() {
+    echo -e "${FONT_CYAN}Available Kernel Console Fonts in RezzOS:${FONT_RESET}"
+    echo -e "  ${FONT_GREEN}TER16x32${FONT_RESET}   - Terminus 16x32 (Modern, High-DPI Crisp Font - DEFAULT)"
+    echo -e "  ${FONT_GREEN}SUN12x22${FONT_RESET}   - Sun 12x22 (Large Workstation Font)"
+    echo -e "  ${FONT_GREEN}10x18${FONT_RESET}      - 10x18 Console Font"
+    echo -e "  ${FONT_GREEN}7x14${FONT_RESET}       - 7x14 Compact Font"
+    echo -e "  ${FONT_GREEN}SUN8x16${FONT_RESET}    - Sun 8x16 Classic Font"
+    echo -e "  ${FONT_GREEN}VGA8x16${FONT_RESET}    - Standard VGA 8x16 Font"
+    echo -e "  ${FONT_GREEN}VGA8x8${FONT_RESET}     - Standard VGA 8x8 Font"
+    echo -e "  ${FONT_GREEN}6x11${FONT_RESET}       - Macintosh 6x11 Font"
+    echo -e "  ${FONT_GREEN}PEARL8x8${FONT_RESET}   - Pearl 8x8 Font"
+    echo -e "  ${FONT_GREEN}Acorn8x8${FONT_RESET}   - Acorn 8x8 Font"
+    echo -e "  ${FONT_GREEN}MINI4x6${FONT_RESET}    - Mini 4x6 Micro Font"
+}
+
+show_current() {
+    SAVED_FONT=""
+    if [ -f "$CONF_FILE" ]; then
+        SAVED_FONT=$(grep -o 'FONT=[^ ]*' "$CONF_FILE" 2>/dev/null | cut -d= -f2)
+    fi
+
+    SYS_FONT=""
+    if [ -f /sys/module/fbcon/parameters/font ]; then
+        SYS_FONT=$(cat /sys/module/fbcon/parameters/font 2>/dev/null)
+    fi
+
+    CMDLINE=$(cat /proc/cmdline 2>/dev/null)
+    BOOT_FONT=$(echo "$CMDLINE" | grep -o 'fbcon=font:[^ ]*' | cut -d: -f2)
+
+    CUR_FONT="${SYS_FONT:-${SAVED_FONT:-${BOOT_FONT:-TER16x32}}}"
+    echo -e "Current active console font: ${FONT_GREEN}${CUR_FONT}${FONT_RESET}"
+}
+
+set_font() {
+    TARGET_FONT="$1"
+    if [ -z "$TARGET_FONT" ]; then
+        echo -e "${FONT_RED}Error: Please specify a font name.${FONT_RESET}"
+        echo "Example: font set SUN12x22"
+        echo "Run 'font list' to see available fonts."
+        exit 1
+    fi
+
+    case "$TARGET_FONT" in
+        TER16x32|SUN12x22|10x18|7x14|SUN8x16|VGA8x16|VGA8x8|6x11|6x8|PEARL8x8|Acorn8x8|MINI4x6|ter16x32|sun12x22|sun8x16|vga8x16|vga8x8)
+            # Normalize case for standard kernel fonts
+            case "$TARGET_FONT" in
+                ter16x32) TARGET_FONT="TER16x32" ;;
+                sun12x22) TARGET_FONT="SUN12x22" ;;
+                sun8x16) TARGET_FONT="SUN8x16" ;;
+                vga8x16) TARGET_FONT="VGA8x16" ;;
+                vga8x8) TARGET_FONT="VGA8x8" ;;
+            esac
+
+            # Save configuration persistently inside OS and persistent disk
+            echo "FONT=$TARGET_FONT" > "$CONF_FILE" 2>/dev/null || true
+            if [ -d /mnt/disk ]; then
+                echo "FONT=$TARGET_FONT" > /mnt/disk/font.conf 2>/dev/null || true
+            fi
+            
+            # 1. Update sysfs parameter if supported by kernel module
+            if [ -w /sys/module/fbcon/parameters/font ]; then
+                echo "$TARGET_FONT" > /sys/module/fbcon/parameters/font 2>/dev/null || true
+            fi
+
+            # 2. Invoke setconsolefont helper ioctl
+            if [ -x /usr/bin/setconsolefont ]; then
+                /usr/bin/setconsolefont "$TARGET_FONT" 2>/dev/null || true
+            fi
+
+            clear 2>/dev/null || true
+
+            echo -e "${FONT_GREEN}Font successfully updated to $TARGET_FONT${FONT_RESET}"
+            echo -e "Saved system preference to $CONF_FILE"
+            ;;
+        *)
+            echo -e "${FONT_RED}Unknown font: '$TARGET_FONT'${FONT_RESET}"
+            echo "Run 'font list' to view all supported fonts."
+            exit 1
+            ;;
+    esac
+}
+
+case "$1" in
+    list)
+        list_fonts
+        ;;
+    set)
+        set_font "$2"
+        ;;
+    current|status)
+        show_current
+        ;;
+    help|*)
+        show_help
+        ;;
+esac

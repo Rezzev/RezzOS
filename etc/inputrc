@@ -28,3 +28,28 @@ set output-meta on
 "\e[H": beginning-of-line
 "\e[F": end-of-line
 "\e[3~": delete-char
+
+# Ctrl+Backspace / Alt+Backspace to delete previous word (like modern OSes)
+"\C-h": backward-kill-word
+"\C-w": backward-kill-word
+"\e\x7f": backward-kill-word
+"\e\b": backward-kill-word
+"\e\C-?": backward-kill-word
+"\e\C-h": backward-kill-word
+"\e[3;5~": backward-kill-word
+"\e[127;5u": backward-kill-word
+"\e[8;5~": backward-kill-word
+
+# Ctrl+Delete to delete next word
+"\e[3;5~": kill-word
+"\e[3;3~": kill-word
+
+# Ctrl+Left / Ctrl+Right to move cursor word by word
+"\e[1;5D": backward-word
+"\e[1;5C": forward-word
+"\e[5D": backward-word
+"\e[5C": forward-word
+"\e\e[D": backward-word
+"\e\e[C": forward-word
+"\e[1;3D": backward-word
+"\e[1;3C": forward-word

@@ -1,3 +1,11 @@
+## Power Management
+| Command | Description |
+|---------|----------|
+| `poweroff` | Shut down system cleanly |
+| `reboot` | Reboot system cleanly |
+| `hibernate` | Suspend system state to disk/RAM |
+| `shutdown [opts] [time]` | Multi-purpose system shutdown utility (`-h`, `-r`, `-z`, `now`) |
+
 ## Package Manager
 | Command | Description |
 |---------|----------|
@@ -25,10 +33,16 @@
 | `swap create [size]` | Create & activate swap file on persistent disk |
 | `swap status` | Check swap memory status |
 
+## Font & Display
+| Command | Description |
+|---------|----------|
+| `font list` | List all available built-in kernel console fonts |
+| `font set <name>` | Change OS font (e.g. `font set SUN12x22` or `font set TER16x32`) |
+| `font current` | Show currently active OS font |
+
 ## Development
 | Command | Description |
 |---------|----------|
 | `tcc <file.c>` | Compile C code |
 | `lua5.3 <file.lua>` | Run Lua script |
 | `make` | Build projects |
-

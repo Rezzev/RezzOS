@@ -100,14 +100,39 @@ CONFIG_FB_VESA=y
 CONFIG_DRM=y
 CONFIG_UNIX98_PTYS=y
 CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+CONFIG_PM=y
+CONFIG_PM_SLEEP=y
+CONFIG_SUSPEND=y
+CONFIG_HIBERNATION=y
+CONFIG_HIBERNATION_SNAPSHOT_DEV=y
+CONFIG_ACPI=y
+CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT=y
+CONFIG_FONT_SUPPORT=y
+# CONFIG_FONT_AUTOSELECT is not set
+CONFIG_FONT_8x16=y
+CONFIG_FONT_8x8=y
+CONFIG_FONT_6x11=y
+CONFIG_FONT_7x14=y
+CONFIG_FONT_PEARL_8x8=y
+CONFIG_FONT_ACORN_8x8=y
+CONFIG_FONT_MINI_4x6=y
+CONFIG_FONT_6x10=y
+CONFIG_FONT_10x18=y
+CONFIG_FONT_SUN8x16=y
+CONFIG_FONT_SUN12x22=y
+CONFIG_FONT_TER16x32=y
+CONFIG_FONT_6x8=y
+CONFIG_FRAMEBUFFER_CONSOLE=y
+CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
 KCONF
-    yes "" | make oldconfig
+    make olddefconfig
     make -j"$JOBS"
     cp arch/x86/boot/bzImage "$REPO_DIR/bzImage"
     cd "$REPO_DIR"
 fi
 
 step "Assembling rootfs"
+rm -f "$ROOTFS_DIR/usr/bin/font" "$ROOTFS_DIR/usr/bin/rezzfont" "$ROOTFS_DIR/bin/font" "$ROOTFS_DIR/bin/rezzfont" 2>/dev/null || true
 cp -r etc "$ROOTFS_DIR/"
 cp -r usr "$ROOTFS_DIR/"
 [ -d root ] && cp -r root "$ROOTFS_DIR/" || true
@@ -133,8 +158,9 @@ cp -r lib/* "$ROOTFS_DIR/lib/"
 step "Downloading Alpine packages (using local cache)"
 MAIN_PACKAGES="ncurses-terminfo-base-6.4_p20240420-r2.apk libncursesw-6.4_p20240420-r2.apk libevent-2.1.12-r7.apk tmux-3.4-r1.apk readline-8.2.10-r0.apk bash-5.2.26-r0.apk nano-8.0-r0.apk dropbear-2024.85-r0.apk dropbear-ssh-2024.85-r0.apk zlib-1.3.2-r0.apk musl-dev-1.2.5-r3.apk musl-1.2.5-r3.apk make-4.4.1-r2.apk lua5.3-5.3.6-r6.apk lua5.3-libs-5.3.6-r6.apk linenoise-1.0-r5.apk"
 for pkg in $MAIN_PACKAGES; do
-    if [ ! -f "$CACHE_DIR/$pkg" ]; then
-        wget -q "$ALPINE_MAIN/$pkg" -O "$CACHE_DIR/$pkg"
+    if [ ! -s "$CACHE_DIR/$pkg" ]; then
+        rm -f "$CACHE_DIR/$pkg"
+        wget "$ALPINE_MAIN/$pkg" -O "$CACHE_DIR/$pkg" || { echo "Failed to download $pkg from $ALPINE_MAIN"; exit 1; }
     fi
     mkdir -p /tmp/p
     cd /tmp/p
@@ -146,10 +172,11 @@ for pkg in $MAIN_PACKAGES; do
     [ -d etc ] && cp -r etc/* "$ROOTFS_DIR/etc/" 2>/dev/null || true
 done
 
-COMMUNITY_PACKAGES="runit-2.1.2-r7.apk neatvi-15-r0.apk"
+COMMUNITY_PACKAGES="runit-2.1.2-r7.apk neatvi-15-r0.apk sudo-1.9.15_p5-r0.apk"
 for pkg in $COMMUNITY_PACKAGES; do
-    if [ ! -f "$CACHE_DIR/$pkg" ]; then
-        wget -q "$ALPINE_COMMUNITY/$pkg" -O "$CACHE_DIR/$pkg"
+    if [ ! -s "$CACHE_DIR/$pkg" ]; then
+        rm -f "$CACHE_DIR/$pkg"
+        wget "$ALPINE_COMMUNITY/$pkg" -O "$CACHE_DIR/$pkg" || { echo "Failed to download $pkg from $ALPINE_COMMUNITY"; exit 1; }
     fi
     mkdir -p /tmp/p
     cd /tmp/p
@@ -162,10 +189,11 @@ for pkg in $COMMUNITY_PACKAGES; do
     [ -d etc ] && cp -r etc/* "$ROOTFS_DIR/etc/" 2>/dev/null || true
 done
 
-EDGE_COMMUNITY_PACKAGES="tcc-0.9.27_git20250619-r1.apk tcc-libs-0.9.27_git20250619-r1.apk tcc-libs-static-0.9.27_git20250619-r1.apk"
+EDGE_COMMUNITY_PACKAGES="tcc-0.9.27_git20260714-r0.apk tcc-libs-0.9.27_git20260714-r0.apk tcc-libs-static-0.9.27_git20260714-r0.apk"
 for pkg in $EDGE_COMMUNITY_PACKAGES; do
-    if [ ! -f "$CACHE_DIR/$pkg" ]; then
-        wget -q "$ALPINE_EDGE_COMMUNITY/$pkg" -O "$CACHE_DIR/$pkg"
+    if [ ! -s "$CACHE_DIR/$pkg" ]; then
+        rm -f "$CACHE_DIR/$pkg"
+        wget "$ALPINE_EDGE_COMMUNITY/$pkg" -O "$CACHE_DIR/$pkg" || { echo "Failed to download $pkg from $ALPINE_EDGE_COMMUNITY"; exit 1; }
     fi
     mkdir -p /tmp/p
     cd /tmp/p
@@ -180,6 +208,19 @@ done
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/bin/"* 2>/dev/null || true
+chmod +x "$ROOTFS_DIR/etc/runit/3" 2>/dev/null || true
+
+# Re-copy repository custom scripts to ensure they overwrite package defaults
+rm -f "$ROOTFS_DIR/usr/bin/font" "$ROOTFS_DIR/usr/bin/rezzfont" "$ROOTFS_DIR/bin/font" "$ROOTFS_DIR/bin/rezzfont" 2>/dev/null || true
+cp -r "$REPO_DIR/usr/"* "$ROOTFS_DIR/usr/" 2>/dev/null || true
+cp -r "$REPO_DIR/etc/"* "$ROOTFS_DIR/etc/" 2>/dev/null || true
+
+# Compile setconsolefont helper if C source exists
+if [ -f "$REPO_DIR/usr/bin/setconsolefont.c" ]; then
+    gcc -O2 "$REPO_DIR/usr/bin/setconsolefont.c" -o "$ROOTFS_DIR/usr/bin/setconsolefont" 2>/dev/null || true
+fi
+
+chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 
 # Ensure editor executable symlinks exist
 [ -f "$ROOTFS_DIR/usr/bin/nano" ] && ln -sf /usr/bin/nano "$ROOTFS_DIR/bin/nano" 2>/dev/null || true
@@ -189,6 +230,33 @@ if [ -f "$ROOTFS_DIR/usr/bin/neatvi" ]; then
     ln -sf /usr/bin/neatvi "$ROOTFS_DIR/usr/bin/vi" 2>/dev/null || true
 fi
 
+# Ensure font management tool symlinks exist
+[ -f "$ROOTFS_DIR/usr/bin/font" ] && ln -sf /usr/bin/font "$ROOTFS_DIR/bin/font" 2>/dev/null || true
+[ -f "$ROOTFS_DIR/usr/bin/font" ] && ln -sf /usr/bin/font "$ROOTFS_DIR/usr/bin/rezzfont" 2>/dev/null || true
+[ -f "$ROOTFS_DIR/usr/bin/font" ] && ln -sf /usr/bin/font "$ROOTFS_DIR/bin/rezzfont" 2>/dev/null || true
+
+# Ensure sudo permissions and executable symlinks
+if [ -f "$ROOTFS_DIR/usr/bin/sudo" ]; then
+    chmod 4755 "$ROOTFS_DIR/usr/bin/sudo" 2>/dev/null || true
+    ln -sf /usr/bin/sudo "$ROOTFS_DIR/bin/sudo" 2>/dev/null || true
+    [ -f "$ROOTFS_DIR/etc/sudoers" ] && chmod 0440 "$ROOTFS_DIR/etc/sudoers" 2>/dev/null || true
+fi
+
+# Ensure power management command symlinks exist across sbin and bin
+ln -sf /usr/bin/shutdown "$ROOTFS_DIR/sbin/shutdown" 2>/dev/null || true
+ln -sf /usr/bin/poweroff "$ROOTFS_DIR/sbin/poweroff" 2>/dev/null || true
+ln -sf /usr/bin/reboot "$ROOTFS_DIR/sbin/reboot" 2>/dev/null || true
+ln -sf /usr/bin/hibernate "$ROOTFS_DIR/sbin/hibernate" 2>/dev/null || true
+ln -sf /usr/bin/suspend "$ROOTFS_DIR/sbin/suspend" 2>/dev/null || true
+ln -sf /usr/bin/poweroff "$ROOTFS_DIR/sbin/halt" 2>/dev/null || true
+
+ln -sf /usr/bin/shutdown "$ROOTFS_DIR/bin/shutdown" 2>/dev/null || true
+ln -sf /usr/bin/poweroff "$ROOTFS_DIR/bin/poweroff" 2>/dev/null || true
+ln -sf /usr/bin/reboot "$ROOTFS_DIR/bin/reboot" 2>/dev/null || true
+ln -sf /usr/bin/hibernate "$ROOTFS_DIR/bin/hibernate" 2>/dev/null || true
+ln -sf /usr/bin/suspend "$ROOTFS_DIR/bin/suspend" 2>/dev/null || true
+ln -sf /usr/bin/poweroff "$ROOTFS_DIR/bin/halt" 2>/dev/null || true
+
 step "Packing rootfs.cpio.gz"
 cd "$ROOTFS_DIR"
 find . | cpio -o -H newc | gzip > "$REPO_DIR/rootfs.cpio.gz"
@@ -197,7 +265,7 @@ cd "$REPO_DIR"
 # create disk.img
 if [ ! -f "$REPO_DIR/disk.img" ]; then
     step "Creating disk.img"
-    qemu-img create -f raw disk.img 256M
+    qemu-img create -f raw disk.img 1G
     mkfs.ext4 -F disk.img
 fi
 

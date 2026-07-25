@@ -7,6 +7,11 @@ export INPUTRC=/etc/inputrc
 export EDITOR=nano
 export PAGER=less
 
+# TTY Line Discipline: set word erase to Ctrl+Backspace (^H)
+if [ -t 0 ]; then
+    stty werase ^H 2>/dev/null || true
+fi
+
 # History Settings
 export HISTFILE="${HOME:-/root}/.bash_history"
 export HISTSIZE=10000
