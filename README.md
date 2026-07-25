@@ -70,19 +70,9 @@ udhcpc -i eth0
 echo "nameserver 8.8.8.8" > /etc/resolv.conf
 ```
 
-## Usage
-```bash
-pkg install nano
-pkg search python
-ghget https://url file
-sv status /etc/runit/runsvdir/default/*
-sv restart tty1
-```
 
-## Quick Start
+## Quick Start(in qemu)
 To get launched, use ./start.sh or start-gui.sh
-
-
 
 
 
