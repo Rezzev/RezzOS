@@ -2,6 +2,7 @@
 echo -e "\033[1;34m=== RezzOS Help ===\033[0m"
 echo ""
 echo -e "\033[1;36mSystem Info & Monitoring:\033[0m"
+echo "  rezzconfig / config      - Interactive system control center & TUI menu"
 echo "  rezzfetch                - Show system information logo and specs"
 echo "  rezzmon [watch]          - Interactive system resource monitor (CPU/RAM/Disks/Net)"
 echo "  swap [create|on|off]     - Manage swap memory file"

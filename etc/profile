@@ -34,6 +34,8 @@ alias status='rsv list'
 alias mon='rezzmon'
 alias sysmon='rezzmon'
 alias fetch='rezzfetch'
+alias config='rezzconfig'
+alias rezzcontrol='rezzconfig'
 
 # Dynamic Prompt (PS1) with Colors
 if [ "$(id -u 2>/dev/null)" -eq 0 ]; then

@@ -133,10 +133,11 @@ fi
 
 step "Assembling rootfs"
 rm -f "$ROOTFS_DIR/usr/bin/font" "$ROOTFS_DIR/usr/bin/rezzfont" "$ROOTFS_DIR/bin/font" "$ROOTFS_DIR/bin/rezzfont" 2>/dev/null || true
-cp -r etc "$ROOTFS_DIR/"
-cp -r usr "$ROOTFS_DIR/"
-[ -d root ] && cp -r root "$ROOTFS_DIR/" || true
-cp init "$ROOTFS_DIR/"
+[ -d "$ROOTFS_DIR/etc" ] && chmod -R u+w "$ROOTFS_DIR/etc" 2>/dev/null || true
+cp -rf --remove-destination etc "$ROOTFS_DIR/"
+cp -rf --remove-destination usr "$ROOTFS_DIR/"
+[ -d root ] && cp -rf --remove-destination root "$ROOTFS_DIR/" || true
+cp -f init "$ROOTFS_DIR/"
 
 cd "$ROOTFS_DIR"
 mkdir -p dev proc sys tmp mnt/disk var/log lib usr/lib usr/share/terminfo
@@ -212,8 +213,10 @@ chmod +x "$ROOTFS_DIR/etc/runit/3" 2>/dev/null || true
 
 # Re-copy repository custom scripts to ensure they overwrite package defaults
 rm -f "$ROOTFS_DIR/usr/bin/font" "$ROOTFS_DIR/usr/bin/rezzfont" "$ROOTFS_DIR/bin/font" "$ROOTFS_DIR/bin/rezzfont" 2>/dev/null || true
-cp -r "$REPO_DIR/usr/"* "$ROOTFS_DIR/usr/" 2>/dev/null || true
-cp -r "$REPO_DIR/etc/"* "$ROOTFS_DIR/etc/" 2>/dev/null || true
+[ -d "$ROOTFS_DIR/etc" ] && chmod -R u+w "$ROOTFS_DIR/etc" 2>/dev/null || true
+[ -d "$ROOTFS_DIR/usr" ] && chmod -R u+w "$ROOTFS_DIR/usr" 2>/dev/null || true
+cp -rf --remove-destination "$REPO_DIR/usr/"* "$ROOTFS_DIR/usr/" 2>/dev/null || true
+cp -rf --remove-destination "$REPO_DIR/etc/"* "$ROOTFS_DIR/etc/" 2>/dev/null || true
 
 # Compile setconsolefont helper if C source exists
 if [ -f "$REPO_DIR/usr/bin/setconsolefont.c" ]; then

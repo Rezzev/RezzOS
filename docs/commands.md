@@ -27,6 +27,7 @@
 ## System & Monitoring
 | Command | Description |
 |---------|----------|
+| `rezzconfig` / `config` | Interactive TUI control center & system configuration |
 | `rezzfetch` | System info banner & specs |
 | `rezzmon` | System resource monitor (CPU, RAM, Disks, Net) |
 | `rezzmon watch` | Live updating resource monitor |
