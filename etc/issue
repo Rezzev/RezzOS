@@ -1,6 +1,6 @@
 
- \033[1;36mWelcome to RezzOS Linux (\l)\033[0m
- Kernel \r on an \m
+ [1;36mWelcome to RezzOS Linux (\l)[0m
+ Kernel  on an \m
 
  Default Accounts:
    - root (Password: rezzos)

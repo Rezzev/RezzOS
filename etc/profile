@@ -40,10 +40,10 @@ alias rezzcontrol='rezzconfig'
 # Dynamic Prompt (PS1) with Colors
 if [ "$(id -u 2>/dev/null)" -eq 0 ]; then
     # Root Prompt (Red)
-    export PS1='\[\033[1;31m\]\u@\h\[\033[0m\]:\[\033[1;34m\]\w\[\033[0m\]\[\033[1;31m\]#\[\033[0m\] '
+    export PS1='\[\e[1;31m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\[\e[1;31m\]#\[\e[0m\] '
 else
     # User Prompt (Green)
-    export PS1='\[\033[1;32m\]\u@\h\[\033[0m\]:\[\033[1;34m\]\w\[\033[0m\]\[\033[1;32m\]\$\[\033[0m\] '
+    export PS1='\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\[\e[1;32m\]\$\[\e[0m\] '
 fi
 
 # Auto-Welcome Banner for Interactive Login Shells

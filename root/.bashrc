@@ -17,7 +17,7 @@ if [ -z "$TMUX" ] && [ -t 0 ] && [ "$TERM" != "dumb" ] && [ -z "$SSH_CLIENT" ] &
 fi
 
 clear
-printf "Welcome to \033[0;37mRezz\033[0;34mOS\033[0m!\n"
+printf "Welcome to \e[0;37mRezz\e[0;34mOS\e[0m!\n"
 echo "Packages:"
 echo "pkg install <name>"
 echo "pkg search <name>"

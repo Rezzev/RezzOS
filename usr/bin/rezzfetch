@@ -1,9 +1,9 @@
 #!/bin/bash
 
-BLUE='\033[1;34m'
-WHITE='\033[1;37m'
-CYAN='\033[1;36m'
-NC='\033[0m'
+BLUE=$(printf '\033[1;34m')
+WHITE=$(printf '\033[1;37m')
+CYAN=$(printf '\033[1;36m')
+NC=$(printf '\033[0m')
 
 OS="RezzOS"
 KERNEL=$(uname -r)
