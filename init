@@ -3,7 +3,7 @@ mount -t proc proc /proc
 mount -t sysfs sysfs /sys
 mount -t devtmpfs dev /dev
 mkdir -p /dev/pts
-mount -t devpts devpts /dev/pts 2>/dev/null || true
+mount -t devpts devpts /dev/pts -o mode=0620,ptmxmode=0666 2>/dev/null || mount -t devpts devpts /dev/pts 2>/dev/null || true
 
 hostname rezzos
 echo 0 > /proc/sys/kernel/printk
@@ -16,10 +16,18 @@ if ! grep -q "^user:" /etc/passwd 2>/dev/null; then
     chown -R 1000:1000 /home/user
 fi
 
-# Network - DHCP
+# Network - Wait for eth0 driver probe and configure link UP then IP
+for i in 1 2 3 4 5 6 7 8 9 10; do
+    [ -d /sys/class/net/eth0 ] && break
+    sleep 0.2
+done
+
 ifconfig lo 127.0.0.1 up
 ifconfig eth0 up
-udhcpc -b -i eth0 -s /usr/share/udhcpc/default.script
+sleep 0.2
+ifconfig eth0 10.0.2.15 netmask 255.255.255.0 broadcast 10.0.2.255
+route add default gw 10.0.2.2 2>/dev/null || true
+udhcpc -b -i eth0 -s /usr/share/udhcpc/default.script 2>/dev/null || true
 echo "nameserver 8.8.8.8" > /etc/resolv.conf
 
 # Mount disk safely

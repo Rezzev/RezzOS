@@ -7,6 +7,7 @@ RezzOS/
 │
 ├── usr/                  # User scripts
 │   └── bin/
+│       ├── rezzconfig    # Interactive Control Center
 │       ├── pkg           # Package manager
 │       ├── ghget         # File downloader
 │       ├── rsv           # Runit service manager

@@ -19,14 +19,21 @@
 ## Services (runit)
 | Command | Description |
 |---------|----------|
-| `rsv list` | List services |
-| `rsv up <name>` | Start service |
-| `rsv down <name>` | Stop service |
-| `rsv restart <name>` | Restart service |
+| `rsv list` | List enabled services & their status |
+| `rsv available` | List all available services in `/etc/sv` |
+| `rsv status <name>` | Show status of a specific service |
+| `rsv log <name>` | View log file of a specific service |
+| `rsv up <name>` | Start a service |
+| `rsv down <name>` | Stop a service |
+| `rsv restart <name>` | Restart a service |
+| `rsv enable <name>` | Enable service (symlink to auto-start at boot) |
+| `rsv disable <name>` | Disable service (remove auto-start symlink) |
+| `rsv create <name> "<cmd>"` | Create a new custom service in `/etc/sv` |
 
 ## System & Monitoring
 | Command | Description |
 |---------|----------|
+| `rezzconfig` / `config` | Interactive TUI control center & system configuration |
 | `rezzfetch` | System info banner & specs |
 | `rezzmon` | System resource monitor (CPU, RAM, Disks, Net) |
 | `rezzmon watch` | Live updating resource monitor |

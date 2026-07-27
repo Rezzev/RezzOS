@@ -1,0 +1,7 @@
+root:x:0:root
+tty:x:5:
+wheel:x:10:root,user
+audio:x:29:user
+video:x:44:user
+user:x:1000:
+nobody:x:65534:

@@ -1,40 +1,144 @@
 #!/bin/sh
 
-# Default service directory paths for runit
 SV_DIR="${SERVICE_DIR:-/etc/runit/runsvdir/default}"
+ALL_SV_DIR="${ALL_SERVICE_DIR:-/etc/sv}"
 
 print_usage() {
-    echo "Runit Service Manager"
+    echo "RezzOS Runit Service Manager (rsv)"
+    echo ""
     echo "Usage:"
-    echo "  rsv list                 - List all services and their current status"
-    echo "  rsv status [service]     - Show detailed status of a specific service"
-    echo "  rsv up [service]         - Start a service"
-    echo "  rsv down [service]       - Stop a service"
-    echo "  rsv restart [service]    - Restart a service"
-  
+    echo "  rsv list                     - List enabled services & status"
+    echo "  rsv available                - List all available services (/etc/sv)"
+    echo "  rsv status [service]         - Show status of a service"
+    echo "  rsv log [service]            - View logs for a service"
+    echo "  rsv up [service]             - Start a service"
+    echo "  rsv down [service]           - Stop a service"
+    echo "  rsv restart [service]        - Restart a service"
+    echo "  rsv enable [service]         - Enable a service (auto-start at boot)"
+    echo "  rsv disable [service]        - Disable a service (remove auto-start)"
+    echo "  rsv create <name> <command>  - Create a new service in /etc/sv"
+    echo ""
 }
 
-list_services() {
+list_enabled() {
     if [ ! -d "$SV_DIR" ]; then
         echo "Error: Service directory '$SV_DIR' not found."
         exit 1
     fi
 
-    printf "%-20s | %-10s\n" "service" "status"
+    printf "%-20s | %-12s | %-10s\n" "SERVICE" "AUTOSTART" "STATUS"
+    echo "----------------------------------------------------"
 
+    found=0
     for d in "$SV_DIR"/*; do
-        if [ -d "$d" ] && [ -f "$d/run" ]; then
+        if [ -d "$d" ] || [ -L "$d" ]; then
+            [ -f "$d/run" ] || continue
+            found=1
             name=$(basename "$d")
             status_out=$(sv status "$d" 2>&1)
             
             case "$status_out" in
-                run:*)    printf "%-20s | [ active ]\n" "$name" ;;
-                down:*)   printf "%-20s | [ down ]\n" "$name" ;;
-                *)        printf "%-20s | [ error ]\n" "$name" ;;
+                run:*)    st="[ active ]" ;;
+                down:*)   st="[ down ]" ;;
+                *)        st="[ error ]" ;;
             esac
+            printf "%-20s | %-12s | %-10s\n" "$name" "enabled" "$st"
+        fi
+    done
+
+    if [ "$found" -eq 0 ]; then
+        echo "No enabled services found."
+    fi
+    echo ""
+}
+
+list_available() {
+    if [ ! -d "$ALL_SV_DIR" ]; then
+        mkdir -p "$ALL_SV_DIR"
+    fi
+
+    printf "%-20s | %-12s | %-10s\n" "SERVICE" "AUTOSTART" "STATUS"
+    echo "----------------------------------------------------"
+
+    for d in "$ALL_SV_DIR"/*; do
+        if [ -d "$d" ] && [ -f "$d/run" ]; then
+            name=$(basename "$d")
+            if [ -e "$SV_DIR/$name" ]; then
+                autostart="enabled"
+                status_out=$(sv status "$SV_DIR/$name" 2>&1)
+                case "$status_out" in
+                    run:*)  st="[ active ]" ;;
+                    down:*) st="[ down ]" ;;
+                    *)      st="[ error ]" ;;
+                esac
+            else
+                autostart="disabled"
+                st="[ stopped ]"
+            fi
+            printf "%-20s | %-12s | %-10s\n" "$name" "$autostart" "$st"
         fi
     done
     echo ""
+}
+
+enable_service() {
+    name="$1"
+    if [ -z "$name" ]; then
+        echo "Error: Please specify a service name to enable."
+        exit 1
+    fi
+
+    if [ ! -d "$ALL_SV_DIR/$name" ]; then
+        echo "Error: Service '$name' does not exist in $ALL_SV_DIR."
+        exit 1
+    fi
+
+    if [ -e "$SV_DIR/$name" ]; then
+        echo "Service '$name' is already enabled."
+        exit 0
+    fi
+
+    mkdir -p "$SV_DIR"
+    ln -sf "$ALL_SV_DIR/$name" "$SV_DIR/$name"
+    echo "Enabled service '$name' -> $SV_DIR/$name"
+}
+
+disable_service() {
+    name="$1"
+    if [ -z "$name" ]; then
+        echo "Error: Please specify a service name to disable."
+        exit 1
+    fi
+
+    if [ ! -e "$SV_DIR/$name" ]; then
+        echo "Service '$name' is not enabled."
+        exit 0
+    fi
+
+    if [ -d "$SV_DIR/$name/supervise" ]; then
+        echo "Stopping service '$name'..."
+        sv down "$SV_DIR/$name" 2>/dev/null || true
+    fi
+    rm -f "$SV_DIR/$name"
+    echo "Disabled service '$name'."
+}
+
+show_log() {
+    name="$1"
+    if [ -z "$name" ]; then
+        echo "Error: Please specify a service name."
+        exit 1
+    fi
+
+    if [ -f "/var/log/$name.log" ]; then
+        echo "=== Logs for $name (/var/log/$name.log) ==="
+        tail -n 50 "/var/log/$name.log"
+    elif [ -f "/var/log/$name/current" ]; then
+        echo "=== Logs for $name (/var/log/$name/current) ==="
+        tail -n 50 "/var/log/$name/current"
+    else
+        echo "No log file found for service '$name'."
+    fi
 }
 
 control_service() {
@@ -46,31 +150,70 @@ control_service() {
         exit 1
     fi
 
-    if [ ! -d "$SV_DIR/$name" ]; then
-        echo "Error: Service '$name' does not exist."
+    target=""
+    if [ -e "$SV_DIR/$name" ]; then
+        target="$SV_DIR/$name"
+    elif [ -e "$ALL_SV_DIR/$name" ]; then
+        target="$ALL_SV_DIR/$name"
+    else
+        echo "Error: Service '$name' not found."
         exit 1
     fi
 
-    echo "Sending command '$action' to service '$name'..."
-    sv "$action" "$SV_DIR/$name"
+    echo "Sending '$action' to service '$name'..."
+    sv "$action" "$target"
+}
+
+create_service() {
+    name="$1"
+    cmd="$2"
+
+    if [ -z "$name" ] || [ -z "$cmd" ]; then
+        echo "Usage: rsv create <service_name> \"<command_to_run>\""
+        exit 1
+    fi
+
+    mkdir -p "$ALL_SV_DIR/$name"
+    cat << EOF > "$ALL_SV_DIR/$name/run"
+#!/bin/sh
+exec $cmd >> /var/log/$name.log 2>&1
+EOF
+    chmod +x "$ALL_SV_DIR/$name/run"
+    echo "Created service '$name' in $ALL_SV_DIR/$name"
+    echo "Run 'rsv enable $name' to enable and auto-start it."
 }
 
 case "$1" in
     list)
-        list_services
+        list_enabled
+        ;;
+    available|all)
+        list_available
+        ;;
+    enable)
+        enable_service "$2"
+        ;;
+    disable)
+        disable_service "$2"
+        ;;
+    log|logs)
+        show_log "$2"
         ;;
     status)
         if [ -z "$2" ]; then
-            echo "Error: Please specify a service name."
-            exit 1
+            list_enabled
+        else
+            control_service status "$2"
         fi
-        sv status "$SV_DIR/$2"
         ;;
-    up|down|restart)
+    up|down|restart|reload)
         control_service "$1" "$2"
+        ;;
+    create)
+        create_service "$2" "$3"
         ;;
     *)
         print_usage
-        list_services
+        list_enabled
         ;;
 esac

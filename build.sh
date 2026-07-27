@@ -133,10 +133,11 @@ fi
 
 step "Assembling rootfs"
 rm -f "$ROOTFS_DIR/usr/bin/font" "$ROOTFS_DIR/usr/bin/rezzfont" "$ROOTFS_DIR/bin/font" "$ROOTFS_DIR/bin/rezzfont" 2>/dev/null || true
-cp -r etc "$ROOTFS_DIR/"
-cp -r usr "$ROOTFS_DIR/"
-[ -d root ] && cp -r root "$ROOTFS_DIR/" || true
-cp init "$ROOTFS_DIR/"
+[ -d "$ROOTFS_DIR/etc" ] && chmod -R u+w "$ROOTFS_DIR/etc" 2>/dev/null || true
+cp -rf --remove-destination etc "$ROOTFS_DIR/"
+cp -rf --remove-destination usr "$ROOTFS_DIR/"
+[ -d root ] && cp -rf --remove-destination root "$ROOTFS_DIR/" || true
+cp -f init "$ROOTFS_DIR/"
 
 cd "$ROOTFS_DIR"
 mkdir -p dev proc sys tmp mnt/disk var/log lib usr/lib usr/share/terminfo
@@ -212,8 +213,11 @@ chmod +x "$ROOTFS_DIR/etc/runit/3" 2>/dev/null || true
 
 # Re-copy repository custom scripts to ensure they overwrite package defaults
 rm -f "$ROOTFS_DIR/usr/bin/font" "$ROOTFS_DIR/usr/bin/rezzfont" "$ROOTFS_DIR/bin/font" "$ROOTFS_DIR/bin/rezzfont" 2>/dev/null || true
-cp -r "$REPO_DIR/usr/"* "$ROOTFS_DIR/usr/" 2>/dev/null || true
-cp -r "$REPO_DIR/etc/"* "$ROOTFS_DIR/etc/" 2>/dev/null || true
+[ -d "$ROOTFS_DIR/etc" ] && chmod -R u+w "$ROOTFS_DIR/etc" 2>/dev/null || true
+[ -d "$ROOTFS_DIR/usr" ] && chmod -R u+w "$ROOTFS_DIR/usr" 2>/dev/null || true
+cp -a "$REPO_DIR/usr/"* "$ROOTFS_DIR/usr/" 2>/dev/null || true
+cp -a "$REPO_DIR/etc/"* "$ROOTFS_DIR/etc/" 2>/dev/null || true
+[ -d "$REPO_DIR/root" ] && cp -a "$REPO_DIR/root/"* "$ROOTFS_DIR/root/" 2>/dev/null || true
 
 # Compile setconsolefont helper if C source exists
 if [ -f "$REPO_DIR/usr/bin/setconsolefont.c" ]; then
@@ -222,6 +226,8 @@ fi
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/usr/share/udhcpc/default.script" 2>/dev/null || true
+find "$ROOTFS_DIR/etc/runit/runsvdir" -type f -exec chmod +x {} + 2>/dev/null || true
+find "$ROOTFS_DIR/etc/sv" -type f -exec chmod +x {} + 2>/dev/null || true
 
 # Ensure editor executable symlinks exist
 [ -f "$ROOTFS_DIR/usr/bin/nano" ] && ln -sf /usr/bin/nano "$ROOTFS_DIR/bin/nano" 2>/dev/null || true
@@ -265,7 +271,7 @@ chmod +x "$ROOTFS_DIR/etc/init.d/rcS"
 
 step "Packing rootfs.cpio.gz"
 cd "$ROOTFS_DIR"
-find . | cpio -o -H newc | gzip > "$REPO_DIR/rootfs.cpio.gz"
+find . | cpio -o -H newc --owner 0:0 | gzip > "$REPO_DIR/rootfs.cpio.gz"
 cd "$REPO_DIR"
 
 # create disk.img
@@ -288,7 +294,7 @@ Run:
         -kernel bzImage \
         -initrd rootfs.cpio.gz \
         -append "console=ttyS0" \
-        -netdev user,id=net0 -device virtio-net,netdev=net0 \
+        -netdev user,id=net0,hostfwd=tcp::2222-:22 -device virtio-net,netdev=net0 \
         -drive file=disk.img,format=raw,if=virtio \
         -m 512M -nographic
 EOF
