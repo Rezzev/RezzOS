@@ -1,0 +1,6 @@
+#!/bin/sh
+mkdir -p /etc/dropbear
+while ! ifconfig eth0 2>/dev/null | grep -q "inet "; do
+    sleep 0.5
+done
+exec /usr/sbin/dropbear -F -E
