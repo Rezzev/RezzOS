@@ -156,7 +156,7 @@ cp -r lib/* "$ROOTFS_DIR/lib/"
 [ -d usr/lib ] && cp -r usr/lib/* "$ROOTFS_DIR/usr/lib/" || true
 
 step "Downloading Alpine packages (using local cache)"
-MAIN_PACKAGES="ncurses-terminfo-base-6.4_p20240420-r2.apk dhcpcd-10.0.6-r1.apk libncursesw-6.4_p20240420-r2.apk libevent-2.1.12-r7.apk tmux-3.4-r1.apk readline-8.2.10-r0.apk bash-5.2.26-r0.apk nano-8.0-r0.apk dropbear-2024.85-r0.apk dropbear-ssh-2024.85-r0.apk zlib-1.3.2-r0.apk musl-dev-1.2.5-r3.apk musl-1.2.5-r3.apk make-4.4.1-r2.apk lua5.3-5.3.6-r6.apk lua5.3-libs-5.3.6-r6.apk linenoise-1.0-r5.apk"
+MAIN_PACKAGES="ncurses-terminfo-base-6.4_p20240420-r2.apk dhcpcd-10.0.6-r1.apk libncursesw-6.4_p20240420-r2.apk libevent-2.1.12-r7.apk tmux-3.4-r1.apk readline-8.2.10-r0.apk bash-5.2.26-r0.apk nano-8.0-r0.apk dropbear-2024.85-r0.apk dropbear-ssh-2024.85-r0.apk zlib-1.3.2-r0.apk musl-dev-1.2.5-r3.apk musl-1.2.5-r3.apk make-4.4.1-r2.apk linenoise-1.0-r5.apk"
 for pkg in $MAIN_PACKAGES; do
     if [ ! -s "$CACHE_DIR/$pkg" ]; then
         rm -f "$CACHE_DIR/$pkg"
@@ -172,7 +172,7 @@ for pkg in $MAIN_PACKAGES; do
     [ -d etc ] && cp -r etc/* "$ROOTFS_DIR/etc/" 2>/dev/null || true
 done
 
-COMMUNITY_PACKAGES="runit-2.1.2-r7.apk neatvi-15-r0.apk sudo-1.9.15_p5-r0.apk iwd-2.17-r0.apk "
+COMMUNITY_PACKAGES="runit-2.1.2-r7.apk  sudo-1.9.15_p5-r0.apk iwd-2.17-r0.apk "
 for pkg in $COMMUNITY_PACKAGES; do
     if [ ! -s "$CACHE_DIR/$pkg" ]; then
         rm -f "$CACHE_DIR/$pkg"
