@@ -225,6 +225,7 @@ fi
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/usr/share/udhcpc/default.script" 2>/dev/null || true
+find "$ROOTFS_DIR/etc/runit/runsvdir" -type f -exec chmod +x {} + 2>/dev/null || true
 
 # Ensure editor executable symlinks exist
 [ -f "$ROOTFS_DIR/usr/bin/nano" ] && ln -sf /usr/bin/nano "$ROOTFS_DIR/bin/nano" 2>/dev/null || true
@@ -268,7 +269,7 @@ chmod +x "$ROOTFS_DIR/etc/init.d/rcS"
 
 step "Packing rootfs.cpio.gz"
 cd "$ROOTFS_DIR"
-find . | cpio -o -H newc | gzip > "$REPO_DIR/rootfs.cpio.gz"
+find . | cpio -o -H newc --owner 0:0 | gzip > "$REPO_DIR/rootfs.cpio.gz"
 cd "$REPO_DIR"
 
 # create disk.img
@@ -291,7 +292,7 @@ Run:
         -kernel bzImage \
         -initrd rootfs.cpio.gz \
         -append "console=ttyS0" \
-        -netdev user,id=net0 -device virtio-net,netdev=net0 \
+        -netdev user,id=net0,hostfwd=tcp::2222-:22 -device virtio-net,netdev=net0 \
         -drive file=disk.img,format=raw,if=virtio \
         -m 512M -nographic
 EOF
