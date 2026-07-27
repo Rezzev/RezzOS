@@ -10,7 +10,7 @@ PS1='\[\e[1;34m\]\u\[\e[0m\]@\h:\w\$> '
 alias ll='ls -la'
 alias ..='cd ..'
 
-if [ -z "$TMUX" ] && [ -t 0 ] && [ "$TERM" != "dumb" ] && command -v tmux >/dev/null 2>&1; then
+if [ -z "$TMUX" ] && [ -t 0 ] && [ "$TERM" != "dumb" ] && [ -z "$SSH_CLIENT" ] && [ -z "$SSH_TTY" ] && command -v tmux >/dev/null 2>&1; then
     mkdir -p /dev/pts
     mount -t devpts devpts /dev/pts 2>/dev/null || true
     exec tmux new-session -A -s rezzos /bin/bash --rcfile /root/.bashrc

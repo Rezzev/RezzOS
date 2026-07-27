@@ -215,8 +215,9 @@ chmod +x "$ROOTFS_DIR/etc/runit/3" 2>/dev/null || true
 rm -f "$ROOTFS_DIR/usr/bin/font" "$ROOTFS_DIR/usr/bin/rezzfont" "$ROOTFS_DIR/bin/font" "$ROOTFS_DIR/bin/rezzfont" 2>/dev/null || true
 [ -d "$ROOTFS_DIR/etc" ] && chmod -R u+w "$ROOTFS_DIR/etc" 2>/dev/null || true
 [ -d "$ROOTFS_DIR/usr" ] && chmod -R u+w "$ROOTFS_DIR/usr" 2>/dev/null || true
-cp -rf --remove-destination "$REPO_DIR/usr/"* "$ROOTFS_DIR/usr/" 2>/dev/null || true
-cp -rf --remove-destination "$REPO_DIR/etc/"* "$ROOTFS_DIR/etc/" 2>/dev/null || true
+cp -a "$REPO_DIR/usr/"* "$ROOTFS_DIR/usr/" 2>/dev/null || true
+cp -a "$REPO_DIR/etc/"* "$ROOTFS_DIR/etc/" 2>/dev/null || true
+[ -d "$REPO_DIR/root" ] && cp -a "$REPO_DIR/root/"* "$ROOTFS_DIR/root/" 2>/dev/null || true
 
 # Compile setconsolefont helper if C source exists
 if [ -f "$REPO_DIR/usr/bin/setconsolefont.c" ]; then

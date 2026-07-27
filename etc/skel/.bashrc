@@ -10,7 +10,7 @@ alias ll='ls -la'
 alias ..='cd ..'
 
 # Launch tmux only if interactive, not already in tmux, and tmux works
-if [ -z "$TMUX" ] && [ -t 0 ] && [ "$TERM" != "dumb" ] && command -v tmux >/dev/null 2>&1; then
+if [ -z "$TMUX" ] && [ -t 0 ] && [ "$TERM" != "dumb" ] && [ -z "$SSH_CLIENT" ] && [ -z "$SSH_TTY" ] && command -v tmux >/dev/null 2>&1; then
     mkdir -p /dev/pts
     mount -t devpts devpts /dev/pts 2>/dev/null || true
     # Use && to only exec if tmux test passes; fallback to plain shell on failure
