@@ -10,7 +10,8 @@ fi
 qemu-system-x86_64 \
     -kernel bzImage \
     -initrd rootfs.cpio.gz \
-    -append "console=ttyS0 resume=/dev/vda fbcon=font:$FONT" \
-    -netdev user,id=net0 -device virtio-net,netdev=net0 \
+    -append "console=ttyS0 resume=/dev/vda fbcon=font:$FONT random.trust_cpu=on" \
+    -netdev user,id=net0,hostfwd=tcp::2222-:22 -device virtio-net,netdev=net0 \
+    -object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 \
     -drive file=disk.img,format=raw,if=virtio \
     -m 512M -nographic

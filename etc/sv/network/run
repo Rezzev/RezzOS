@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "Network service active"
+exec sleep 999999
