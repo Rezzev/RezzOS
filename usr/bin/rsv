@@ -10,6 +10,7 @@ print_usage() {
     echo "  rsv list                     - List enabled services & status"
     echo "  rsv available                - List all available services (/etc/sv)"
     echo "  rsv status [service]         - Show status of a service"
+    echo "  rsv log [service]            - View logs for a service"
     echo "  rsv up [service]             - Start a service"
     echo "  rsv down [service]           - Stop a service"
     echo "  rsv restart [service]        - Restart a service"
@@ -122,6 +123,24 @@ disable_service() {
     echo "Disabled service '$name'."
 }
 
+show_log() {
+    name="$1"
+    if [ -z "$name" ]; then
+        echo "Error: Please specify a service name."
+        exit 1
+    fi
+
+    if [ -f "/var/log/$name.log" ]; then
+        echo "=== Logs for $name (/var/log/$name.log) ==="
+        tail -n 50 "/var/log/$name.log"
+    elif [ -f "/var/log/$name/current" ]; then
+        echo "=== Logs for $name (/var/log/$name/current) ==="
+        tail -n 50 "/var/log/$name/current"
+    else
+        echo "No log file found for service '$name'."
+    fi
+}
+
 control_service() {
     action="$1"
     name="$2"
@@ -157,7 +176,7 @@ create_service() {
     mkdir -p "$ALL_SV_DIR/$name"
     cat << EOF > "$ALL_SV_DIR/$name/run"
 #!/bin/sh
-exec $cmd
+exec $cmd >> /var/log/$name.log 2>&1
 EOF
     chmod +x "$ALL_SV_DIR/$name/run"
     echo "Created service '$name' in $ALL_SV_DIR/$name"
@@ -176,6 +195,9 @@ case "$1" in
         ;;
     disable)
         disable_service "$2"
+        ;;
+    log|logs)
+        show_log "$2"
         ;;
     status)
         if [ -z "$2" ]; then

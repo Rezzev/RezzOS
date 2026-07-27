@@ -22,6 +22,7 @@
 | `rsv list` | List enabled services & their status |
 | `rsv available` | List all available services in `/etc/sv` |
 | `rsv status <name>` | Show status of a specific service |
+| `rsv log <name>` | View log file of a specific service |
 | `rsv up <name>` | Start a service |
 | `rsv down <name>` | Stop a service |
 | `rsv restart <name>` | Restart a service |

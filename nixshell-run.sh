@@ -4,6 +4,7 @@ set -e
 cd "$(dirname "$0")"
 
 echo "Setup temp folder for build..."
+rm -rf /tmp/RezzOS_build
 mkdir -p /tmp/RezzOS_build
 # Copy project files while excluding heavy source trees
 find . -mindepth 1 -maxdepth 1 ! -name 'linux-6.6.40' ! -name 'busybox-1.36.1' ! -name '.git' -exec cp -a {} /tmp/RezzOS_build/ \;
