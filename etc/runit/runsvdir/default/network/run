@@ -1,3 +1,0 @@
-#!/bin/sh
-echo "Network started"
-sleep 99999
