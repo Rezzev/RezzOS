@@ -25,6 +25,7 @@ fi
 
 
 info() {
+	echo -e "${BLUE}_______________________________________________________________________${NC}"
 	echo -e "${CYAN}OS:${NC} $OS													 "
 	echo -e "${CYAN}ARCH:${NC} $ARCH											 "
 	echo -e "${CYAN}UPTIME:${NC} $UPTIME										 "
