@@ -1,6 +1,9 @@
 #!/bin/sh
 export DISPLAY=:0
 
+# Kill lingering daemons from previous sessions
+killall pcmanfm 2>/dev/null || true
+
 # Ensure dbus machine-id exists (needed for GTK apps)
 mkdir -p /var/lib/dbus
 dbus-uuidgen --ensure
