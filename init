@@ -5,6 +5,16 @@ mount -t devtmpfs dev /dev
 mkdir -p /dev/pts
 mount -t devpts devpts /dev/pts -o mode=0620,ptmxmode=0666 2>/dev/null || mount -t devpts devpts /dev/pts 2>/dev/null || true
 
+mkdir -p /run
+mount -t tmpfs tmpfs /run
+
+# Start udev for input devices (X11/libinput)
+if [ -x /sbin/udevd ]; then
+    /sbin/udevd --daemon
+    udevadm trigger
+    udevadm settle
+fi
+
 hostname rezzos
 echo 0 > /proc/sys/kernel/printk
 
@@ -72,6 +82,17 @@ if [ -d /mnt/disk/packages ]; then
     done
     rm -rf /tmp/pkg
     cd /
+fi
+
+# Restore enabled services from persistent disk
+if [ -d /mnt/disk/services ]; then
+    for svc in /mnt/disk/services/*; do
+        [ -f "$svc" ] || continue
+        svc_name=$(basename "$svc")
+        if [ -d "/etc/sv/$svc_name" ]; then
+            ln -s "/etc/sv/$svc_name" "/etc/runit/runsvdir/default/$svc_name" 2>/dev/null || true
+        fi
+    done
 fi
 
 clear

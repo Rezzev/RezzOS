@@ -1,0 +1,9 @@
+#!/bin/sh
+export DISPLAY=:0
+
+# Start dbus if available
+if [ -x /usr/bin/dbus-launch ]; then
+    eval $(dbus-launch --sh-syntax --exit-with-session)
+fi
+
+exec jwm -f /root/.jwmrc
