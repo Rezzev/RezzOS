@@ -1,31 +1,39 @@
 <?xml version="1.0"?>
 <JWM>
-    <!-- The root menu. -->
+    <!-- Start Menu (Left Click) -->
+    <RootMenu onroot="1">
+        <Program icon="folder" label="Проводник">pcmanfm -n</Program>
+        <Program icon="accessories-text-editor" label="Блокнот">mousepad</Program>
+        <Program icon="utilities-terminal" label="Терминал">st</Program>
+        <Separator/>
+        <Program icon="utilities-system-monitor" label="Информация о системе">sysinfo.sh</Program>
+        <Program icon="utilities-system-monitor" label="Диспетчер задач">st -e htop</Program>
+        <Separator/>
+        <Restart label="Перезагрузить JWM" icon="view-refresh"/>
+        <Exit label="Выход" confirm="true" icon="system-log-out"/>
+    </RootMenu>
+
+    <!-- Desktop Context Menu (Right Click) -->
     <RootMenu onroot="3">
-        <Program icon="terminal.png" label="Terminal">st</Program>
-        <Program icon="editor.png" label="Text Editor">st -e nano</Program>
+        <Program icon="document-new" label="Создать файл...">create_file.sh</Program>
+        <Program icon="folder-new" label="Создать папку...">create_folder.sh</Program>
         <Separator/>
-        <Menu icon="folder.png" label="System">
-            <Program icon="info.png" label="System Info">st -e top</Program>
-            <Program icon="terminal.png" label="Shell Profile">st -e bash -l</Program>
-        </Menu>
+        <Program icon="folder" label="Открыть Проводник здесь">pcmanfm -n</Program>
+        <Program icon="utilities-terminal" label="Открыть Терминал здесь">st</Program>
         <Separator/>
-        <Program icon="lock.png" label="Lock">xlock</Program>
-        <Separator/>
-        <Restart label="Restart JWM" icon="restart.png"/>
-        <Exit label="Exit" confirm="true" icon="quit.png"/>
+        <Program icon="utilities-system-monitor" label="Информация о системе">sysinfo.sh</Program>
     </RootMenu>
 
     <!-- Options for program interfaces. -->
     <Tray x="0" y="-1" autohide="off">
-        <TrayButton icon="jwm-blue">root:3</TrayButton>
+        <TrayButton label="Пуск" icon="jwm-blue">root:1</TrayButton>
         <Spacer width="2"/>
         <TrayButton label="_">showdesktop</TrayButton>
         <Spacer width="2"/>
         <Pager labeled="true"/>
         <TaskList maxwidth="256"/>
         <Dock/>
-        <Clock format="%H:%M"><Button mask="123">exec:st</Button></Clock>
+        <Clock format="%d.%m.%Y %H:%M"></Clock>
     </Tray>
 
     <!-- Visual Styles -->
