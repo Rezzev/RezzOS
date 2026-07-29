@@ -9,8 +9,15 @@
         <Program icon="utilities-system-monitor" label="Информация о системе">sysinfo.sh</Program>
         <Program icon="utilities-system-monitor" label="Диспетчер задач">st -e htop</Program>
         <Separator/>
-        <Restart label="Перезагрузить JWM" icon="view-refresh"/>
-        <Exit label="Выход" confirm="true" icon="system-log-out"/>
+        <Menu icon="system-shutdown" label="Питание">
+            <Program icon="system-suspend" label="Спящий режим">sh -c 'zenity --info --title="RezzOS" --text="Переход в спящий режим..." --timeout=2 &amp; suspend'</Program>
+            <Program icon="system-hibernate" label="Гибернация">sh -c 'zenity --info --title="RezzOS" --text="Гибернация..." --timeout=3 &amp; hibernate'</Program>
+            <Program icon="system-reboot" label="Перезагрузка">sh -c 'zenity --info --title="RezzOS" --text="Перезагрузка..." --timeout=5 &amp; reboot'</Program>
+            <Program icon="system-shutdown" label="Выключение">sh -c 'zenity --info --title="RezzOS" --text="Завершение работы..." --timeout=5 &amp; poweroff'</Program>
+            <Separator/>
+            <Restart label="Перезагрузить JWM" icon="view-refresh"/>
+            <Exit label="Выход из GUI" confirm="true" icon="system-log-out"/>
+        </Menu>
     </RootMenu>
 
     <!-- Desktop Context Menu (Right Click) -->
@@ -26,7 +33,7 @@
 
     <!-- Options for program interfaces. -->
     <Tray x="0" y="-1" autohide="off">
-        <TrayButton label="Пуск" icon="jwm-blue">root:1</TrayButton>
+        <TrayButton label="Menu" icon="jwm-blue">root:1</TrayButton>
         <Spacer width="2"/>
         <TrayButton label="_">showdesktop</TrayButton>
         <Spacer width="2"/>
@@ -118,4 +125,5 @@
     <Key mask="A" key="Left">ldesktop</Key>
     <Key mask="A" key="Up">udesktop</Key>
     <Key mask="A" key="Down">ddesktop</Key>
+    <Key mask="CA" key="t">exec:st</Key>
 </JWM>

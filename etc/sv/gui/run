@@ -9,4 +9,5 @@ export PATH=/sbin:/bin:/usr/bin:/usr/sbin
 udevadm settle 2>/dev/null || true
 
 cd /root
-exec startx
+startx
+sv down gui
