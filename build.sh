@@ -214,6 +214,30 @@ for pkg in $EDGE_COMMUNITY_PACKAGES; do
     [ -d etc ] && cp -r etc/* "$ROOTFS_DIR/etc/" 2>/dev/null || true
 done
 
+step "Installing GUI apps and dependencies using apk.static"
+if [ ! -s "$CACHE_DIR/apk-tools-static.apk" ]; then
+    wget -q "http://dl-cdn.alpinelinux.org/alpine/v3.20/main/x86_64/apk-tools-static-2.14.4-r1.apk" -O "$CACHE_DIR/apk-tools-static.apk" || true
+fi
+tar -xzf "$CACHE_DIR/apk-tools-static.apk" sbin/apk.static 2>/dev/null || true
+
+# Make sure directories are writable before apk.static installs into them
+[ -d "$ROOTFS_DIR/etc" ] && chmod -R u+w "$ROOTFS_DIR/etc" 2>/dev/null || true
+[ -d "$ROOTFS_DIR/usr" ] && chmod -R u+w "$ROOTFS_DIR/usr" 2>/dev/null || true
+[ -d "$ROOTFS_DIR/lib" ] && chmod -R u+w "$ROOTFS_DIR/lib" 2>/dev/null || true
+[ -d "$ROOTFS_DIR/bin" ] && chmod -R u+w "$ROOTFS_DIR/bin" 2>/dev/null || true
+[ -d "$ROOTFS_DIR/sbin" ] && chmod -R u+w "$ROOTFS_DIR/sbin" 2>/dev/null || true
+
+if [ -f sbin/apk.static ]; then
+    mkdir -p "$ROOTFS_DIR/etc/apk" "$ROOTFS_DIR/lib/apk/db" "$ROOTFS_DIR/var/cache/apk"
+    touch "$ROOTFS_DIR/etc/apk/world"
+    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" --initdb -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted update
+    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm mousepad zenity htop neofetch adwaita-icon-theme menu-cache gvfs
+fi
+
+# Restore custom busybox and remove conflicting Alpine busybox symlinks for runit
+cp -f "$BUSYBOX_DIR/busybox" "$ROOTFS_DIR/bin/busybox" 2>/dev/null || true
+rm -f "$ROOTFS_DIR/usr/bin/runsv" "$ROOTFS_DIR/usr/bin/runsvdir" "$ROOTFS_DIR/usr/bin/runsvchdir" "$ROOTFS_DIR/usr/bin/sv" "$ROOTFS_DIR/usr/bin/svlogd" "$ROOTFS_DIR/usr/bin/chpst" "$ROOTFS_DIR/usr/bin/utmpset"
+
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/etc/runit/3" 2>/dev/null || true
