@@ -254,6 +254,10 @@ fi
 [ -f "$ROOTFS_DIR/usr/bin/font" ] && ln -sf /usr/bin/font "$ROOTFS_DIR/usr/bin/rezzfont" 2>/dev/null || true
 [ -f "$ROOTFS_DIR/usr/bin/font" ] && ln -sf /usr/bin/font "$ROOTFS_DIR/bin/rezzfont" 2>/dev/null || true
 
+# Ensure rezzconfig alias exists
+[ -f "$ROOTFS_DIR/usr/bin/rezzconfig" ] && ln -sf /usr/bin/rezzconfig "$ROOTFS_DIR/usr/bin/config" 2>/dev/null || true
+[ -f "$ROOTFS_DIR/usr/bin/rezzconfig" ] && ln -sf /usr/bin/rezzconfig "$ROOTFS_DIR/bin/config" 2>/dev/null || true
+
 # Ensure sudo permissions and executable symlinks
 if [ -f "$ROOTFS_DIR/usr/bin/sudo" ]; then
     chmod 4755 "$ROOTFS_DIR/usr/bin/sudo" 2>/dev/null || true
