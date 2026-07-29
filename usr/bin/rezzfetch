@@ -25,14 +25,14 @@ fi
 
 
 info() {
-	echo -e "${BLUE}_______________________________________________________________________${NC}"
-	echo -e "${CYAN}OS:${NC} $OS													 "
+	echo -e "${BLUE}____________________________________________________________${NC}"
+	echo -e "${CYAN}OS:${NC} $OS												 "
 	echo -e "${CYAN}ARCH:${NC} $ARCH											 "
 	echo -e "${CYAN}UPTIME:${NC} $UPTIME										 "
 	echo -e "${CYAN}KERNEL:${NC} $KERNEL										 "
 	echo -e "${CYAN}CPU:${NC} $CPU												 "
 	echo -e "${CYAN}MEMORY:${NC} $MEMORY										 "										
-	echo -e "${BLUE}_______________________________________________________________________${NC}"
+	echo -e "${BLUE}____________________________________________________________${NC}"
 
 
 
