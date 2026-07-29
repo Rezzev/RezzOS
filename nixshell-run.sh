@@ -17,6 +17,7 @@ nix-shell -E 'with import <nixpkgs> {}; gcc13Stdenv.mkDerivation { name = "env";
 echo "Return collected images..."
 cd - > /dev/null
 cp /tmp/RezzOS_build/{bzImage,rootfs.cpio.gz,disk.img} . 2>/dev/null || true
+cp -r /tmp/RezzOS_build/dl_cache . 2>/dev/null || true
 
 echo "Start RezzOS GUI..."
 nix-shell -p qemu --run "./start-gui.sh"
