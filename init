@@ -5,6 +5,16 @@ mount -t devtmpfs dev /dev
 mkdir -p /dev/pts
 mount -t devpts devpts /dev/pts -o mode=0620,ptmxmode=0666 2>/dev/null || mount -t devpts devpts /dev/pts 2>/dev/null || true
 
+mkdir -p /run
+mount -t tmpfs tmpfs /run
+
+# Start udev for input devices (X11/libinput)
+if [ -x /sbin/udevd ]; then
+    /sbin/udevd --daemon
+    udevadm trigger
+    udevadm settle
+fi
+
 hostname rezzos
 echo 0 > /proc/sys/kernel/printk
 
@@ -72,6 +82,35 @@ if [ -d /mnt/disk/packages ]; then
     done
     rm -rf /tmp/pkg
     cd /
+fi
+
+# Restore enabled services from persistent disk
+if [ -d /mnt/disk/services ]; then
+    for svc in /mnt/disk/services/*; do
+        [ -f "$svc" ] || continue
+        svc_name=$(basename "$svc")
+        if [ -d "/etc/sv/$svc_name" ]; then
+            ln -s "/etc/sv/$svc_name" "/etc/runit/runsvdir/default/$svc_name" 2>/dev/null || true
+        fi
+    done
+fi
+
+if [ ! -f /usr/share/glib-2.0/schemas/gschemas.compiled ]; then
+    echo "Configuring GTK/Desktop caches..."
+    /usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas 2>/dev/null || true
+    if [ -x /usr/bin/gdk-pixbuf-query-loaders ]; then
+        /usr/bin/gdk-pixbuf-query-loaders > /usr/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache 2>/dev/null || true
+    fi
+    if [ -x /usr/bin/update-mime-database ]; then
+        /usr/bin/update-mime-database /usr/share/mime 2>/dev/null || true
+    fi
+    if [ -x /usr/bin/update-desktop-database ]; then
+        /usr/bin/update-desktop-database /usr/share/applications 2>/dev/null || true
+    fi
+    if [ -x /usr/bin/gtk-update-icon-cache ]; then
+        /usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/Adwaita 2>/dev/null || true
+        /usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+    fi
 fi
 
 clear

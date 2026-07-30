@@ -1,0 +1,129 @@
+<?xml version="1.0"?>
+<JWM>
+    <!-- Start Menu (Left Click) -->
+    <RootMenu onroot="1">
+        <Program icon="folder" label="Проводник">pcmanfm -n</Program>
+        <Program icon="accessories-text-editor" label="Блокнот">mousepad</Program>
+        <Program icon="utilities-terminal" label="Терминал">st</Program>
+        <Separator/>
+        <Program icon="utilities-system-monitor" label="Информация о системе">sysinfo.sh</Program>
+        <Program icon="utilities-system-monitor" label="Диспетчер задач">st -e htop</Program>
+        <Separator/>
+        <Menu icon="system-shutdown" label="Питание">
+            <Program icon="system-suspend" label="Спящий режим">sh -c 'zenity --info --title="RezzOS" --text="Переход в спящий режим..." --timeout=2 &amp; suspend'</Program>
+            <Program icon="system-hibernate" label="Гибернация">sh -c 'zenity --info --title="RezzOS" --text="Гибернация..." --timeout=3 &amp; hibernate'</Program>
+            <Program icon="system-reboot" label="Перезагрузка">sh -c 'zenity --info --title="RezzOS" --text="Перезагрузка..." --timeout=5 &amp; reboot'</Program>
+            <Program icon="system-shutdown" label="Выключение">sh -c 'zenity --info --title="RezzOS" --text="Завершение работы..." --timeout=5 &amp; poweroff'</Program>
+            <Separator/>
+            <Restart label="Перезагрузить JWM" icon="view-refresh"/>
+            <Exit label="Выход из GUI" confirm="true" icon="system-log-out"/>
+        </Menu>
+    </RootMenu>
+
+    <!-- Desktop Context Menu (Right Click) -->
+    <RootMenu onroot="3">
+        <Program icon="document-new" label="Создать файл...">create_file.sh</Program>
+        <Program icon="folder-new" label="Создать папку...">create_folder.sh</Program>
+        <Separator/>
+        <Program icon="folder" label="Открыть Проводник здесь">pcmanfm -n</Program>
+        <Program icon="utilities-terminal" label="Открыть Терминал здесь">st</Program>
+        <Separator/>
+        <Program icon="utilities-system-monitor" label="Информация о системе">sysinfo.sh</Program>
+    </RootMenu>
+
+    <!-- Options for program interfaces. -->
+    <Tray x="0" y="-1" autohide="off">
+        <TrayButton label="Menu" icon="jwm-blue">root:1</TrayButton>
+        <Spacer width="2"/>
+        <TrayButton label="_">showdesktop</TrayButton>
+        <Spacer width="2"/>
+        <Pager labeled="true"/>
+        <TaskList maxwidth="256"/>
+        <Dock/>
+        <Clock format="%d.%m.%Y %H:%M"></Clock>
+    </Tray>
+
+    <!-- Visual Styles -->
+    <WindowStyle>
+        <Font>Sans-9</Font>
+        <Width>4</Width>
+        <Height>21</Height>
+        <Corner>3</Corner>
+        <Foreground>#FFFFFF</Foreground>
+        <Background>#333333</Background>
+        <Outline>#000000</Outline>
+        <Opacity>0.5</Opacity>
+        <Active>
+            <Foreground>#FFFFFF</Foreground>
+            <Background>#0077CC</Background>
+            <Outline>#000000</Outline>
+            <Opacity>1.0</Opacity>
+        </Active>
+    </WindowStyle>
+    
+    <TrayStyle group="true" list="all">
+        <Font>Sans-9</Font>
+        <Background>#333333</Background>
+        <Foreground>#FFFFFF</Foreground>
+        <Outline>#000000</Outline>
+        <Opacity>0.75</Opacity>
+    </TrayStyle>
+
+    <PagerStyle>
+        <Outline>#000000</Outline>
+        <Foreground>#555555</Foreground>
+        <Background>#333333</Background>
+        <Text>#FFFFFF</Text>
+        <Active>
+            <Foreground>#0077CC</Foreground>
+            <Background>#004488</Background>
+        </Active>
+    </PagerStyle>
+
+    <MenuStyle>
+        <Font>Sans-9</Font>
+        <Foreground>#FFFFFF</Foreground>
+        <Background>#333333</Background>
+        <Outline>#000000</Outline>
+        <Active>
+            <Foreground>#FFFFFF</Foreground>
+            <Background>#0077CC</Background>
+        </Active>
+        <Opacity>0.85</Opacity>
+    </MenuStyle>
+
+    <PopupStyle>
+        <Font>Sans-9</Font>
+        <Foreground>#000000</Foreground>
+        <Background>#999999</Background>
+    </PopupStyle>
+
+    <!-- Virtual Desktops -->
+    <Desktops width="4" height="1">
+        <!-- Default background -->
+        <Background type="solid">#112233</Background>
+    </Desktops>
+
+    <!-- Key bindings -->
+    <Key key="Up">up</Key>
+    <Key key="Down">down</Key>
+    <Key key="Right">right</Key>
+    <Key key="Left">left</Key>
+    <Key key="h">left</Key>
+    <Key key="j">down</Key>
+    <Key key="k">up</Key>
+    <Key key="l">right</Key>
+    <Key key="Return">select</Key>
+    <Key key="Escape">escape</Key>
+
+    <Key mask="A" key="Tab">nextstacked</Key>
+    <Key mask="A" key="F4">close</Key>
+    <Key mask="A" key="F1">root:3</Key>
+    <Key mask="A" key="F2">window</Key>
+    <Key mask="A" key="F10">maximize</Key>
+    <Key mask="A" key="Right">rdesktop</Key>
+    <Key mask="A" key="Left">ldesktop</Key>
+    <Key mask="A" key="Up">udesktop</Key>
+    <Key mask="A" key="Down">ddesktop</Key>
+    <Key mask="CA" key="t">exec:st</Key>
+</JWM>
