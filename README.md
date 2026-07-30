@@ -70,6 +70,10 @@ udhcpc -i eth0
 echo "nameserver 8.8.8.8" > /etc/resolv.conf
 ```
 
+# Enter before use pkg:
+```bash
+pkg update
+```
 
 ## Quick Start(in qemu)
 To get launched, use ./start.sh or start-gui.sh
