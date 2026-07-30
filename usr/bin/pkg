@@ -78,44 +78,81 @@ find_pkg() {
     return 1
 }
 
-install_pkg() {
-    test -z "$1" && usage && return 1
-
-    for PKG in "$@"; do
-        if echo "$PKG" | grep -q "\.apk$"; then
-            APK="$PKG"
-        else
-            APK=$(find_pkg "$PKG")
+get_deps() {
+    NAME="$1"
+    for idx in "$CACHE_DIR/APKINDEX_main" "$CACHE_DIR/APKINDEX_community"; do
+        test -f "$idx" || continue
+        DEPS=$(grep -A20 "P:$NAME$" "$idx" | grep "^D:" | head -1 | sed 's/D://')
+        if test -n "$DEPS"; then
+            for dep in $DEPS; do
+                case "$dep" in
+                    so:*|cmd:*|pc:*) continue ;;
+                esac
+                dep_name=$(echo "$dep" | sed 's/[<>=].*//')
+                test "$dep_name" != "$NAME" && echo "$dep_name"
+            done
+            return 0
         fi
-
-        if test -z "$APK"; then
-            echo -e "${RED}Not found: $PKG${NC}"
-            continue
-        fi
-
-        echo -e "${YELLOW}Installing $APK...${NC}"
-        mkdir -p "$PKG_DIR" /tmp/pkg_dl
-
-        wget -q --no-check-certificate "$REPO_MAIN/$APK" -O "/tmp/pkg_dl/$APK" 2>/dev/null || \
-        wget -q --no-check-certificate "$REPO_COMMUNITY/$APK" -O "/tmp/pkg_dl/$APK" 2>/dev/null
-
-        if test ! -s "/tmp/pkg_dl/$APK"; then
-            echo -e "${RED}Download failed for $APK${NC}"
-            continue
-        fi
-
-        cd /tmp && rm -rf /tmp/pkg_extract && mkdir -p /tmp/pkg_extract
-        cd /tmp/pkg_extract
-        tar -xzf "/tmp/pkg_dl/$APK" 2>/dev/null
-
-        test -d usr && cp -r usr/* /usr/ 2>/dev/null
-        test -d bin && cp -r bin/* /bin/ 2>/dev/null
-        test -d lib && cp -r lib/* /lib/ 2>/dev/null
-
-        cp "/tmp/pkg_dl/$APK" "$PKG_DIR/"
-        echo "$APK" >> "$INSTALLED_LIST"
-        echo -e "${GREEN}Done: $APK${NC}"
     done
+    return 1
+}
+
+install_single_pkg() {
+    PKG="$1"
+    if echo "$PKG" | grep -q "\.apk$"; then
+        APK="$PKG"
+    else
+        APK=$(find_pkg "$PKG")
+    fi
+
+    test -z "$APK" && echo -e "${RED}Not found: $PKG${NC}" && return 1
+
+    echo -e "${YELLOW}Installing $APK...${NC}"
+    mkdir -p "$PKG_DIR" /tmp/pkg_dl
+
+    wget -q --no-check-certificate "$REPO_MAIN/$APK" -O "/tmp/pkg_dl/$APK" 2>/dev/null || \
+    wget -q --no-check-certificate "$REPO_COMMUNITY/$APK" -O "/tmp/pkg_dl/$APK" 2>/dev/null
+
+    if test ! -s "/tmp/pkg_dl/$APK"; then
+        echo -e "${RED}Download failed for $APK${NC}"
+        return 1
+    fi
+
+    cd /tmp && rm -rf /tmp/pkg_extract && mkdir -p /tmp/pkg_extract
+    cd /tmp/pkg_extract
+    tar -xzf "/tmp/pkg_dl/$APK" 2>/dev/null
+
+    test -d usr && cp -r usr/* /usr/ 2>/dev/null
+    test -d bin && cp -r bin/* /bin/ 2>/dev/null
+    test -d lib && cp -r lib/* /lib/ 2>/dev/null
+
+    cp "/tmp/pkg_dl/$APK" "$PKG_DIR/"
+    echo "$APK" >> "$INSTALLED_LIST"
+    echo -e "${GREEN}Done: $APK${NC}"
+    return 0
+}
+
+install_with_deps() {
+    PKG_NAME="$1"
+    INSTALLED=""
+    
+    install_deps_recursive() {
+        local name="$1"
+        local deps=$(get_deps "$name")
+        for dep in $deps; do
+            if ! echo "$INSTALLED" | grep -q " $dep "; then
+                if ! grep -q "^${dep}-" "$INSTALLED_LIST" 2>/dev/null; then
+                    INSTALLED="$INSTALLED $dep "
+                    install_deps_recursive "$dep"
+                    echo "Installing dependency: $dep"
+                    install_single_pkg "$dep" 2>/dev/null || true
+                fi
+            fi
+        done
+    }
+    
+    install_deps_recursive "$PKG_NAME"
+    install_single_pkg "$PKG_NAME"
 }
 
 remove_pkg() {
@@ -158,7 +195,7 @@ remove_pkg() {
 CMD="$1"
 case "$CMD" in
     update)  update_index ;;
-    install) test -z "$2" && usage || { shift; install_pkg "$@"; } ;;
+    install) test -z "$2" && usage || { shift; for pkg in "$@"; do install_with_deps "$pkg"; done; } ;;
     search)  search_pkg "$2" ;;
     info)    info_pkg "$2" ;;
     list)    cat "$INSTALLED_LIST" 2>/dev/null || echo "No packages" ;;
