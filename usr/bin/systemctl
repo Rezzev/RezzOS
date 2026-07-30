@@ -1,0 +1,61 @@
+#!/bin/sh
+# A simple systemctl wrapper for runit in RezzOS
+
+if [ "$#" -lt 2 ]; then
+    echo "Usage: systemctl {enable|disable|start|stop|restart|status} <service>"
+    exit 1
+fi
+
+ACTION=$1
+SERVICE=$2
+SV_DIR="/etc/sv"
+RUN_DIR="/etc/runit/runsvdir/default"
+
+export SVDIR="$RUN_DIR"
+
+case "$ACTION" in
+    enable)
+        if [ ! -d "$SV_DIR/$SERVICE" ]; then
+            echo "Error: Service '$SERVICE' does not exist in $SV_DIR."
+            exit 1
+        fi
+        if [ -e "$RUN_DIR/$SERVICE" ]; then
+            echo "Service '$SERVICE' is already enabled."
+        else
+            ln -s "$SV_DIR/$SERVICE" "$RUN_DIR/$SERVICE"
+            # Persist to disk if available
+            if [ -d /mnt/disk ]; then
+                mkdir -p /mnt/disk/services
+                touch "/mnt/disk/services/$SERVICE"
+            fi
+            echo "Created symlink: $RUN_DIR/$SERVICE -> $SV_DIR/$SERVICE"
+            echo "Service '$SERVICE' enabled for autostart."
+        fi
+        ;;
+    disable)
+        if [ ! -e "$RUN_DIR/$SERVICE" ]; then
+            echo "Service '$SERVICE' is not enabled."
+        else
+            rm -f "$RUN_DIR/$SERVICE"
+            # Remove from persistent disk
+            if [ -d /mnt/disk/services ]; then
+                rm -f "/mnt/disk/services/$SERVICE"
+            fi
+            echo "Removed symlink: $RUN_DIR/$SERVICE"
+            echo "Service '$SERVICE' disabled from autostart."
+        fi
+        ;;
+    start|stop|restart|status)
+        if command -v sv >/dev/null 2>&1; then
+            sv "$ACTION" "$SERVICE"
+        else
+            echo "Error: 'sv' command not found. Ensure runit is installed."
+            exit 1
+        fi
+        ;;
+    *)
+        echo "Unknown action: $ACTION"
+        echo "Usage: systemctl {enable|disable|start|stop|restart|status} <service>"
+        exit 1
+        ;;
+esac

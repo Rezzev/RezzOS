@@ -11,6 +11,23 @@ ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up
 route add default gw 10.0.2.2
 echo "nameserver 8.8.8.8" > /etc/resolv.conf
 mount /dev/vda /mnt/disk 2>/dev/null
+if ! grep -q messagebus /etc/passwd; then
+    addgroup -S messagebus 2>/dev/null
+    adduser -S -D -H -h /var/run/dbus -s /sbin/nologin -G messagebus -g "dbus" messagebus 2>/dev/null
+fi
+mkdir -p /var/run/dbus
+dbus-daemon --system --fork 2>/dev/null || true
+
+if [ ! -f /etc/gtk_setup_done ]; then
+    echo "Configuring GTK schemas and mime database..."
+    /usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas 2>/dev/null
+    /usr/bin/update-mime-database /usr/share/mime 2>/dev/null
+    /usr/bin/gdk-pixbuf-query-loaders > /usr/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache 2>/dev/null
+    /usr/bin/gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null
+    touch /etc/gtk_setup_done
+fi
+
 clear
 /usr/bin/fetch
 echo ""
+dropbear -R

@@ -157,8 +157,9 @@ cp -r lib/* "$ROOTFS_DIR/lib/"
 [ -d usr/lib ] && cp -r usr/lib/* "$ROOTFS_DIR/usr/lib/" || true
 
 step "Downloading Alpine packages (using local cache)"
-MAIN_PACKAGES="ncurses-terminfo-base-6.4_p20240420-r2.apk dhcpcd-10.0.6-r1.apk libncursesw-6.4_p20240420-r2.apk libevent-2.1.12-r7.apk tmux-3.4-r1.apk readline-8.2.10-r0.apk bash-5.2.26-r0.apk nano-8.0-r0.apk dropbear-2024.85-r0.apk dropbear-ssh-2024.85-r0.apk zlib-1.3.2-r0.apk musl-dev-1.2.5-r3.apk musl-1.2.5-r3.apk make-4.4.1-r2.apk linenoise-1.0-r5.apk"
-for pkg in $MAIN_PACKAGES; do
+MAIN_GUI="libsm-1.2.4-r4.apk xz-libs-5.8.3-r0.apk dbus-x11-1.14.10-r1.apk dbus-libs-1.14.10-r1.apk libpng-1.6.57-r0.apk libffi-3.4.6-r0.apk mesa-24.0.9-r1.apk harfbuzz-8.5.0-r0.apk wayland-libs-client-1.22.0-r4.apk libgcc-13.2.1_git20240309-r1.apk pcre2-10.43-r0.apk libuuid-2.40.1-r1.apk libice-1.1.1-r6.apk libxdmcp-1.1.5-r1.apk libxt-1.3.0-r5.apk libxxf86vm-1.1.5-r6.apk libxau-1.0.11-r4.apk pango-1.52.2-r0.apk mcookie-2.40.1-r1.apk libxft-2.3.8-r3.apk libeconf-0.6.3-r0.apk libxinerama-1.1.5-r4.apk libpciaccess-0.18.1-r0.apk libxshmfence-1.3.2-r6.apk cairo-1.18.4-r0.apk font-alias-1.0.5-r0.apk brotli-libs-1.1.0-r2.apk font-terminus-4.49.1-r4.apk libmd-1.1.0-r0.apk encodings-1.0.7-r1.apk pixman-0.43.2-r0.apk libblkid-2.40.1-r1.apk font-liberation-2.1.5-r2.apk musl-1.2.5-r3.apk wayland-libs-server-1.22.0-r4.apk libxcb-1.16.1-r0.apk font-dejavu-2.37-r5.apk mkfontscale-1.2.2-r6.apk font-misc-misc-1.1.3-r1.apk libcrypto3-3.3.7-r0.apk udev-init-scripts-35-r1.apk graphite2-1.3.14-r6.apk libstdc++-13.2.1_git20240309-r1.apk libmount-2.40.1-r1.apk libdrm-2.4.120-r0.apk xkeyboard-config-2.41-r0.apk fribidi-1.0.15-r0.apk mesa-gbm-24.0.9-r1.apk mesa-gl-24.0.9-r1.apk hwdata-pci-0.382-r0.apk fontconfig-2.15.0-r1.apk kmod-libs-32-r0.apk freetype-2.13.2-r0.apk nettle-3.10.2-r0.apk libxmu-1.1.4-r2.apk util-macros-1.20.0-r0.apk libbsd-0.12.2-r0.apk libx11-1.8.9-r1.apk libepoxy-1.5.10-r1.apk mesa-glapi-24.0.9-r1.apk zlib-1.3.2-r0.apk tiff-4.6.0t-r0.apk dbus-1.14.10-r1.apk eudev-3.2.14-r2.apk xkbcomp-1.5.0-r0.apk libsharpyuv-1.3.2-r0.apk libxrender-0.9.11-r5.apk libfontenc-1.1.8-r0.apk mesa-egl-24.0.9-r1.apk libjpeg-turbo-3.0.3-r0.apk libxext-1.3.6-r2.apk gdk-pixbuf-2.42.12-r0.apk libbz2-1.0.8-r6.apk libxfixes-6.0.1-r4.apk libintl-0.22.5-r0.apk ncurses-terminfo-base-6.4_p20240420-r2.apk libexpat-2.8.1-r0.apk eudev-libs-3.2.14-r2.apk gmp-6.3.0-r1.apk glib-2.80.5-r0.apk libwebp-1.3.2-r0.apk libxpm-3.5.19-r0.apk libxrandr-1.5.4-r1.apk libxml2-2.12.10-r0.apk zstd-libs-1.5.6-r0.apk cairo-gobject-1.18.4-r0.apk shared-mime-info-2.4-r0.apk libxkbfile-1.1.3-r0.apk font-cursor-misc-1.0.4-r1.apk"
+MAIN_PACKAGES="ncurses-terminfo-base-6.4_p20240420-r2.apk dhcpcd-10.0.6-r1.apk libncursesw-6.4_p20240420-r2.apk libevent-2.1.12-r7.apk tmux-3.4-r1.apk readline-8.2.10-r0.apk bash-5.2.26-r0.apk nano-8.0-r0.apk dropbear-2024.85-r0.apk dropbear-ssh-2024.85-r0.apk zlib-1.3.2-r0.apk musl-dev-1.2.5-r3.apk musl-1.2.5-r3.apk make-4.4.1-r2.apk lua5.3-5.3.6-r6.apk lua5.3-libs-5.3.6-r6.apk linenoise-1.0-r5.apk"
+for pkg in $MAIN_PACKAGES $MAIN_GUI; do
     if [ ! -s "$CACHE_DIR/$pkg" ]; then
         rm -f "$CACHE_DIR/$pkg"
         wget "$ALPINE_MAIN/$pkg" -O "$CACHE_DIR/$pkg" || { echo "Failed to download $pkg from $ALPINE_MAIN"; exit 1; }
@@ -169,12 +170,16 @@ for pkg in $MAIN_PACKAGES; do
     tar -xzf "$CACHE_DIR/$pkg" 2>/dev/null
     [ -d usr ] && cp -r usr/* "$ROOTFS_DIR/usr/" 2>/dev/null || true
     [ -d bin ] && cp -r bin/* "$ROOTFS_DIR/bin/" 2>/dev/null || true
+    [ -d sbin ] && cp -r sbin/* "$ROOTFS_DIR/sbin/" 2>/dev/null || true
     [ -d lib ] && cp -r lib/* "$ROOTFS_DIR/lib/" 2>/dev/null || true
     [ -d etc ] && cp -r etc/* "$ROOTFS_DIR/etc/" 2>/dev/null || true
+    [ -d var ] && cp -r var/* "$ROOTFS_DIR/var/" 2>/dev/null || true
+    [ -d share ] && cp -r share/* "$ROOTFS_DIR/usr/share/" 2>/dev/null || true
 done
 
-COMMUNITY_PACKAGES="runit-2.1.2-r7.apk  sudo-1.9.15_p5-r0.apk iwd-2.17-r0.apk "
-for pkg in $COMMUNITY_PACKAGES; do
+COMM_GUI="mtdev-1.1.6-r3.apk libinput-libs-1.25.0-r0.apk xorg-server-common-21.1.14-r0.apk xrdb-1.2.2-r0.apk jwm-2.4.3-r0.apk libevdev-1.13.1-r0.apk setxkbmap-1.3.4-r0.apk st-0.9.2-r0.apk xinit-1.4.2-r1.apk libxcvt-0.1.2-r0.apk xmodmap-1.0.11-r1.apk xorg-server-21.1.14-r0.apk xf86-video-fbdev-0.5.0-r6.apk xf86-video-vesa-2.6.0-r4.apk librsvg-2.58.5-r0.apk xauth-1.1.3-r0.apk xf86-input-libinput-1.4.0-r1.apk libxfont2-2.0.6-r4.apk"
+COMMUNITY_PACKAGES="runit-2.1.2-r7.apk neatvi-15-r0.apk sudo-1.9.15_p5-r0.apk iwd-2.17-r0.apk "
+for pkg in $COMMUNITY_PACKAGES $COMM_GUI; do
     if [ ! -s "$CACHE_DIR/$pkg" ]; then
         rm -f "$CACHE_DIR/$pkg"
         wget "$ALPINE_COMMUNITY/$pkg" -O "$CACHE_DIR/$pkg" || { echo "Failed to download $pkg from $ALPINE_COMMUNITY"; exit 1; }
@@ -188,6 +193,8 @@ for pkg in $COMMUNITY_PACKAGES; do
     [ -d bin ] && cp -r bin/* "$ROOTFS_DIR/bin/" 2>/dev/null || true
     [ -d lib ] && cp -r lib/* "$ROOTFS_DIR/lib/" 2>/dev/null || true
     [ -d etc ] && cp -r etc/* "$ROOTFS_DIR/etc/" 2>/dev/null || true
+    [ -d var ] && cp -r var/* "$ROOTFS_DIR/var/" 2>/dev/null || true
+    [ -d share ] && cp -r share/* "$ROOTFS_DIR/usr/share/" 2>/dev/null || true
 done
 
 EDGE_COMMUNITY_PACKAGES="tcc-0.9.27_git20260714-r0.apk tcc-libs-0.9.27_git20260714-r0.apk tcc-libs-static-0.9.27_git20260714-r0.apk"
@@ -206,6 +213,30 @@ for pkg in $EDGE_COMMUNITY_PACKAGES; do
     [ -d lib ] && cp -r lib/* "$ROOTFS_DIR/lib/" 2>/dev/null || true
     [ -d etc ] && cp -r etc/* "$ROOTFS_DIR/etc/" 2>/dev/null || true
 done
+
+step "Installing GUI apps and dependencies using apk.static"
+if [ ! -s "$CACHE_DIR/apk-tools-static.apk" ]; then
+    wget -q "http://dl-cdn.alpinelinux.org/alpine/v3.20/main/x86_64/apk-tools-static-2.14.4-r1.apk" -O "$CACHE_DIR/apk-tools-static.apk" || true
+fi
+tar -xzf "$CACHE_DIR/apk-tools-static.apk" sbin/apk.static 2>/dev/null || true
+
+# Make sure directories are writable before apk.static installs into them
+[ -d "$ROOTFS_DIR/etc" ] && chmod -R u+w "$ROOTFS_DIR/etc" 2>/dev/null || true
+[ -d "$ROOTFS_DIR/usr" ] && chmod -R u+w "$ROOTFS_DIR/usr" 2>/dev/null || true
+[ -d "$ROOTFS_DIR/lib" ] && chmod -R u+w "$ROOTFS_DIR/lib" 2>/dev/null || true
+[ -d "$ROOTFS_DIR/bin" ] && chmod -R u+w "$ROOTFS_DIR/bin" 2>/dev/null || true
+[ -d "$ROOTFS_DIR/sbin" ] && chmod -R u+w "$ROOTFS_DIR/sbin" 2>/dev/null || true
+
+if [ -f sbin/apk.static ]; then
+    mkdir -p "$ROOTFS_DIR/etc/apk" "$ROOTFS_DIR/lib/apk/db" "$ROOTFS_DIR/var/cache/apk"
+    touch "$ROOTFS_DIR/etc/apk/world"
+    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" --initdb -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted update
+    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm mousepad zenity htop neofetch adwaita-icon-theme menu-cache gvfs
+fi
+
+# Restore custom busybox and remove conflicting Alpine busybox symlinks for runit
+cp -f "$BUSYBOX_DIR/busybox" "$ROOTFS_DIR/bin/busybox" 2>/dev/null || true
+rm -f "$ROOTFS_DIR/usr/bin/runsv" "$ROOTFS_DIR/usr/bin/runsvdir" "$ROOTFS_DIR/usr/bin/runsvchdir" "$ROOTFS_DIR/usr/bin/sv" "$ROOTFS_DIR/usr/bin/svlogd" "$ROOTFS_DIR/usr/bin/chpst" "$ROOTFS_DIR/usr/bin/utmpset"
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/bin/"* 2>/dev/null || true
@@ -237,10 +268,19 @@ if [ -f "$ROOTFS_DIR/usr/bin/neatvi" ]; then
     ln -sf /usr/bin/neatvi "$ROOTFS_DIR/usr/bin/vi" 2>/dev/null || true
 fi
 
+# Make xinitrc executable and alias xterm to st
+[ -f "$ROOTFS_DIR/etc/X11/xinit/xinitrc" ] && chmod +x "$ROOTFS_DIR/etc/X11/xinit/xinitrc" 2>/dev/null || true
+[ -f "$ROOTFS_DIR/root/.xinitrc" ] && chmod +x "$ROOTFS_DIR/root/.xinitrc" 2>/dev/null || true
+[ -f "$ROOTFS_DIR/usr/bin/st" ] && ln -sf /usr/bin/st "$ROOTFS_DIR/usr/bin/xterm" 2>/dev/null || true
+
 # Ensure font management tool symlinks exist
 [ -f "$ROOTFS_DIR/usr/bin/font" ] && ln -sf /usr/bin/font "$ROOTFS_DIR/bin/font" 2>/dev/null || true
 [ -f "$ROOTFS_DIR/usr/bin/font" ] && ln -sf /usr/bin/font "$ROOTFS_DIR/usr/bin/rezzfont" 2>/dev/null || true
 [ -f "$ROOTFS_DIR/usr/bin/font" ] && ln -sf /usr/bin/font "$ROOTFS_DIR/bin/rezzfont" 2>/dev/null || true
+
+# Ensure rezzconfig alias exists
+[ -f "$ROOTFS_DIR/usr/bin/rezzconfig" ] && ln -sf /usr/bin/rezzconfig "$ROOTFS_DIR/usr/bin/config" 2>/dev/null || true
+[ -f "$ROOTFS_DIR/usr/bin/rezzconfig" ] && ln -sf /usr/bin/rezzconfig "$ROOTFS_DIR/bin/config" 2>/dev/null || true
 
 # Ensure sudo permissions and executable symlinks
 if [ -f "$ROOTFS_DIR/usr/bin/sudo" ]; then

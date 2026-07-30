@@ -1,0 +1,13 @@
+#!/bin/sh
+# Runit service for RezzOS GUI (JWM)
+
+export HOME=/root
+export USER=root
+export PATH=/sbin:/bin:/usr/bin:/usr/sbin
+
+# Wait for udev to populate input devices
+udevadm settle 2>/dev/null || true
+
+cd /root
+startx
+sv down gui
