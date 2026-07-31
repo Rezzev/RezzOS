@@ -9,10 +9,13 @@ mkdir -p /run
 mount -t tmpfs tmpfs /run
 
 # Start udev for input devices (X11/libinput)
+# NOTE: udevd --daemon doesn't reliably return control in this initramfs
+# environment, so it's wrapped in `timeout` to guarantee boot continues
+# even if the daemon fails to fork/settle properly.
 if [ -x /sbin/udevd ]; then
-    /sbin/udevd --daemon
-    udevadm trigger
-    udevadm settle
+    timeout 5 /sbin/udevd --daemon
+    timeout 5 udevadm trigger
+    timeout 10 udevadm settle
 fi
 
 hostname rezzos
@@ -36,7 +39,7 @@ ifconfig lo 127.0.0.1 up
 ifconfig eth0 up
 sleep 0.2
 
-udhcpc -i eth0 -t 5 -s /usr/share/udhcpc/default.script 2>/dev/null
+timeout 8 udhcpc -i eth0 -t 5 -s /usr/share/udhcpc/default.script 2>/dev/null
 
 if ! ifconfig eth0 | grep -q "inet "; then
     ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up
