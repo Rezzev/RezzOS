@@ -7,3 +7,4 @@ busybox-*/
 tmp/
 _install/
 bzImage
+rezzos.iso
