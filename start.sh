@@ -14,4 +14,4 @@ qemu-system-x86_64 \
     -netdev user,id=net0,hostfwd=tcp::2222-:22 -device virtio-net,netdev=net0 \
     -object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 \
     -drive file=disk.img,format=raw,if=virtio \
-    -m 512M -nographic
+    -m 1024M -nographic
