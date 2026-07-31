@@ -2,33 +2,33 @@
 <JWM>
     <!-- Start Menu (Left Click) -->
     <RootMenu onroot="1">
-        <Program icon="folder" label="Проводник">pcmanfm -n</Program>
-        <Program icon="accessories-text-editor" label="Блокнот">mousepad</Program>
-        <Program icon="utilities-terminal" label="Терминал">st</Program>
+        <Program icon="folder" label="File Manager">pcmanfm -n</Program>
+        <Program icon="accessories-text-editor" label="Notepad">rezzpad</Program>
+        <Program icon="utilities-terminal" label="Terminal">st</Program>
         <Separator/>
-        <Program icon="utilities-system-monitor" label="Информация о системе">sysinfo.sh</Program>
-        <Program icon="utilities-system-monitor" label="Диспетчер задач">st -e htop</Program>
+        <Program icon="utilities-system-monitor" label="System Info">sysinfo.sh</Program>
+        <Program icon="utilities-system-monitor" label="Task Manager">st -e htop</Program>
         <Separator/>
-        <Menu icon="system-shutdown" label="Питание">
-            <Program icon="system-suspend" label="Спящий режим">sh -c 'zenity --info --title="RezzOS" --text="Переход в спящий режим..." --timeout=2 &amp; suspend'</Program>
-            <Program icon="system-hibernate" label="Гибернация">sh -c 'zenity --info --title="RezzOS" --text="Гибернация..." --timeout=3 &amp; hibernate'</Program>
-            <Program icon="system-reboot" label="Перезагрузка">sh -c 'zenity --info --title="RezzOS" --text="Перезагрузка..." --timeout=5 &amp; reboot'</Program>
-            <Program icon="system-shutdown" label="Выключение">sh -c 'zenity --info --title="RezzOS" --text="Завершение работы..." --timeout=5 &amp; poweroff'</Program>
+        <Menu icon="system-shutdown" label="Power">
+            <Program icon="system-suspend" label="Suspend">sh -c 'zenity --info --title="RezzOS" --text="Suspending..." --timeout=2 &amp; suspend'</Program>
+            <Program icon="system-hibernate" label="Hibernate">sh -c 'zenity --info --title="RezzOS" --text="Hibernating..." --timeout=3 &amp; hibernate'</Program>
+            <Program icon="system-reboot" label="Reboot">sh -c 'zenity --info --title="RezzOS" --text="Rebooting..." --timeout=5 &amp; reboot'</Program>
+            <Program icon="system-shutdown" label="Shutdown">sh -c 'zenity --info --title="RezzOS" --text="Shutting down..." --timeout=5 &amp; poweroff'</Program>
             <Separator/>
-            <Restart label="Перезагрузить JWM" icon="view-refresh"/>
-            <Exit label="Выход из GUI" confirm="true" icon="system-log-out"/>
+            <Restart label="Restart JWM" icon="view-refresh"/>
+            <Exit label="Log Out of GUI" confirm="true" icon="system-log-out"/>
         </Menu>
     </RootMenu>
 
     <!-- Desktop Context Menu (Right Click) -->
     <RootMenu onroot="3">
-        <Program icon="document-new" label="Создать файл...">create_file.sh</Program>
-        <Program icon="folder-new" label="Создать папку...">create_folder.sh</Program>
+        <Program icon="document-new" label="Create File...">create_file.sh</Program>
+        <Program icon="folder-new" label="Create Folder...">create_folder.sh</Program>
         <Separator/>
-        <Program icon="folder" label="Открыть Проводник здесь">pcmanfm -n</Program>
-        <Program icon="utilities-terminal" label="Открыть Терминал здесь">st</Program>
+        <Program icon="folder" label="Open File Manager Here">pcmanfm -n</Program>
+        <Program icon="utilities-terminal" label="Open Terminal Here">st</Program>
         <Separator/>
-        <Program icon="utilities-system-monitor" label="Информация о системе">sysinfo.sh</Program>
+        <Program icon="utilities-system-monitor" label="System Info">sysinfo.sh</Program>
     </RootMenu>
 
     <!-- Options for program interfaces. -->
