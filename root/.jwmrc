@@ -5,6 +5,7 @@
         <Program icon="folder" label="File Manager">pcmanfm -n</Program>
         <Program icon="accessories-text-editor" label="Notepad">rezzpad</Program>
         <Program icon="utilities-terminal" label="Terminal">st</Program>
+        <Program icon="image-x-generic" label="Image viewer">rezzview</Program>
         <Separator/>
         <Program icon="utilities-system-monitor" label="System Info">sysinfo.sh</Program>
         <Program icon="utilities-system-monitor" label="Task Manager">st -e htop</Program>
