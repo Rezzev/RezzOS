@@ -6,3 +6,10 @@ video:x:44:user
 input:x:104:user
 user:x:1000:
 nobody:x:65534:
+dialout:x:20:
+kmem:x:15:
+lp:x:7:
+disk:x:6:
+cdrom:x:11:
+tape:x:26:
+kvm:x:36:
