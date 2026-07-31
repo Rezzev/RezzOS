@@ -20,7 +20,7 @@ CACHE_DIR="$REPO_DIR/dl_cache"
 
 JOBS="$(nproc)"
 
-TOTAL_STEPS=8
+TOTAL_STEPS=9
 CURRENT_STEP=0
 
 step() {
@@ -231,7 +231,7 @@ if [ -f sbin/apk.static ]; then
     mkdir -p "$ROOTFS_DIR/etc/apk" "$ROOTFS_DIR/lib/apk/db" "$ROOTFS_DIR/var/cache/apk"
     touch "$ROOTFS_DIR/etc/apk/world"
     fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" --initdb -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted update
-    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm mousepad zenity htop neofetch adwaita-icon-theme menu-cache gvfs
+    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm zenity htop neofetch adwaita-icon-theme menu-cache gvfs
 fi
 
 # Restore custom busybox and remove conflicting Alpine busybox symlinks for runit
@@ -254,6 +254,14 @@ cp -a "$REPO_DIR/etc/"* "$ROOTFS_DIR/etc/" 2>/dev/null || true
 if [ -f "$REPO_DIR/usr/bin/setconsolefont.c" ]; then
     gcc -O2 "$REPO_DIR/usr/bin/setconsolefont.c" -o "$ROOTFS_DIR/usr/bin/setconsolefont" 2>/dev/null || true
 fi
+
+step "Downloading rezzpad binary"
+REZZPAD_URL="https://github.com/neko-qt/rezzpad/releases/download/1.1.0/rezzpad-musl"
+if [ ! -f "$CACHE_DIR/rezzpad-musl" ]; then
+    wget -q "$REZZPAD_URL" -O "$CACHE_DIR/rezzpad-musl" || { echo "Failed to download rezzpad"; exit 1; }
+fi
+cp -f "$CACHE_DIR/rezzpad-musl" "$ROOTFS_DIR/usr/bin/rezzpad"
+chmod +x "$ROOTFS_DIR/usr/bin/rezzpad"
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/usr/share/udhcpc/default.script" 2>/dev/null || true
