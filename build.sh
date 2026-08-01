@@ -231,7 +231,7 @@ if [ -f sbin/apk.static ]; then
     mkdir -p "$ROOTFS_DIR/etc/apk" "$ROOTFS_DIR/lib/apk/db" "$ROOTFS_DIR/var/cache/apk"
     touch "$ROOTFS_DIR/etc/apk/world"
     fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" --initdb -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted update
-    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm zenity htop neofetch adwaita-icon-theme menu-cache gvfs
+    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm zenity neofetch adwaita-icon-theme menu-cache gvfs
 fi
 
 # Restore custom busybox and remove conflicting Alpine busybox symlinks for runit
@@ -269,6 +269,14 @@ if [ ! -f "$CACHE_DIR/rezzview-musl" ]; then
 fi
 cp -f "$CACHE_DIR/rezzview-musl" "$ROOTFS_DIR/usr/bin/rezzview"
 chmod +x "$ROOTFS_DIR/usr/bin/rezzview"
+
+REZZTOP_URL="https://github.com/neko-qt/rezztop/releases/download/1.1.0/rtop"
+if [ ! -f "$CACHE_DIR/rtop" ]; then
+    wget -q "$REZZTOP_URL" -O "$CACHE_DIR/rtop" || { echo "Failed to download rezztop"; exit 1; }
+fi
+cp -f "$CACHE_DIR/rtop" "$ROOTFS_DIR/usr/bin/rtop"
+chmod +x "$ROOTFS_DIR/usr/bin/rtop"
+
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/usr/share/udhcpc/default.script" 2>/dev/null || true
