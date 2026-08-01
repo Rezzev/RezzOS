@@ -8,7 +8,7 @@
         <Program icon="image-x-generic" label="Image viewer">rezzview</Program>
         <Separator/>
         <Program icon="utilities-system-monitor" label="System Info">sysinfo.sh</Program>
-        <Program icon="utilities-system-monitor" label="Task Manager">st -e htop</Program>
+        <Program icon="utilities-system-monitor" label="Task Manager">st -e rtop</Program>
         <Separator/>
         <Menu icon="system-shutdown" label="Power">
             <Program icon="system-suspend" label="Suspend">sh -c 'zenity --info --title="RezzOS" --text="Suspending..." --timeout=2 &amp; suspend'</Program>
