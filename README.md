@@ -90,9 +90,9 @@ To get launched, use ./start.sh or start-gui.sh
 Thanks to all contributors who help improve RezzOS!
 
 
-- [@semen88pochuev-eng](https://github.com/semen88pochuev-eng) (rezzev) - Project creator, core system architecture, kernel configuration, build system (.iso generation, GRUB), Lua integration, and continuous project maintenance
+- [@semen88pochuev-eng](https://github.com/semen88pochuev-eng) (rezzev) - Project creator, core system architecture, build system (.iso generation, GRUB), Lua integration, and continuous project maintenance
 - [@Kenyka kenykovich](https://github.com/keeniGithub) - GUI (JWM) and desktop environment integration, SSH server, multi-user login, systemctl/runit management, rezzconfig TUI, rezzmon, swap manager, and terminal enhancements
-- [@neko_qt](https://github.com/neko-qt) — TCC (Tiny C Compiler) integration with musl libs, neatvi editor, build system improvements (progress bar, auto-download sources), and init script fixes
+- [@neko_qt](https://github.com/neko-qt) — Rezz utils, build system improvements (progress bar, auto-download sources), kernel configuration, and init script fixes
 - [@wqreloxz](https://github.com/wqreloxz) - Initial rsv.sh service script, system fetch, pkg.sh package manager updates, and init script improvements
 - [@valtrynx](https://github.com/d1mazaurus7) - TUI Installer developer
 - [@TOPDATOP](https://github.com/topdatop01) - Added iwd and dhcpcd for wireless network support
