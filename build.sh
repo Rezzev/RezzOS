@@ -255,13 +255,20 @@ if [ -f "$REPO_DIR/usr/bin/setconsolefont.c" ]; then
     gcc -O2 "$REPO_DIR/usr/bin/setconsolefont.c" -o "$ROOTFS_DIR/usr/bin/setconsolefont" 2>/dev/null || true
 fi
 
-step "Downloading rezzpad binary"
+step "Downloading rezz-utils"
 REZZPAD_URL="https://github.com/neko-qt/rezzpad/releases/download/1.1.0/rezzpad-musl"
 if [ ! -f "$CACHE_DIR/rezzpad-musl" ]; then
     wget -q "$REZZPAD_URL" -O "$CACHE_DIR/rezzpad-musl" || { echo "Failed to download rezzpad"; exit 1; }
 fi
 cp -f "$CACHE_DIR/rezzpad-musl" "$ROOTFS_DIR/usr/bin/rezzpad"
 chmod +x "$ROOTFS_DIR/usr/bin/rezzpad"
+
+REZZVIEW_URL="https://github.com/neko-qt/rezzview/releases/download/1.1.0/rezzview-musl"
+if [ ! -f "$CACHE_DIR/rezzview-musl" ]; then
+    wget -q "$REZZVIEW_URL" -O "$CACHE_DIR/rezzview-musl" || { echo "Failed to download rezzview"; exit 1; }
+fi
+cp -f "$CACHE_DIR/rezzview-musl" "$ROOTFS_DIR/usr/bin/rezzview"
+chmod +x "$ROOTFS_DIR/usr/bin/rezzview"
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/usr/share/udhcpc/default.script" 2>/dev/null || true
