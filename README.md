@@ -1,10 +1,14 @@
-<img width="250" height="250" alt="image" src="https://github.com/user-attachments/assets/92fc26a3-9e05-4cbf-8afc-f97e75501fa7" />
+
+
+<div align="center">
+
+<img src="docs/assets/baner.jpg" width=100%>
+
+<h1>RezzOS - Linux Distro</h1>
 
 
 
-
-
-
+**A minimalistic Linux distro on Linux 6.6.40 and busybox**
 
 
 ![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
@@ -12,6 +16,15 @@
 ![Shell](https://img.shields.io/badge/Shell-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)
 
 *more documentation in /docs*
+
+
+
+</div>
+
+
+
+
+
 
 
 
