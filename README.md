@@ -15,6 +15,9 @@
 ![BusyBox](https://img.shields.io/badge/BusyBox-000000?style=for-the-badge&logo=busybox&logoColor=white)
 ![Shell](https://img.shields.io/badge/Shell-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)
 
+<img width="1446" height="816" alt="image" src="https://github.com/user-attachments/assets/cccdda8c-9d78-4aa2-9ef5-7dc5674d9324" />
+
+
 *more documentation in /docs*
 
 
