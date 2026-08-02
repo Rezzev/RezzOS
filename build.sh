@@ -327,10 +327,7 @@ ln -sf /usr/bin/hibernate "$ROOTFS_DIR/bin/hibernate" 2>/dev/null || true
 ln -sf /usr/bin/suspend "$ROOTFS_DIR/bin/suspend" 2>/dev/null || true
 ln -sf /usr/bin/poweroff "$ROOTFS_DIR/bin/halt" 2>/dev/null || true
 
-echo "Starting iwd and dhcpcd at boot..." >> "$ROOTFS_DIR/etc/init.d/rcS"
-echo "/usr/lib/iwd/iwd &" >> "$ROOTFS_DIR/etc/init.d/rcS"
-echo "/usr/sbin/dhcpcd -b" >> "$ROOTFS_DIR/etc/init.d/rcS"
-chmod +x "$ROOTFS_DIR/etc/init.d/rcS"
+
 
 step "Packing rootfs.cpio.gz"
 cd "$ROOTFS_DIR"
