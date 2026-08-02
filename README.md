@@ -34,7 +34,17 @@
 - Package manager (Alpine repos)
 - Persistent ext4 storage
 - Network with DHCP and DNS
-- File downloader (ghget)
+
+## RezzUtils
+*Built-in utility package*
+
+ rezzfetch - fetch                   | source in usr/bin
+ 
+ rezzpad - simple notepad            | [@source](https://github.com/stars/neko-qt/lists/rezz-utils)
+ 
+ rezztop - system monitor resources  | [@source](https://github.com/stars/neko-qt/lists/rezz-utils)
+ 
+ rezzview - photo viewer             | [@source](https://github.com/stars/neko-qt/lists/rezz-utils)
 
 ## Development
 - TCC (Tiny C Compiler) with full musl-dev headers
