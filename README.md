@@ -1,6 +1,6 @@
 <!--
   README.md — RezzOS
-  Улучшённая и оформленная версия README на русском
+  Improved and formatted version of the README in English
 -->
 
 <div align="center">
@@ -9,7 +9,7 @@
 
 # <img width="40" height="40" src="https://github.com/user-attachments/assets/2ea53faa-fcd1-4380-b317-6dc3e521ccd4" alt="RezzOS logo" /> RezzOS
 
-**Минималистичная Linux-сборка на ядре Linux 6.6.40 и BusyBox**
+**A minimalist Linux build based on the Linux 6.6.40 kernel and BusyBox**
 
 
 [![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://kernel.org)
@@ -18,30 +18,30 @@
 
 <img src="https://github.com/user-attachments/assets/cccdda8c-9d78-4aa2-9ef5-7dc5674d9324" alt="screenshot" width="90%" />
 
-<p><em>Дополнительная документация — в каталоге <code>/docs</code>.</em></p>
+<p><em>Additional documentation is in the <code>/docs</code> directory.</em></p>
 
 </div>
 
 ---
 
-## Содержание
-- [О системе](#о-системе)
-- [Особенности](#особенности)
+## Contents
+- [About the system](#about-the-system)
+- [Features](#features)
 - [RezzUtils](#rezzutils)
-- [Разработка](#разработка)
-- [Сборка из исходников](#сборка-из-исходников)
-- [Сеть](#сеть)
-- [Быстрый старт (QEMU)](#быстрый-старт-qemu)
-- [Ссылки](#ссылки)
-- [Контакты и вкладчики](#контакты-и-вкладчики)
-- [Лицензия](#лицензия)
+- [Development](#development)
+- [Building from source](#building-from-source)
+- [Network](#network)
+- [Quick start (QEMU)](#quick-start-qemu)
+- [Links](#links)
+- [Contacts and contributors](#contacts-and-contributors)
+- [License](#license)
 
 ---
 
-## О системе
+## About the system
 
 
-| Компонент | Рекомендуемая версия |
+| Component | Recommended version |
 |-----------|---------------------:|
 | Linux     | 6.6.40 (LTS)        |
 | BusyBox   | 1.36.1              |
@@ -49,51 +49,51 @@
 | musl      | 1.2.5               |
 | runit     | 2.1.2               |
 
->  Изменяйте версии в <code>build.sh</code>, если требуется другая сборка.
+> Change versions in <code>build.sh</code> if you need to build different versions.
 
-## Особенности
-- Менеджер пакетов (репозитории Alpine)
-- Постоянное хранилище (ext4)
-- Сеть с DHCP и DNS
-- Лёгкая и быстрая среда разработки: TCC и Lua в корне системы
+## Features
+- Package manager (Alpine repositories)
+- Persistent storage (ext4)
+- Network with DHCP and DNS
+- Lightweight and fast development environment: TCC and Lua in the root filesystem
 
 ## RezzUtils
-Встроенный набор утилит для удобной работы:
+Built-in utilities for convenient work:
 
-- rezzpad — простой текстовый блокнот
-- rezztop — монитор системных ресурсов
-- rezzview — просмотрщик изображений
+- rezzpad — a simple text notepad
+- rezztop — a system resource monitor
+- rezzview — an image viewer
 
-Исходники и список пакета: [Rezz-utils source](https://github.com/stars/neko-qt/lists/rezz-utils)
+Sources and package list: [Rezz-utils source](https://github.com/stars/neko-qt/lists/rezz-utils)
 
-## Разработка
-RezzOS предоставляет минимальную среду для разработки прямо внутри образа:
-- TCC (Tiny C Compiler) с заголовками musl
-- Lua 5.3 — быстро писать и запускать скрипты
-- Компиляция и запуск C / Lua программ прямо в системе
+## Development
+RezzOS provides a minimal development environment inside the image:
+- TCC (Tiny C Compiler) with musl headers
+- Lua 5.3 — rapid scripting and execution
+- Compile and run C / Lua programs directly inside the system
 
 ---
 
-## Сборка из исходников
-Самый простой способ — использовать встроенный скрипт сборки:
+## Building from source
+The simplest way is to use the included build script:
 
 ```bash
 ./build.sh
 ```
 
-Для NixOS используйте:
+For NixOS use:
 
 ```bash
 ./nixshell-run.sh
 ```
 
-Перед сборкой установите зависимости (список в <code>/docs/build dependencies.md</code>).
-Скрипт автоматически скачает исходники, скомпилирует ядро и BusyBox, соберёт rootfs и создаст образ диска.
+Before building, install dependencies (list in <code>/docs/build dependencies.md</code>).
+The script will automatically download sources, compile the kernel and BusyBox, assemble the rootfs, and create a disk image.
 
 ---
 
-## Сеть
-Если вы используете QEMU (виртуальная машина), можно настроить сеть вручную:
+## Network
+If you are using QEMU (virtual machine), you can configure the network manually:
 
 ```bash
 ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up
@@ -101,7 +101,7 @@ route add default gw 10.0.2.2
 echo "nameserver 8.8.8.8" > /etc/resolv.conf
 ```
 
-На реальном железе используется DHCP. Если сеть не поднимается:
+On real hardware DHCP is used. If the network does not come up:
 
 ```bash
 ifconfig eth0 up
@@ -109,7 +109,7 @@ udhcpc -i eth0
 echo "nameserver 8.8.8.8" > /etc/resolv.conf
 ```
 
-Перед использованием менеджера пакетов выполните:
+Before using the package manager run:
 
 ```bash
 pkg update
@@ -117,37 +117,37 @@ pkg update
 
 ---
 
-## Быстрый старт (в QEMU)
-Запуск из корня репозитория:
+## Quick start (in QEMU)
+Run from the repository root:
 
 ```bash
-./start.sh        # текстовый режим
-./start-gui.sh    # с GUI (если собран)
+./start.sh        # text mode
+./start-gui.sh    # with GUI (if built)
 ```
 
 ---
 
-## Полезные ссылки
-- Репозиторий: https://github.com/semen88pochuev-eng/RezzOS
+## Useful links
+- Repository: https://github.com/semen88pochuev-eng/RezzOS
 - BusyBox: https://busybox.net/
 - Linux kernel: https://kernel.org/
 - Alpine Linux: https://alpinelinux.org/
 
 ---
 
-## Контакты и вкладчики
-Спасибо всем, кто помогает развивать проект!
+## Contacts and contributors
+Thanks to everyone who helps develop the project!
 
-- [@semen88pochuev-eng](https://github.com/semen88pochuev-eng) (rezzev) — создатель проекта, архитектура, система сборки, интеграция Lua, поддержка образов и GRUB.
-- [@Kenyka kenykovich](https://github.com/keeniGithub) — GUI (JWM), интеграция рабочего стола, SSH, multi-user, управление службами, интерфейсы конфигурации.
-- [@neko_qt](https://github.com/neko-qt) — Rezz utils, улучшения сборки, конфигурация ядра, исправления init.
-- [@wqreloxz](https://github.com/wqreloxz) — скрипты сервисов, менеджер пакетов, улучшения init.
-- [@TOPDATOP](https://github.com/topdatop01) — поддержка беспроводных сетей (iwd, dhcpcd).
+- [@semen88pochuev-eng](https://github.com/semen88pochuev-eng) (rezzev) — project creator, architecture, build system, Lua integration, support [...]
+- [@Kenyka kenykovich](https://github.com/keeniGithub) — GUI (JWM), desktop integration, SSH, multi-user, service management, interface work [...]
+- [@neko_qt](https://github.com/neko-qt) — Rezz utils, build improvements, kernel configuration, init fixes.
+- [@wqreloxz](https://github.com/wqreloxz) — service scripts, package manager, init improvements.
+- [@TOPDATOP](https://github.com/topdatop01) — wireless support (iwd, dhcpcd).
 
-Контакты автора:
+Author contact:
 - Telegram: @Loexez
 
 ---
 
-## Лицензия
-Проект распространяется под GNU General Public License v3.0
+## License
+This project is distributed under the GNU General Public License v3.0
