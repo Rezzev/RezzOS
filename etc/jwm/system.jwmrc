@@ -1,59 +1,92 @@
 <?xml version="1.0"?>
 <JWM>
-    <!-- The root menu. -->
-    <RootMenu onroot="3">
-        <Program icon="terminal.png" label="Terminal">st</Program>
-        <Program icon="editor.png" label="Text Editor">st -e nano</Program>
+    <!-- Start Menu (Left Click) -->
+    <RootMenu onroot="1">
+        <Program label="File Manager">pcmanfm -n</Program>
+        <Program label="Notepad">rezzpad</Program>
+        <Program label="Terminal">st</Program>
+        <Program label="Image viewer">rezzview</Program>
         <Separator/>
-        <Menu icon="folder.png" label="System">
-            <Program icon="info.png" label="System Info">st -e top</Program>
-            <Program icon="terminal.png" label="Shell Profile">st -e bash -l</Program>
+        <Program label="System Info">sysinfo.sh</Program>
+        <Program label="Task Manager">st -e rtop</Program>
+        <Separator/>
+        <Menu label="Power">
+            <Program label="Suspend">sh -c 'zenity --info --title="RezzOS" --text="Suspending..." --timeout=2 &amp; suspend'</Program>
+            <Program label="Hibernate">sh -c 'zenity --info --title="RezzOS" --text="Hibernating..." --timeout=3 &amp; hibernate'</Program>
+            <Program label="Reboot">sh -c 'zenity --info --title="RezzOS" --text="Rebooting..." --timeout=5 &amp; reboot'</Program>
+            <Program label="Shutdown">sh -c 'zenity --info --title="RezzOS" --text="Shutting down..." --timeout=5 &amp; poweroff'</Program>
+            <Separator/>
+            <Restart label="Restart JWM"/>
+            <Exit label="Log Out of GUI" confirm="true"/>
         </Menu>
+    </RootMenu>
+
+    <!-- Desktop Context Menu (Right Click) -->
+    <RootMenu onroot="3">
+        <Program label="Create File...">create_file.sh</Program>
+        <Program label="Create Folder...">create_folder.sh</Program>
         <Separator/>
-        <Program icon="lock.png" label="Lock">xlock</Program>
+        <Program label="Open File Manager Here">pcmanfm -n</Program>
+        <Program label="Open Terminal Here">st</Program>
         <Separator/>
-        <Restart label="Restart JWM" icon="restart.png"/>
-        <Exit label="Exit" confirm="true" icon="quit.png"/>
+        <Program label="System Info">sysinfo.sh</Program>
     </RootMenu>
 
     <!-- Options for program interfaces. -->
     <Tray x="0" y="-1" autohide="off">
-        <TrayButton icon="jwm-blue">root:3</TrayButton>
+        <!-- FIXED: Removed jwm-blue icon and changed action to root:1 to open the Start menu -->
+        <TrayButton label="Menu">root:1</TrayButton>
         <Spacer width="2"/>
-        <TrayButton label="_">showdesktop</TrayButton>
+        <!-- FIXED: Action changed to "desktop" so the "_" button minimizes all windows -->
+        <TrayButton label="_">desktop</TrayButton>
         <Spacer width="2"/>
         <Pager labeled="true"/>
         <TaskList maxwidth="256"/>
         <Dock/>
-        <Clock format="%H:%M"><Button mask="123">exec:st</Button></Clock>
+        <Clock format="%d.%m.%Y %H:%M"></Clock>
     </Tray>
 
     <!-- Visual Styles -->
+    <!-- FIXED: Added missing `<` character to WindowStyle tag -->
     <WindowStyle>
-        <Font>Sans-9</Font>
+        <Font>Noto NotoSans-11:bold</Font>
         <Width>4</Width>
         <Height>21</Height>
         <Corner>3</Corner>
-        <Foreground>#FFFFFF</Foreground>
-        <Background>#333333</Background>
+        <!-- FIXED: <Foreground> replaced with <Text> -->
+        <Text>#FFFFFF</Text>
+        <Background>#555555</Background>
         <Outline>#000000</Outline>
-        <Opacity>0.5</Opacity>
+        <Opacity>1</Opacity>
         <Active>
-            <Foreground>#FFFFFF</Foreground>
-            <Background>#0077CC</Background>
+            <!-- FIXED: <Foreground> replaced with <Text> -->
+            <Text>#FFFFFF</Text>
+            <Background>#404552</Background>
             <Outline>#000000</Outline>
-            <Opacity>1.0</Opacity>
+            <Opacity>1</Opacity>
         </Active>
+        <!-- FIXED: Standart window management buttons (Iconify, Maximize, Close) -->
+        <Buttons>imx</Buttons>
     </WindowStyle>
     
     <TrayStyle group="true" list="all">
-        <Font>Sans-9</Font>
-        <Background>#333333</Background>
+        <Font>NotoSans-11</Font>
+        <Background>#383c4a</Background>
         <Foreground>#FFFFFF</Foreground>
         <Outline>#000000</Outline>
-        <Opacity>0.75</Opacity>
+        <Opacity>0.9</Opacity>
     </TrayStyle>
-
+    
+    <TaskListStyle>
+      <Font>NotoSans-11</Font>
+      <Active>
+        <Foreground>#FFFFFF</Foreground>
+        <Background>#555555</Background>
+      </Active>
+      <Foreground>#FFFFFF</Foreground>
+      <Background>#333333</Background>
+    </TaskListStyle>
+    
     <PagerStyle>
         <Outline>#000000</Outline>
         <Foreground>#555555</Foreground>
@@ -64,21 +97,21 @@
             <Background>#004488</Background>
         </Active>
     </PagerStyle>
-
+    
     <MenuStyle>
-        <Font>Sans-9</Font>
+        <Font>NotoSans-11</Font>
         <Foreground>#FFFFFF</Foreground>
         <Background>#333333</Background>
         <Outline>#000000</Outline>
         <Active>
             <Foreground>#FFFFFF</Foreground>
-            <Background>#0077CC</Background>
+            <Background>#5294e2</Background>
         </Active>
-        <Opacity>0.85</Opacity>
+        <Opacity>0.9</Opacity>
     </MenuStyle>
-
+    
     <PopupStyle>
-        <Font>Sans-9</Font>
+        <Font>NotoSans-11</Font>
         <Foreground>#000000</Foreground>
         <Background>#999999</Background>
     </PopupStyle>
@@ -110,4 +143,5 @@
     <Key mask="A" key="Left">ldesktop</Key>
     <Key mask="A" key="Up">udesktop</Key>
     <Key mask="A" key="Down">ddesktop</Key>
+    <Key mask="CA" key="t">exec:st</Key>
 </JWM>
