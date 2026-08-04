@@ -4,7 +4,9 @@
 
 <img src="docs/assets/baner.jpg" width=100%>
 
-<h1>RezzOS - Linux Distro</h1>
+
+
+<h1> <img width="40" height="40" alt="2b0d87cf-c3c9-4951-b7bb-e6573fb19252-Photoroom" src="https://github.com/user-attachments/assets/2ea53faa-fcd1-4380-b317-6dc3e521ccd4" /> RezzOS</h1>
 
 
 
