@@ -39,7 +39,7 @@ ifconfig lo 127.0.0.1 up
 ifconfig eth0 up
 sleep 0.2
 
-timeout 8 udhcpc -i eth0 -t 5 -s /usr/share/udhcpc/default.script 2>/dev/null
+timeout 15 udhcpc -i eth0 -t 5 -s /usr/share/udhcpc/default.script 2>/dev/null
 
 if ! ifconfig eth0 | grep -q "inet "; then
     ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up
