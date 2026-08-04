@@ -56,13 +56,11 @@
 ## RezzUtils
 *Built-in utility package*
 
- rezzfetch - fetch                   | source in usr/bin
- 
- rezzpad - simple notepad            | [@source](https://github.com/stars/neko-qt/lists/rezz-utils)
- 
- rezztop - system monitor resources  | [@source](https://github.com/stars/neko-qt/lists/rezz-utils)
- 
- rezzview - photo viewer             | [@source](https://github.com/stars/neko-qt/lists/rezz-utils)
+ rezzpad - simple notepad            
+ rezztop - system monitor resources  
+ rezzview - photo viewer    
+
+ source code: [@source](https://github.com/stars/neko-qt/lists/rezz-utils)
 
 ## Development
 - TCC (Tiny C Compiler) with full musl-dev headers
@@ -109,10 +107,10 @@ To get launched, use ./start.sh or start-gui.sh
 
 
 ## Links
-- GitHub Repository - https://github.com/semen88pochuev-eng/RezzOS
-- BusyBox - https://busybox.net/
-- Linux kernel - https://kernel.org/
-- Alpine Linux - https://alpinelinux.org/
+- [GitHub Repository](https://github.com/semen88pochuev-eng/RezzOS)
+- [BusyBox](https://busybox.net/)
+- [Linux kernel](https://kernel.org/)
+- [Alpine Linux](https://alpinelinux.org/)
 
 ## Contributors
 Thanks to all contributors who help improve RezzOS!
@@ -123,6 +121,10 @@ Thanks to all contributors who help improve RezzOS!
 - [@neko_qt](https://github.com/neko-qt) — Rezz utils, build system improvements (progress bar, auto-download sources), kernel configuration, and init script fixes
 - [@wqreloxz](https://github.com/wqreloxz) - Initial rsv.sh service script, system fetch, pkg.sh package manager updates, and init script improvements
 - [@TOPDATOP](https://github.com/topdatop01) - Added iwd and dhcpcd for wireless network support
+
+
+## My contact([@semen88pochuev-eng](https://github.com/semen88pochuev-eng))
+- Tg - @Loexez 
 
 ## License
 GNU General Public License v3.0
