@@ -86,10 +86,12 @@ get_deps() {
         if test -n "$DEPS"; then
             for dep in $DEPS; do
                 case "$dep" in
-                    so:*|cmd:*|pc:*) continue ;;
+                    so:*|cmd:*|pc:*|dbus:*|/bin/*|/sbin/*|/usr/*) continue ;;
                 esac
                 dep_name=$(echo "$dep" | sed 's/[<>=].*//')
-                test "$dep_name" != "$NAME" && echo "$dep_name"
+                if echo "$dep_name" | grep -qE '^[a-zA-Z]' && ! echo "$dep_name" | grep -q '/'; then
+                    test "$dep_name" != "$NAME" && echo "$dep_name"
+                fi
             done
             return 0
         fi
