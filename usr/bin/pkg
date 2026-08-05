@@ -124,9 +124,10 @@ install_single_pkg() {
     cd /tmp/pkg_extract
     tar -xzf "/tmp/pkg_dl/$APK" 2>/dev/null
 
-    test -d usr && cp -r usr/* /usr/ 2>/dev/null
-    test -d bin && cp -r bin/* /bin/ 2>/dev/null
-    test -d lib && cp -r lib/* /lib/ 2>/dev/null
+    cp -r usr/* /usr/ 2>/dev/null
+    cp -r lib/* /lib/ 2>/dev/null
+    cp -r bin/* /bin/ 2>/dev/null
+    cp -r sbin/* /sbin/ 2>/dev/null
 
     cp "/tmp/pkg_dl/$APK" "$PKG_DIR/"
     echo "$APK" >> "$INSTALLED_LIST"
