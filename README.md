@@ -26,6 +26,7 @@
 
 ## Contents
 - [About the system](#about-the-system)
+- [How install](#Installation-on-hardware)
 - [Features](#features)
 - [RezzUtils](#rezzutils)
 - [Development](#development)
