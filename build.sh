@@ -142,6 +142,9 @@ cp -f init "$ROOTFS_DIR/"
 cd "$ROOTFS_DIR"
 mkdir -p dev proc sys tmp mnt/disk var/log lib usr/lib usr/share/terminfo
 mkdir -p etc/runit/runsvdir/default
+mkdir -p boot
+cp "$REPO_DIR/bzImage" boot/ 2>/dev/null || true
+cp "$REPO_DIR/rootfs.cpio.gz" boot/ 2>/dev/null || true
 chmod +x init
 
 step "Downloading musl"
