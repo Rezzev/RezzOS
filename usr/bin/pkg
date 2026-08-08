@@ -28,9 +28,89 @@ usage() {
     echo "  pkg remove <package>       - Remove package"
 }
 
+download_file() {
+    URL="$1"
+    OUTPUT="$2"
+
+    # get full size from headers
+    HEADERS=$(wget -S --spider "$URL" 2>&1)
+    TOTAL=$(printf '%s\n' "$HEADERS" |
+        awk 'tolower($1) == "content-length:" { n=$2 } END { print n+0 }')
+
+    rm -f "$OUTPUT"
+
+    # start the dowonload
+    wget --no-check-certificate "$URL" -O "$OUTPUT" >/dev/null 2>&1 &
+    PID=$!
+
+    BAR_WIDTH=30
+
+    while kill -0 "$PID" 2>/dev/null; do
+        if [ -f "$OUTPUT" ]; then
+	   CURRENT=$(wc -c < "$OUTPUT")
+	else
+	    CURRENT=0
+	fi
+
+        if [ "$TOTAL" -gt 0 ]; then
+            PERCENT=$((CURRENT * 100 / TOTAL))
+
+            FILLED=$((PERCENT * BAR_WIDTH / 100))
+            EMPTY=$((BAR_WIDTH - FILLED))
+
+            BAR=""
+
+            i=0
+            while [ "$i" -lt "$FILLED" ]; do
+                BAR="${BAR}="
+                i=$((i + 1))
+            done
+
+            if [ "$FILLED" -lt "$BAR_WIDTH" ]; then
+                BAR="${BAR}>"
+                EMPTY=$((EMPTY - 1))
+            fi
+
+            while [ "$EMPTY" -gt 0 ]; do
+                BAR="${BAR}-"
+                EMPTY=$((EMPTY - 1))
+            done
+
+            printf '\r[%s] %3d%%' "$BAR" "$PERCENT"
+        else
+            # without content length
+            printf '\rDownloaded: %s bytes' "$CURRENT"
+        fi
+
+        sleep 1
+    done
+
+    wait "$PID"
+    RET=$?
+
+    if [ -f "$OUTPUT" ]; then
+    	CURRENT=$(wc -c < "$OUTPUT")
+    else
+	    CURRENT=0
+    fi
+    if [ "$RET" -eq 0 ] && [ "$CURRENT" -gt 0 ]; then
+        if [ "$TOTAL" -gt 0 ]; then
+            printf '\r[%s] 100%%\n' \
+                "=============================="
+        else
+            printf '\rDownloaded: %s bytes\n' "$CURRENT"
+        fi
+        return 0
+    fi
+
+    printf '\n'
+    rm -f "$OUTPUT"
+    return 1
+}
+
 update_index() {
-    echo -n "Fetching main index... "
-    if wget -q --no-check-certificate "$REPO_MAIN/APKINDEX.tar.gz" -O "$CACHE_DIR/APKINDEX_main.tar.gz" 2>/dev/null; then
+    echo "Fetching main index... "
+    if download_file "$REPO_MAIN/APKINDEX.tar.gz" "$CACHE_DIR/APKINDEX_main.tar.gz"; then    
         tar -xzf "$CACHE_DIR/APKINDEX_main.tar.gz" -C "$CACHE_DIR" 2>/dev/null
         mv "$CACHE_DIR/APKINDEX" "$CACHE_DIR/APKINDEX_main" 2>/dev/null
         echo -e "${GREEN}OK${NC}"
@@ -38,8 +118,8 @@ update_index() {
         echo -e "${RED}FAILED${NC}"
     fi
 
-    echo -n "Fetching community index... "
-    if wget -q --no-check-certificate "$REPO_COMMUNITY/APKINDEX.tar.gz" -O "$CACHE_DIR/APKINDEX_community.tar.gz" 2>/dev/null; then
+    echo "Fetching community index... "
+    if download_file "$REPO_COMMUNITY/APKINDEX.tar.gz" "$CACHE_DIR/APKINDEX_community.tar.gz"; then
         tar -xzf "$CACHE_DIR/APKINDEX_community.tar.gz" -C "$CACHE_DIR" 2>/dev/null
         mv "$CACHE_DIR/APKINDEX" "$CACHE_DIR/APKINDEX_community" 2>/dev/null
         echo -e "${GREEN}OK${NC}"
@@ -112,8 +192,8 @@ install_single_pkg() {
     echo -e "${YELLOW}Installing $APK...${NC}"
     mkdir -p "$PKG_DIR" /tmp/pkg_dl
 
-    wget -q --no-check-certificate "$REPO_MAIN/$APK" -O "/tmp/pkg_dl/$APK" 2>/dev/null || \
-    wget -q --no-check-certificate "$REPO_COMMUNITY/$APK" -O "/tmp/pkg_dl/$APK" 2>/dev/null
+    download_file "$REPO_MAIN/$APK" "/tmp/pkg_dl/$APK" || \
+    download_file "$REPO_COMMUNITY/$APK" "/tmp/pkg_dl/$APK"    
 
     if test ! -s "/tmp/pkg_dl/$APK"; then
         echo -e "${RED}Download failed for $APK${NC}"
