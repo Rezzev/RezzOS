@@ -66,6 +66,65 @@ Built-in utilities for convenient work:
 
 Sources and package list: [Rezz-utils source](https://github.com/stars/neko-qt/lists/rezz-utils)
 
+## Installation on hardware
+For execution in RAM(default):
+- Download the ISO image.
+- Save it to a flash drive.
+- And boot from it.
+
+For loading from disk:
+- Follow the steps outlined above.
+- After starting the system, enter these commands:
+```bash
+## installing packages
+
+pkg update
+pkg install syslinux
+pkg install e2fsprogs
+pkg install e2fsprogs-libs
+pkg install libcom_err
+
+## Disk partitioning
+
+fdisk /you/disk
+## o 
+## n (new chapter) → p → 1 → Enter → Enter
+## a 
+## w
+
+## Formating
+
+mkfs.ext4 -F /you/disk
+
+## Mount
+
+mount /dev/sda1 /mnt
+
+## copy system
+
+cp -r /bin /sbin /usr /etc /lib /root /var /boot /mnt/
+mkdir -p /mnt/{dev,proc,sys,tmp}
+
+## installing bootloader
+
+extlinux --install /mnt/boot
+dd if=/usr/share/syslinux/mbr.bin of=/dev/sda bs=440 count=1
+
+## config bootloader
+
+cat > /mnt/boot/extlinux.conf << 'EOF'
+DEFAULT rezzos
+LABEL rezzos
+    LINUX /boot/bzImage
+    APPEND quiet loglevel=0 nokaslr
+    INITRD /boot/rootfs.cpio.gz
+EOF
+
+## Unmount and reboot
+umount /mnt
+reboot -f
+```
+
 ## Development
 RezzOS provides a minimal development environment inside the image:
 - TCC (Tiny C Compiler) with musl headers
