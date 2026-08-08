@@ -120,42 +120,105 @@ install_single_pkg() {
         return 1
     fi
 
-    cd /tmp && rm -rf /tmp/pkg_extract && mkdir -p /tmp/pkg_extract
-    cd /tmp/pkg_extract
-    tar -xzf "/tmp/pkg_dl/$APK" 2>/dev/null
+    cd /tmp || return 1
 
-    cp -r usr/* /usr/ 2>/dev/null
-    cp -r lib/* /lib/ 2>/dev/null
-    cp -r bin/* /bin/ 2>/dev/null
-    cp -r sbin/* /sbin/ 2>/dev/null
+    TMP_DIR=$(mktemp -d /tmp/pkg_extract.XXXXXX) || return 1
 
-    cp "/tmp/pkg_dl/$APK" "$PKG_DIR/"
-    echo "$APK" >> "$INSTALLED_LIST"
+    cd "$TMP_DIR" || {
+        rm -rf "$TMP_DIR"
+        return 1
+    }
+
+    if ! tar -xzf "/tmp/pkg_dl/$APK"; then
+        echo -e "${RED}Failed to extract $APK${NC}"
+        return 1
+    fi
+
+    if test -d usr && ! cp -r usr/. /usr/; then
+        echo -e "${RED}Failed to install usr files from $APK${NC}"
+        return 1
+    fi
+
+    if test -d lib && ! cp -r lib/. /lib/; then
+        echo -e "${RED}Failed to install lib files from $APK${NC}"
+        return 1
+    fi
+
+    if test -d bin && ! cp -r bin/. /bin/; then
+        echo -e "${RED}Failed to install bin files from $APK${NC}"
+        return 1
+    fi
+
+    if test -d sbin && ! cp -r sbin/. /sbin/; then
+        echo -e "${RED}Failed to install sbin files from $APK${NC}"
+        return 1
+    fi
+
+    if ! cp "/tmp/pkg_dl/$APK" "$PKG_DIR/"; then
+        echo -e "${RED}Failed to save $APK${NC}"
+        return 1
+    fi
+
+    if ! echo "$APK" >> "$INSTALLED_LIST"; then
+        echo -e "${RED}Failed to update installed package list${NC}"
+        return 1
+    fi
+
     echo -e "${GREEN}Done: $APK${NC}"
+
+    rm -rf "$TMP_DIR"
     return 0
 }
 
 install_with_deps() {
     PKG_NAME="$1"
     INSTALLED=""
-    
+
+    if ! find_pkg "$PKG_NAME" >/dev/null; then
+        echo -e "${RED}Not found: $PKG_NAME${NC}"
+        return 1
+    fi
+
     install_deps_recursive() {
         local name="$1"
-        local deps=$(get_deps "$name")
+        local deps
+
+        deps=$(get_deps "$name") || return 1
+
         for dep in $deps; do
-            if ! echo "$INSTALLED" | grep -q " $dep "; then
-                if ! grep -q "^${dep}-" "$INSTALLED_LIST" 2>/dev/null; then
-                    INSTALLED="$INSTALLED $dep "
-                    install_deps_recursive "$dep"
-                    echo "Installing dependency: $dep"
-                    install_single_pkg "$dep" 2>/dev/null || true
-                fi
+            if echo "$INSTALLED" | grep -q " $dep "; then
+                continue
+            fi
+
+            if grep -q "^${dep}-" "$INSTALLED_LIST" 2>/dev/null; then
+                continue
+            fi
+
+            INSTALLED="$INSTALLED $dep "
+
+            if ! install_deps_recursive "$dep"; then
+                echo -e "${RED}Failed to resolve dependency: $dep${NC}"
+                return 1
+            fi
+
+            echo "Installing dependency: $dep"
+
+            if ! install_single_pkg "$dep"; then
+                echo -e "${RED}Failed to install dependency: $dep${NC}"
+                return 1
             fi
         done
     }
-    
-    install_deps_recursive "$PKG_NAME"
-    install_single_pkg "$PKG_NAME"
+
+    if ! install_deps_recursive "$PKG_NAME"; then
+        echo -e "${RED}Failed to install dependencies for $PKG_NAME${NC}"
+        return 1
+    fi
+
+    if ! install_single_pkg "$PKG_NAME"; then
+        echo -e "${RED}Failed to install $PKG_NAME${NC}"
+        return 1
+    fi
 }
 
 remove_pkg() {
