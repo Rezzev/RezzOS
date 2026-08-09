@@ -2,7 +2,7 @@
 <JWM>
     <!-- Start Menu (Left Click) -->
     <IconPath>/usr/share/icons/RezzOS</IconPath>
-    <RootMenu icon="/usr/share/icons/RezzOS/menu.png" onroot="1">
+    <RootMenu onroot="1">
         <Program icon="/usr/share/icons/RezzOS/folder.png" label="File Manager">pcmanfm -n</Program>
         <Program icon="/usr/share/icons/RezzOS/rezzpad.png" label="Notepad">rezzpad</Program>
         <Program icon="/usr/share/icons/RezzOS/terminal.png" label="Terminal">st</Program>
