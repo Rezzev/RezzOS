@@ -8,4 +8,11 @@ tmp/
 _install/
 bzImage
 rezzos.iso
-rezzos.iso
+
+# build.sh downloads everything here: kernel and busybox tarballs, Alpine
+# packages, and the prebuilt rezz-utils binaries (rezzpad-musl, rezzview-musl,
+# rtop) which no other rule covers.
+dl_cache/
+
+# build and boot logs
+*.log
