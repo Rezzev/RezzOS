@@ -9,6 +9,7 @@
 ## Package Manager
 | Command | Description |
 |---------|----------|
+| `pkg update` | Refresh package indexes |
 | `pkg install <name>` | Install package |
 | `pkg search <name>` | Search for packages |
 | `pkg list` | List installed packages |
