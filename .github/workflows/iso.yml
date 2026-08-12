@@ -1,0 +1,66 @@
+name: iso
+
+on:
+  push:
+    branches: [experiment/check-setconsolefont]
+
+jobs:
+  iso:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/build-a-bootable-iso
+
+      - name: Free disk
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+
+      - name: Deps, including the ISO tools the docs already ask for
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential flex bison bc libssl-dev libelf-dev libncurses-dev \
+            wget tar bzip2 cpio gzip e2fsprogs fakeroot qemu-utils qemu-system-x86 \
+            grub-pc-bin grub-common xorriso mtools
+
+      - uses: actions/cache@v4
+        with: { path: dl_cache, key: 'rezzos-dl-${{ hashFiles(''build.sh'') }}', restore-keys: rezzos-dl- }
+      - uses: actions/cache@v4
+        with: { path: bzImage, key: 'rezzos-bzImage-${{ hashFiles(''build.sh'') }}' }
+
+      - name: Build
+        run: chmod +x build.sh && ./build.sh > build.log 2>&1 || { tail -50 build.log; exit 1; }
+
+      - name: Inspect the ISO
+        run: |
+          ls -la rezzos.iso
+          echo "--- file type ---"
+          file -b rezzos.iso
+          echo "--- is it left clean afterwards? ---"
+          ls -la iso/boot/
+          echo "--- the kernel and rootfs are inside the image ---"
+          xorriso -indev rezzos.iso -find /boot 2>/dev/null | head
+
+      - name: Boot the ISO itself, no -kernel and no -initrd
+        run: |
+          # Pick the serial menu entry: down arrow, then Enter.
+          printf '\033[B\r' > keys.in
+          timeout 240 qemu-system-x86_64 \
+            -cdrom rezzos.iso -boot d \
+            -m 1024M -display none \
+            -serial stdio < keys.in > serial.log 2>&1 || true
+
+          tr -d '\r' < serial.log > s.txt
+          echo "=========== GRUB ==========="
+          grep -iE "GNU GRUB|RezzOS" s.txt | head -5 || echo "(no menu on serial)"
+          echo "=========== KERNEL ==========="
+          grep -c "Linux version" s.txt || true
+          echo "=========== USERSPACE ==========="
+          grep -E "Run /init|Network service active|login:" s.txt | head -5 || echo "(did not reach userspace)"
+          echo "=========== TAIL ==========="
+          tail -20 s.txt
+
+          grep -q "Linux version" s.txt \
+            && echo "RESULT: the ISO boots and the kernel starts" \
+            || { echo "::error::the ISO did not boot a kernel"; exit 1; }
