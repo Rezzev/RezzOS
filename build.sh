@@ -200,7 +200,7 @@ for pkg in $COMMUNITY_PACKAGES $COMM_GUI; do
     [ -d share ] && cp -r share/* "$ROOTFS_DIR/usr/share/" 2>/dev/null || true
 done
 
-EDGE_COMMUNITY_PACKAGES="tcc-0.9.27_git20260714-r0.apk tcc-libs-0.9.27_git20260714-r0.apk tcc-libs-static-0.9.27_git20260714-r0.apk"
+EDGE_COMMUNITY_PACKAGES="links-graphics-2.30-r1.apk tcc-0.9.27_git20260714-r0.apk tcc-libs-0.9.27_git20260714-r0.apk tcc-libs-static-0.9.27_git20260714-r0.apk"
 for pkg in $EDGE_COMMUNITY_PACKAGES; do
     if [ ! -s "$CACHE_DIR/$pkg" ]; then
         rm -f "$CACHE_DIR/$pkg"
