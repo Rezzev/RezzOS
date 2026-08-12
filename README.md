@@ -56,6 +56,7 @@
 - Package manager (Alpine repositories)
 - Persistent storage (ext4)
 - Network with DHCP and DNS
+- Built-in diagnostics: `rezz-doctor` checks storage, services, network and memory, and reports what is wrong
 - Lightweight and fast development environment: TCC and Lua in the root filesystem
 
 ## RezzUtils
