@@ -25,8 +25,17 @@ echo 0 > /proc/sys/kernel/printk
 if ! grep -q "^user:" /etc/passwd 2>/dev/null; then
     echo "user:x:1000:" >> /etc/group
     echo "user:x:1000:1000:User:/home/user:/bin/bash" >> /etc/passwd
+fi
+
+# /etc/passwd ships with the user account already in it, so the branch above
+# never runs and /home/user was never created. Give the home directory its own
+# condition and seed it from /etc/skel, the way adduser would, so logging in as
+# user lands in a real directory with the shipped .bashrc.
+if [ ! -d /home/user ]; then
     mkdir -p /home/user
+    [ -d /etc/skel ] && cp -a /etc/skel/. /home/user/ 2>/dev/null
     chown -R 1000:1000 /home/user
+    chmod 755 /home/user
 fi
 
 # Network - DHCP for real hardware, static fallback for QEMU
