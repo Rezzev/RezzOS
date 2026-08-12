@@ -344,8 +344,55 @@ if [ ! -f "$REPO_DIR/disk.img" ]; then
     mkfs.ext4 -F disk.img
 fi
 
+# Build the bootable ISO.
+#
+# The pieces have been in the repository for a while: iso/boot/grub/grub.cfg
+# holds the menu, .gitignore already lists rezzos.iso, and the first step of
+# the hardware install in the README is "download the ISO image". Nothing
+# actually produced one, so that path started at a file that did not exist.
+#
+# Kept optional on purpose. grub-mkrescue and xorriso are not needed for a
+# kernel plus rootfs build, so a missing toolchain is a note rather than a
+# failed build, and the required-command list above stays as it was.
+if command -v grub-mkrescue >/dev/null 2>&1 && command -v xorriso >/dev/null 2>&1; then
+    step "Building rezzos.iso"
+    ISO_DIR="$REPO_DIR/iso"
+    mkdir -p "$ISO_DIR/boot/grub"
+
+    if [ ! -f "$ISO_DIR/boot/grub/grub.cfg" ]; then
+        echo "Missing $ISO_DIR/boot/grub/grub.cfg, cannot build the ISO."
+        exit 1
+    fi
+
+    cp -f "$REPO_DIR/bzImage" "$ISO_DIR/boot/bzImage"
+    cp -f "$REPO_DIR/rootfs.cpio.gz" "$ISO_DIR/boot/rootfs.cpio.gz"
+
+    # grub-mkrescue is noisy on stderr about optional platforms it cannot find
+    # (EFI images, mac boot). Those are warnings, so judge it by its exit code
+    # and by whether an image came out.
+    rm -f "$REPO_DIR/rezzos.iso"
+    grub-mkrescue -o "$REPO_DIR/rezzos.iso" "$ISO_DIR" \
+        -- -volid REZZOS
+
+    if [ ! -s "$REPO_DIR/rezzos.iso" ]; then
+        echo "grub-mkrescue reported success but produced no image."
+        exit 1
+    fi
+
+    # The kernel and rootfs staged above are build output, not sources. Leave
+    # the directory the way it was found so a rebuild does not accumulate.
+    rm -f "$ISO_DIR/boot/bzImage" "$ISO_DIR/boot/rootfs.cpio.gz"
+else
+    log "Skipping rezzos.iso: install grub-mkrescue and xorriso to build it"
+fi
+
 step "Done"
 ls -la bzImage rootfs.cpio.gz disk.img
+# The script runs under `set -e` and this is the last command, so a plain
+# `[ -f ... ] && ls` would exit 1 whenever the ISO was skipped.
+if [ -f "$REPO_DIR/rezzos.iso" ]; then
+    ls -la rezzos.iso
+fi
 
 if [ -f "$REPO_DIR/start.sh" ]; then
     echo "Run: ./start.sh"
