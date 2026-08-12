@@ -222,44 +222,58 @@ install_single_pkg() {
         return 1
     }
 
+    # Every failure below has to drop the extraction directory on the way out.
+    # /tmp is a tmpfs, so a leaked directory costs RAM until the next reboot.
+    cleanup_tmp() {
+        cd /tmp 2>/dev/null
+        rm -rf "$TMP_DIR"
+    }
+
     if ! tar -xzf "/tmp/pkg_dl/$APK"; then
         echo -e "${RED}Failed to extract $APK${NC}"
+        cleanup_tmp
         return 1
     fi
 
     if test -d usr && ! cp -r usr/. /usr/; then
         echo -e "${RED}Failed to install usr files from $APK${NC}"
+        cleanup_tmp
         return 1
     fi
 
     if test -d lib && ! cp -r lib/. /lib/; then
         echo -e "${RED}Failed to install lib files from $APK${NC}"
+        cleanup_tmp
         return 1
     fi
 
     if test -d bin && ! cp -r bin/. /bin/; then
         echo -e "${RED}Failed to install bin files from $APK${NC}"
+        cleanup_tmp
         return 1
     fi
 
     if test -d sbin && ! cp -r sbin/. /sbin/; then
         echo -e "${RED}Failed to install sbin files from $APK${NC}"
+        cleanup_tmp
         return 1
     fi
 
     if ! cp "/tmp/pkg_dl/$APK" "$PKG_DIR/"; then
         echo -e "${RED}Failed to save $APK${NC}"
+        cleanup_tmp
         return 1
     fi
 
     if ! echo "$APK" >> "$INSTALLED_LIST"; then
         echo -e "${RED}Failed to update installed package list${NC}"
+        cleanup_tmp
         return 1
     fi
 
     echo -e "${GREEN}Done: $APK${NC}"
 
-    rm -rf "$TMP_DIR"
+    cleanup_tmp
     return 0
 }
 
@@ -394,12 +408,51 @@ remove_pkg() {
 
         echo -e "${YELLOW}Removing $APK...${NC}"
 
-        for file in $(tar -tzf "$APK_FILE" 2>/dev/null); do
-            target="/$file"
-            if test -f "$target" || test -L "$target"; then
-                rm -f "$target"
-            fi
+        # Collect every path owned by the other installed packages. Alpine
+        # packages share files freely, so deleting this package's file list
+        # outright can pull a library out from under something still installed.
+        KEPT="/tmp/pkg_kept.$$"
+        : > "$KEPT"
+        for OTHER in $(sort -u "$INSTALLED_LIST" 2>/dev/null); do
+            test "$OTHER" != "$APK" || continue
+            test -f "$PKG_DIR/$OTHER" || continue
+            tar -tzf "$PKG_DIR/$OTHER" 2>/dev/null | sed 's#^\./##' >> "$KEPT"
         done
+        sort -u "$KEPT" -o "$KEPT" 2>/dev/null
+
+        # Read the file list from a file rather than a $(...) split, so paths
+        # containing spaces are handled correctly.
+        OWNED="/tmp/pkg_owned.$$"
+        tar -tzf "$APK_FILE" 2>/dev/null > "$OWNED"
+
+        SHARED=0
+        while IFS= read -r file; do
+            # Alpine packages list paths bare (usr/bin/tree), but a tar built
+            # from "." prefixes them with "./". Normalise so the skip list
+            # below matches either form.
+            file=${file#./}
+
+            # apk metadata, not files belonging to the system
+            case "$file" in
+                ""|.PKGINFO|.SIGN.*|.pre-*|.post-*|.trigger*) continue ;;
+            esac
+
+            target="/$file"
+            test -f "$target" || test -L "$target" || continue
+
+            if grep -qxF "$file" "$KEPT" 2>/dev/null; then
+                SHARED=$((SHARED + 1))
+                continue
+            fi
+
+            rm -f "$target"
+        done < "$OWNED"
+
+        rm -f "$KEPT" "$OWNED"
+
+        if test "$SHARED" -gt 0; then
+            echo -e "${YELLOW}Kept $SHARED file(s) still owned by other packages${NC}"
+        fi
 
         rm -f "$APK_FILE"
         sed -i "/^${APK}$/d" "$INSTALLED_LIST" 2>/dev/null
