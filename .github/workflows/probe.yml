@@ -9,26 +9,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: fix/setconsolefont-links-against-musl
 
-      - name: What does build.sh's gcc line actually produce
+      - name: Does the fixed line produce a runnable binary
         run: |
-          echo "=== committed binaries in usr/bin ==="
-          for f in usr/bin/setconsolefont usr/bin/rezzfetch usr/bin/swap-offset; do
-            printf '%-26s ' "$f"
-            file -b "$f" | cut -c1-110
-          done
-
+          gcc -O2 -static usr/bin/setconsolefont.c -o /tmp/scf
+          printf 'result: '; file -b /tmp/scf | cut -c1-90
+          echo "interpreter section:"
+          readelf -l /tmp/scf | grep -c INTERP || echo "  none, as intended"
+          echo "dynamic NEEDED entries:"
+          readelf -d /tmp/scf 2>/dev/null | grep -c NEEDED || echo "  none, as intended"
           echo
-          echo "=== build.sh line 258, reproduced exactly ==="
-          gcc -O2 usr/bin/setconsolefont.c -o /tmp/scf
-          printf 'compiled output: '; file -b /tmp/scf | cut -c1-110
-          echo "interpreter it will ask the kernel for:"
-          readelf -l /tmp/scf | grep -A1 INTERP | tail -1
-          echo "shared libraries it needs:"
-          readelf -d /tmp/scf | grep NEEDED
-
+          echo "it runs and reports usage on no args:"
+          /tmp/scf; echo "  exit=$? (1 expected)"
+          echo "and it does not crash when given a font name off-console:"
+          /tmp/scf TER16x32; echo "  exit=$? (1 expected here, no tty0 in a container)"
           echo
-          echo "=== does a musl-only rootfs have that loader? ==="
-          echo "RezzOS ships /lib/ld-musl-x86_64.so.1 (from musl-1.2.5-r3.apk)"
-          echo "and no glibc package appears anywhere in build.sh:"
-          grep -c 'glibc\|gcompat' build.sh || echo "0 matches"
+          echo "committed binary still in the tree?"
+          test -e usr/bin/setconsolefont && echo "  yes, still there" || echo "  no, removed"
