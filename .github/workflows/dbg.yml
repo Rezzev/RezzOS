@@ -26,6 +26,7 @@ jobs:
           path: dl_cache
           key: rezzos-dl-${{ hashFiles('build.sh') }}
           restore-keys: rezzos-dl-
+
       - uses: actions/cache@v4
         with:
           path: bzImage
@@ -34,28 +35,77 @@ jobs:
       - name: Build
         run: chmod +x build.sh && ./build.sh > b.log 2>&1 || { tail -40 b.log; exit 1; }
 
-      - name: Trace rezz-mkinitrd inside a booted guest
+      - name: Boot 1, let the running system build an image of itself
         run: |
-          mkdir -p ov/etc/sv/dbg ov/etc/runit/runsvdir/default
-          cat > ov/etc/sv/dbg/run <<'P'
+          mkdir -p ov/etc/sv/mk ov/etc/runit/runsvdir/default
+          cat > ov/etc/sv/mk/run <<'P'
           #!/bin/sh
           exec >/dev/console 2>&1
           sleep 8
-          echo "DBG file exists: $(ls -la /usr/bin/rezz-mkinitrd 2>&1)"
-          echo "DBG first line: $(head -1 /usr/bin/rezz-mkinitrd | od -c | head -1)"
-          echo "DBG cpio -o supported:"
-          echo hi > /tmp/hi; ( cd /tmp && echo ./hi | cpio -o -H newc > /tmp/t.cpio ) 2>&1 | sed 's/^/DBG   /'
-          echo "DBG   cpio rc=$? size=$(wc -c < /tmp/t.cpio 2>/dev/null)"
           mkdir -p /mnt/disk/out
-          echo "DBG ---- trace ----"
-          sh -x /usr/bin/rezz-mkinitrd /mnt/disk/out/new.cpio.gz 2>&1 | head -70 | sed 's/^/DBG /'
-          echo "DBG ---- end, rc above ----"
-          echo "DBG DONE"
+          if /usr/bin/rezz-mkinitrd /mnt/disk/out/new.cpio.gz; then
+            echo "MK ok"
+          else
+            echo "MK FAILED"
+          fi
+          ls -la /mnt/disk/out/ | sed 's/^/MK /'
+          sync
+          echo "MK DONE"
           poweroff -f
           P
-          chmod +x ov/etc/sv/dbg/run
-          ln -sf /etc/sv/dbg ov/etc/runit/runsvdir/default/dbg
+          chmod +x ov/etc/sv/mk/run
+          ln -sf /etc/sv/mk ov/etc/runit/runsvdir/default/mk
           ( cd ov && find . -mindepth 1 | cpio -o -H newc --owner 0:0 --quiet ) | gzip -9 > ov.cpio.gz
-          cat rootfs.cpio.gz ov.cpio.gz > t.cpio.gz
-          timeout 300 qemu-system-x86_64 -kernel bzImage -initrd t.cpio.gz -append "console=ttyS0 random.trust_cpu=on" -drive file=disk.img,format=raw,if=virtio -m 1024M -display none -no-reboot -serial file:s.log || true
-          tr -d '\r' < s.log | grep "^DBG" || { echo "no trace"; tail -30 s.log; }
+          cat rootfs.cpio.gz ov.cpio.gz > b1.cpio.gz
+
+          timeout 300 qemu-system-x86_64 -kernel bzImage -initrd b1.cpio.gz -append "console=ttyS0 random.trust_cpu=on" -drive file=disk.img,format=raw,if=virtio -m 1024M -display none -no-reboot -serial file:s1.log || true
+
+          tr -d '\r' < s1.log > s1.txt
+          grep "^MK" s1.txt || { echo "no report from the guest"; tail -25 s1.txt; exit 1; }
+          grep -q "^MK ok" s1.txt || { echo "::error::rezz-mkinitrd failed"; exit 1; }
+
+      - name: Take that image off the disk
+        run: |
+          mkdir -p mnt
+          sudo mount -o loop disk.img mnt
+          sudo cp mnt/out/new.cpio.gz .
+          sudo umount mnt
+          sudo chown "$USER" new.cpio.gz
+          echo "image the guest built: $(stat -c%s new.cpio.gz) bytes"
+          echo "top of its contents:"
+          gzip -dc new.cpio.gz | cpio -t 2>/dev/null | head -5
+
+      - name: Boot 2, from the image the guest built
+        run: |
+          mkdir -p ov2/etc/sv/rt ov2/etc/runit/runsvdir/default
+          cat > ov2/etc/sv/rt/run <<'P'
+          #!/bin/sh
+          exec >/dev/console 2>&1
+          sleep 8
+          check() { if eval "$2" >/dev/null 2>&1; then echo "RT PASS $1"; else echo "RT FAIL $1"; fi; }
+          check supervisor 'pidof runsvdir'
+          check bash       'bash -c "exit 0"'
+          check pkg        'test -x /usr/bin/pkg'
+          check mkinitrd   'test -x /usr/bin/rezz-mkinitrd'
+          check disk       'grep -q " /mnt/disk " /proc/mounts'
+          echo "RT DONE"
+          exec sleep 3600
+          P
+          chmod +x ov2/etc/sv/rt/run
+          ln -sf /etc/sv/rt ov2/etc/runit/runsvdir/default/rt
+          ( cd ov2 && find . -mindepth 1 | cpio -o -H newc --owner 0:0 --quiet ) | gzip -9 > ov2.cpio.gz
+          cat new.cpio.gz ov2.cpio.gz > b2.cpio.gz
+
+          qemu-img create -f raw d2.img 512M > /dev/null
+          mkfs.ext4 -F -q d2.img
+
+          timeout 300 qemu-system-x86_64 -kernel bzImage -initrd b2.cpio.gz -append "console=ttyS0 random.trust_cpu=on" -drive file=d2.img,format=raw,if=virtio -m 1024M -display none -no-reboot -serial file:s2.log || true
+
+          tr -d '\r' < s2.log > s2.txt
+          echo "=========== SECOND BOOT ==========="
+          grep "^RT" s2.txt || { echo "the generated image did not reach userspace"; tail -25 s2.txt; exit 1; }
+          if grep -q "^RT FAIL" s2.txt; then
+            echo "::error::checks failed on the guest-built image"
+            exit 1
+          fi
+          echo "RESULT: RezzOS built a bootable image of itself, and that image boots"
