@@ -162,19 +162,31 @@ get_deps() {
     NAME="$1"
     for idx in "$CACHE_DIR/APKINDEX_main" "$CACHE_DIR/APKINDEX_community"; do
         test -f "$idx" || continue
-        DEPS=$(grep -A20 "P:$NAME$" "$idx" | grep "^D:" | head -1 | sed 's/D://')
-        if test -n "$DEPS"; then
-            for dep in $DEPS; do
-                case "$dep" in
-                    so:*|cmd:*|pc:*|dbus:*|/bin/*|/sbin/*|/usr/*) continue ;;
-                esac
-                dep_name=$(echo "$dep" | sed 's/[<>=].*//')
-                if echo "$dep_name" | grep -qE '^[a-zA-Z]' && ! echo "$dep_name" | grep -q '/'; then
-                    test "$dep_name" != "$NAME" && echo "$dep_name"
-                fi
-            done
-            return 0
-        fi
+
+        # Having no dependencies is normal - about a third of Alpine packages
+        # carry no D: line at all. Decide "found" by the P: line, not by D:,
+        # otherwise those packages look missing and never get installed.
+        grep -q "^P:$NAME$" "$idx" || continue
+
+        # APKINDEX records are separated by blank lines. Read D: from this
+        # package's own record only; `grep -A20` used to run past the end of a
+        # short record and pick up the next package's dependencies.
+        DEPS=$(awk -v want="P:$NAME" '
+            $0 == want { found = 1; next }
+            found && /^$/ { exit }
+            found && /^D:/ { sub(/^D:/, ""); print; exit }
+        ' "$idx")
+
+        for dep in $DEPS; do
+            case "$dep" in
+                so:*|cmd:*|pc:*|dbus:*|/bin/*|/sbin/*|/usr/*) continue ;;
+            esac
+            dep_name=$(echo "$dep" | sed 's/[<>=].*//')
+            if echo "$dep_name" | grep -qE '^[a-zA-Z]' && ! echo "$dep_name" | grep -q '/'; then
+                test "$dep_name" != "$NAME" && echo "$dep_name"
+            fi
+        done
+        return 0
     done
     return 1
 }
@@ -288,6 +300,8 @@ install_with_deps() {
                 return 1
             fi
         done
+
+        return 0
     }
 
     if ! install_deps_recursive "$PKG_NAME"; then
