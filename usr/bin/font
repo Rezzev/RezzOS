@@ -9,6 +9,14 @@ FONT_RESET=$(printf '\033[0m')
 
 CONF_FILE="/etc/font.conf"
 
+# init creates /mnt/disk with mkdir -p whether or not a disk actually mounted
+# there, so `[ -d /mnt/disk ]` is true even on a system with no persistent
+# storage at all. Everything outside /mnt/disk is initramfs, which is RAM, so
+# a write that lands there looks like it worked and is gone at the next boot.
+disk_is_mounted() {
+    grep -q ' /mnt/disk ' /proc/mounts 2>/dev/null
+}
+
 show_help() {
     echo -e "${FONT_CYAN}RezzOS Font Manager${FONT_RESET}"
     echo "Usage:"
@@ -73,8 +81,10 @@ set_font() {
 
             # Save configuration persistently inside OS and persistent disk
             echo "FONT=$TARGET_FONT" > "$CONF_FILE" 2>/dev/null || true
-            if [ -d /mnt/disk ]; then
+            if disk_is_mounted; then
                 echo "FONT=$TARGET_FONT" > /mnt/disk/font.conf 2>/dev/null || true
+            else
+                echo -e "${FONT_YELLOW}No persistent disk at /mnt/disk, this font resets at reboot.${FONT_RESET}"
             fi
             
             # 1. Update sysfs parameter if supported by kernel module
