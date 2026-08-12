@@ -40,7 +40,7 @@ if [ ! -f "$REPO_DIR/init" ] || [ ! -d "$REPO_DIR/etc" ] || [ ! -d "$REPO_DIR/us
     exit 1
 fi
 
-for cmd in wget tar make gcc cpio gzip qemu-img mkfs.ext4; do
+for cmd in wget tar make gcc cpio gzip qemu-img mkfs.ext4 fakeroot; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         echo "Missing command: $cmd"
         exit 1
