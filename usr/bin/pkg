@@ -139,11 +139,94 @@ search_pkg() {
 
 info_pkg() {
     NAME="$1"
-    test -z "$NAME" && echo "Specify package" && return 1
+    if test -z "$NAME"; then
+        echo -e "${RED}Specify a package.${NC}"
+        return 1
+    fi
+
+    # The old implementation was `grep -A10 "P:$NAME$" | head -10`, which cut
+    # the record off at ten lines. D: is the thirteenth field, so the one thing
+    # you actually want from `pkg info`, what the package pulls in, was the one
+    # thing it never showed. It also printed the raw single letter APKINDEX
+    # keys and sizes in bytes, and printed the record twice for a package that
+    # is in both repositories.
+    #
+    # Read the record properly, stop at the blank line that ends it, and label
+    # the fields.
     for idx in "$CACHE_DIR/APKINDEX_main" "$CACHE_DIR/APKINDEX_community"; do
         test -f "$idx" || continue
-        grep -A10 "P:$NAME$" "$idx" | head -10
+        REPO=$(basename "$idx" | sed 's/^APKINDEX_//')
+
+        awk -v want="P:$NAME" -v repo="$REPO" '
+            function human(b) {
+                # Force a number. The field arrives from substr() as a string,
+                # and awk compares two strings lexicographically, so "448569"
+                # would test as greater than "1048576" and every size came out
+                # in MiB.
+                b = b + 0
+                if (b <= 0)       return "unknown"
+                if (b >= 1048576) return sprintf("%.1f MiB", b / 1048576)
+                if (b >= 1024)    return sprintf("%.1f KiB", b / 1024)
+                return b " B"
+            }
+            function show(label, value) {
+                if (value != "") printf "  %-13s %s\n", label, value
+            }
+            $0 == want   { found = 1 }
+            found && /^$/ { exit }
+            found {
+                key = substr($0, 1, 1)
+                val = substr($0, 3)
+                if      (key == "P") name  = val
+                else if (key == "V") ver   = val
+                else if (key == "T") desc  = val
+                else if (key == "U") url   = val
+                else if (key == "L") lic   = val
+                else if (key == "A") arch  = val
+                else if (key == "S") dl    = val
+                else if (key == "I") inst  = val
+                else if (key == "m") maint = val
+                else if (key == "D") deps  = val
+            }
+            END {
+                if (name == "") exit 1
+
+                printf "\n  %s %s\n\n", name, ver
+                show("Description:", desc)
+                show("Repository:",  repo)
+                show("Architecture:", arch)
+                show("License:",     lic)
+                show("Homepage:",    url)
+                show("Maintainer:",  maint)
+                show("Download:",    human(dl))
+                show("Installed:",   human(inst))
+
+                if (deps == "") {
+                    printf "  %-13s none\n", "Depends on:"
+                } else {
+                    # Wrap the dependency list instead of running it off the
+                    # side of an 80 column console.
+                    n = split(deps, d, " ")
+                    line = ""
+                    label = "Depends on:"
+                    for (i = 1; i <= n; i++) {
+                        if (length(line) + length(d[i]) + 1 > 62) {
+                            printf "  %-13s %s\n", label, line
+                            label = ""
+                            line = ""
+                        }
+                        line = (line == "") ? d[i] : line " " d[i]
+                    }
+                    if (line != "") printf "  %-13s %s\n", label, line
+                }
+                printf "\n"
+            }
+        ' "$idx" && return 0
     done
+
+    echo -e "${RED}No package named '$NAME'.${NC}"
+    echo "Try 'pkg search $NAME', or 'pkg update' if the indexes are stale."
+    return 1
 }
 
 find_pkg() {
