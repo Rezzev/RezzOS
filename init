@@ -46,7 +46,14 @@ if ! ifconfig eth0 | grep -q "inet "; then
     route add default gw 10.0.2.2 2>/dev/null || true
 fi
 
-echo "nameserver 8.8.8.8" > /etc/resolv.conf
+# udhcpc's default.script already wrote the nameservers the DHCP server handed
+# out. Only fall back to a public resolver when it wrote nothing, otherwise
+# the DHCP servers we just asked get overwritten one line later. Networks that
+# filter 8.8.8.8, or that resolve internal names through their own resolver,
+# were left with no working DNS even though DHCP had handed over a good one.
+if ! grep -q '^nameserver' /etc/resolv.conf 2>/dev/null; then
+    echo "nameserver 8.8.8.8" > /etc/resolv.conf
+fi
 
 # Mount disk safely
 mkdir -p /mnt/disk
