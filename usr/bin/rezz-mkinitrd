@@ -92,8 +92,16 @@ if ! gzip -t "$TMP" 2>/dev/null; then
     exit 1
 fi
 
-if ! gzip -dc "$TMP" | cpio -t 2>/dev/null | grep -qx './init'; then
+# Compare on the normalised name. `find .` writes ./init into the archive but
+# busybox cpio -t lists it as init, so matching either spelling literally is
+# what makes this work with the cpio that is actually in the image rather than
+# the one on a build host.
+if ! gzip -dc "$TMP" | cpio -t 2>/dev/null | sed 's#^\./##' | grep -qx 'init'; then
     echo -e "${RED}The image has no /init, discarding it.${NC}"
+    echo "This is a bug in rezz-mkinitrd rather than something you did."
+    echo "The archive contained, at the top level:"
+    gzip -dc "$TMP" | cpio -t 2>/dev/null | sed 's#^\./##' |
+        awk -F/ 'NF <= 1 && $0 != "" { print "  " $0 }' | head -12
     rm -f "$TMP"
     exit 1
 fi
