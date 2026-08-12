@@ -58,13 +58,64 @@ jobs:
           chmod +x build.sh
           ./build.sh
 
+      - name: Build the check overlay
+        run: |
+          # The checks run inside the guest as an ordinary runit service, so
+          # they see the system exactly as init leaves it.
+          #
+          # Rather than unpack and repack rootfs.cpio.gz, which would need
+          # fakeroot again to keep ownership, the service is shipped as a
+          # second cpio archive concatenated onto the first. The kernel reads
+          # initramfs archives in sequence and later ones overlay earlier ones,
+          # so nothing in the real rootfs is touched or rebuilt.
+          mkdir -p overlay/etc/sv/citest overlay/etc/runit/runsvdir/default
+
+          cat > overlay/etc/sv/citest/run <<'CITEST'
+          #!/bin/sh
+          # CI only. Not part of the image, injected by .github/workflows.
+          exec >/dev/console 2>&1
+
+          # runsvdir starts every service at once, so give the rest of them a
+          # moment to configure their interfaces and mounts before looking.
+          sleep 8
+
+          check() {
+              if eval "$2" >/dev/null 2>&1; then
+                  echo "CITEST PASS $1"
+              else
+                  echo "CITEST FAIL $1"
+              fi
+          }
+
+          check supervisor-running  'pidof runsvdir'
+          check sv-responds         'SVDIR=/etc/runit/runsvdir/default sv status syslogd'
+          check eth0-has-address    'ifconfig eth0 | grep -q "inet "'
+          check resolver-configured 'grep -q "^nameserver" /etc/resolv.conf'
+          check disk-mounted        'grep -q " /mnt/disk " /proc/mounts'
+          check disk-writable       'touch /mnt/disk/.citest && rm -f /mnt/disk/.citest'
+          check bash-runs           'bash -c "exit 0"'
+          check pkg-present         'test -x /usr/bin/pkg'
+
+          echo "CITEST DONE"
+
+          # Print once. runsv would restart this script the moment it exits.
+          exec sleep 3600
+          CITEST
+
+          chmod +x overlay/etc/sv/citest/run
+          ln -sf /etc/sv/citest overlay/etc/runit/runsvdir/default/citest
+
+          ( cd overlay && find . -mindepth 1 | cpio -o -H newc --owner 0:0 --quiet ) \
+            | gzip -9 > overlay.cpio.gz
+          cat rootfs.cpio.gz overlay.cpio.gz > rootfs-test.cpio.gz
+
       - name: Boot smoke test
         run: |
           # TCG only - hosted runners give no reliable /dev/kvm.
           # QEMU never exits on its own here, so `timeout` ending it is expected.
           timeout 180 qemu-system-x86_64 \
             -kernel bzImage \
-            -initrd rootfs.cpio.gz \
+            -initrd rootfs-test.cpio.gz \
             -append "console=ttyS0 random.trust_cpu=on" \
             -drive file=disk.img,format=raw,if=virtio \
             -netdev user,id=net0 -device virtio-net,netdev=net0 \
@@ -86,6 +137,25 @@ jobs:
           # so a clean boot is quiet. Only a panic is a hard failure.
           if grep -qE "Kernel panic|Attempted to kill init|not syncing" serial.log; then
             echo "::error::Kernel panic during boot."
+            exit 1
+          fi
+
+          # The guest writes to a tty, so every line arrives with a CR on it.
+          tr -d '\r' < serial.log > serial.clean
+
+          if ! grep -q "^CITEST DONE" serial.clean; then
+            echo "::error::The in-guest checks never finished. Either init did not reach runsvdir, or a service wedged before the checks ran."
+            exit 1
+          fi
+
+          echo "--------- in-guest checks ---------"
+          grep "^CITEST " serial.clean
+          echo "-----------------------------------"
+
+          if grep -q "^CITEST FAIL" serial.clean; then
+            grep "^CITEST FAIL" serial.clean | while read -r _ _ name; do
+              echo "::error::in-guest check failed: $name"
+            done
             exit 1
           fi
 
