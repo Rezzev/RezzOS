@@ -19,15 +19,18 @@ jobs:
       - name: Deps, including the ISO tools the docs already ask for
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential flex bison bc libssl-dev libelf-dev libncurses-dev \
-            wget tar bzip2 cpio gzip e2fsprogs fakeroot qemu-utils qemu-system-x86 \
-            grub-pc-bin grub-common xorriso mtools
+          sudo apt-get install -y --no-install-recommends build-essential flex bison bc libssl-dev libelf-dev libncurses-dev wget tar bzip2 cpio gzip e2fsprogs fakeroot qemu-utils qemu-system-x86 grub-pc-bin grub-common xorriso mtools
 
       - uses: actions/cache@v4
-        with: { path: dl_cache, key: 'rezzos-dl-${{ hashFiles(''build.sh'') }}', restore-keys: rezzos-dl- }
+        with:
+          path: dl_cache
+          key: rezzos-dl-${{ hashFiles('build.sh') }}
+          restore-keys: rezzos-dl-
+
       - uses: actions/cache@v4
-        with: { path: bzImage, key: 'rezzos-bzImage-${{ hashFiles(''build.sh'') }}' }
+        with:
+          path: bzImage
+          key: rezzos-bzImage-${{ hashFiles('build.sh') }}
 
       - name: Build
         run: chmod +x build.sh && ./build.sh > build.log 2>&1 || { tail -50 build.log; exit 1; }
@@ -35,32 +38,38 @@ jobs:
       - name: Inspect the ISO
         run: |
           ls -la rezzos.iso
-          echo "--- file type ---"
           file -b rezzos.iso
-          echo "--- is it left clean afterwards? ---"
+          echo "--- iso/boot is left clean afterwards ---"
           ls -la iso/boot/
           echo "--- the kernel and rootfs are inside the image ---"
-          xorriso -indev rezzos.iso -find /boot 2>/dev/null | head
+          xorriso -indev rezzos.iso -find /boot -maxdepth 1 2>/dev/null | head
 
       - name: Boot the ISO itself, no -kernel and no -initrd
         run: |
-          # Pick the serial menu entry: down arrow, then Enter.
-          printf '\033[B\r' > keys.in
-          timeout 240 qemu-system-x86_64 \
-            -cdrom rezzos.iso -boot d \
-            -m 1024M -display none \
-            -serial stdio < keys.in > serial.log 2>&1 || true
+          # GRUB's menu times out after 5 s, so the keystroke has to land while
+          # it is still waiting, and the pipe has to stay open afterwards or
+          # QEMU sees EOF on the serial line. Down arrow then Enter picks the
+          # "for COM port, qemu" entry. awk emits the escape byte so no
+          # backslash has to survive YAML and the shell.
+          DOWN=$(awk 'BEGIN { printf "%c[B", 27 }')
+          ( sleep 3; printf '%s' "$DOWN"; sleep 1; echo; sleep 200 ) | timeout 240 qemu-system-x86_64 -cdrom rezzos.iso -boot d -m 1024M -display none -serial stdio > serial.log 2>&1 || true
 
-          tr -d '\r' < serial.log > s.txt
+          tr -d '\r' < serial.log | sed 's/.\[[0-9;?]*[a-zA-Z]//g' > s.txt
+
           echo "=========== GRUB ==========="
-          grep -iE "GNU GRUB|RezzOS" s.txt | head -5 || echo "(no menu on serial)"
-          echo "=========== KERNEL ==========="
-          grep -c "Linux version" s.txt || true
-          echo "=========== USERSPACE ==========="
-          grep -E "Run /init|Network service active|login:" s.txt | head -5 || echo "(did not reach userspace)"
-          echo "=========== TAIL ==========="
-          tail -20 s.txt
+          grep -oE "GNU GRUB +version [0-9.]+" s.txt | head -1 || echo "(no menu)"
 
-          grep -q "Linux version" s.txt \
-            && echo "RESULT: the ISO boots and the kernel starts" \
-            || { echo "::error::the ISO did not boot a kernel"; exit 1; }
+          echo "=========== USERSPACE ==========="
+          # Both entries boot with `quiet loglevel=0`, so the kernel says very
+          # little. init and the services are the visible proof.
+          grep -E "Configuring GTK|Network service active|login:" s.txt | head -5 || echo "(nothing from userspace)"
+
+          echo "=========== TAIL ==========="
+          tail -15 s.txt
+
+          if grep -qE "Network service active|login:" s.txt; then
+            echo "RESULT: the ISO boots GRUB, loads the kernel and reaches userspace"
+          else
+            echo "::error::the ISO did not reach userspace"
+            exit 1
+          fi
