@@ -130,11 +130,56 @@ update_index() {
 }
 
 search_pkg() {
-    echo -e "${YELLOW}Searching for '$1'...${NC}"
-    for idx in "$CACHE_DIR/APKINDEX_main" "$CACHE_DIR/APKINDEX_community"; do
-        test -f "$idx" || continue
-        grep -i "P:$1" "$idx" | sed 's/P://'
-    done
+    QUERY="$1"
+    if test -z "$QUERY"; then
+        echo -e "${RED}Specify something to search for.${NC}"
+        return 1
+    fi
+
+    echo -e "${YELLOW}Searching for '$QUERY'...${NC}"
+
+    # The old implementation was `grep -i "P:$1" | sed 's/P://'`, which had two
+    # problems.
+    #
+    # The pattern has no ^ but the package name follows "P:" immediately, so it
+    # only ever matched names that *start* with the query. Searching for ssl
+    # found ssl_client and sslh but not openssl, libssl3 or bearssl, 75 of the
+    # 84 packages with ssl in the name.
+    #
+    # And -i made it match the lowercase p: "provides" lines too, which are not
+    # packages at all, so a search for python printed a raw line of
+    # "p:pythonispython3=3.12.13-r0 so:libpython3.12.so.1.0=1.0 cmd:..." in
+    # among the results.
+    #
+    # Walk the records instead and match on the name field only. index() is a
+    # plain substring test, so a query containing regex characters searches for
+    # itself rather than being interpreted.
+    RESULTS=$(
+        for idx in "$CACHE_DIR/APKINDEX_main" "$CACHE_DIR/APKINDEX_community"; do
+            test -f "$idx" || continue
+            awk -v q="$QUERY" '
+                function emit() {
+                    if (name != "" && index(tolower(name), tolower(q)) > 0)
+                        printf "%-34s %-20s %s\n", name, ver, desc
+                    name = ""; ver = ""; desc = ""
+                }
+                /^P:/ { emit(); name = substr($0, 3); next }
+                /^V:/ { ver  = substr($0, 3); next }
+                /^T:/ { desc = substr($0, 3); next }
+                END   { emit() }
+            ' "$idx"
+        done | sort -u
+    )
+
+    if test -z "$RESULTS"; then
+        echo -e "${RED}No package matches '$QUERY'.${NC}"
+        echo "Run 'pkg update' first if you have not refreshed the indexes."
+        return 1
+    fi
+
+    printf '%s\n' "$RESULTS"
+    echo ""
+    echo -e "${GREEN}$(printf '%s\n' "$RESULTS" | wc -l) package(s) found.${NC}"
 }
 
 info_pkg() {
