@@ -144,7 +144,18 @@ mkdir -p dev proc sys tmp mnt/disk var/log lib usr/lib usr/share/terminfo
 mkdir -p etc/runit/runsvdir/default
 mkdir -p boot
 cp "$REPO_DIR/bzImage" boot/ 2>/dev/null || true
-cp "$REPO_DIR/rootfs.cpio.gz" boot/ 2>/dev/null || true
+
+# The initramfs cannot contain a copy of itself. Copying the previous
+# rootfs.cpio.gz in here gave every rebuild the last build's image as
+# baggage: 109 MiB, then 217, then 326, growing by the size of a whole
+# image each time. The copy was also always wrong, since it is by
+# definition one build behind the system it sits inside, and missing
+# entirely on a first build.
+#
+# The install procedure in the README needs /boot/rootfs.cpio.gz on the
+# target disk, so `rezz-mkinitrd` builds it from the running system at
+# install time, where it can be current and correct.
+rm -f boot/rootfs.cpio.gz
 chmod +x init
 
 step "Downloading musl"
