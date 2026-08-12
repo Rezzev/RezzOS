@@ -9,7 +9,35 @@ BLUE=$(printf '\033[1;34m')
 NC=$(printf '\033[0m')
 
 SWAPFILE="/mnt/disk/swapfile"
-[ -d /mnt/disk ] || SWAPFILE="/swapfile"
+
+# /mnt/disk is the only real storage on this system. The root filesystem is
+# the initramfs, so it and every path outside /mnt/disk are RAM.
+#
+# The old fallback here was
+#
+#     [ -d /mnt/disk ] || SWAPFILE="/swapfile"
+#
+# which never fired, because init runs mkdir -p /mnt/disk before it tries to
+# mount anything and swallows the failure. Even if it had fired, /swapfile is
+# in the initramfs too, so both branches pointed at RAM.
+#
+# With nothing mounted, `swap create 512M` therefore wrote half a gigabyte of
+# zeroes into memory, which is the opposite of what swap is for, and swapon
+# then rejected the file anyway since tmpfs cannot hand out the fixed blocks
+# swap needs. Check for a real mount and refuse instead.
+disk_is_mounted() {
+    grep -q ' /mnt/disk ' /proc/mounts 2>/dev/null
+}
+
+require_disk() {
+    if disk_is_mounted; then
+        return 0
+    fi
+    echo -e "${RED}[Error] No persistent disk is mounted at /mnt/disk.${NC}"
+    echo "Everything outside /mnt/disk is in RAM, so a swap file there would"
+    echo "consume the memory it is meant to free up. Attach a disk and reboot."
+    return 1
+}
 
 usage() {
     echo -e "${BLUE}=== RezzOS Swap Manager (swap) ===${NC}"
@@ -23,7 +51,9 @@ usage() {
 
 create_swap() {
     SIZE="${1:-512M}"
-    
+
+    require_disk || return 1
+
     if [ -f "$SWAPFILE" ]; then
         echo -e "${YELLOW}Swap file already exists at $SWAPFILE.${NC}"
         echo "Use 'swap on' to enable it, or 'swap remove' first."
