@@ -127,10 +127,25 @@ hostname_menu() {
     echo -n "Enter new hostname (leave blank to cancel): "
     read -r NEW_HN
 
+    case "$NEW_HN" in
+        *[!a-zA-Z0-9.-]*)
+            echo -e "${RED}A hostname may only contain letters, digits, dots and hyphens.${NC}"
+            pause
+            return
+            ;;
+    esac
+
     if [ -n "$NEW_HN" ]; then
         hostname "$NEW_HN"
         echo "$NEW_HN" > /etc/hostname
+        # Keep 127.0.0.1 pointing at the machine's own name. Leaving the old
+        # one there makes anything that looks itself up wait for a lookup that
+        # cannot succeed.
+        sed -i "s/^127\.0\.0\.1 .*/127.0.0.1 $NEW_HN localhost/" /etc/hosts 2>/dev/null || true
         if [ -d /mnt/disk ]; then
+            # /mnt/disk/etc does not exist on a fresh disk, and without this
+            # mkdir the redirect below fails and the name is lost at reboot.
+            mkdir -p /mnt/disk/etc 2>/dev/null
             echo "$NEW_HN" > /mnt/disk/etc/hostname 2>/dev/null || true
         fi
         echo -e "${GREEN}Hostname changed to '$NEW_HN' successfully!${NC}"

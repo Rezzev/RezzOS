@@ -52,6 +52,23 @@ echo "nameserver 8.8.8.8" > /etc/resolv.conf
 mkdir -p /mnt/disk
 mount /dev/vda /mnt/disk 2>/dev/null
 
+# Restore the hostname chosen in rezzconfig. The disk is not mounted yet when
+# "hostname rezzos" runs above, and the initramfs /etc comes back fresh from
+# the image on every boot, so this is the only place the saved name can be
+# applied. Ignore anything that is not a plausible hostname rather than feed
+# it to /etc/hosts.
+if [ -f /mnt/disk/etc/hostname ]; then
+    SAVED_HN=$(head -n 1 /mnt/disk/etc/hostname 2>/dev/null | tr -d '[:space:]')
+    case "$SAVED_HN" in
+        ""|*[!a-zA-Z0-9.-]*) ;;
+        *)
+            hostname "$SAVED_HN"
+            echo "$SAVED_HN" > /etc/hostname
+            sed -i "s/^127\.0\.0\.1 .*/127.0.0.1 $SAVED_HN localhost/" /etc/hosts 2>/dev/null || true
+            ;;
+    esac
+fi
+
 # Restore persistent font configuration
 if [ -f /mnt/disk/font.conf ]; then
     cp /mnt/disk/font.conf /etc/font.conf 2>/dev/null || true
