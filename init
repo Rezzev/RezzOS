@@ -64,9 +64,40 @@ if ! grep -q '^nameserver' /etc/resolv.conf 2>/dev/null; then
     echo "nameserver 8.8.8.8" > /etc/resolv.conf
 fi
 
-# Mount disk safely
+# Mount disk safely.
+#
+# Under QEMU's virtio the persistent disk is /dev/vda, but on real hardware the
+# same disk shows up as /dev/sda, so hardcoding vda meant packages, swap,
+# enabled services and the saved font silently stopped persisting anywhere
+# outside a VM. Only ext4 is tried: build.sh formats disk.img with mkfs.ext4,
+# and kernel.config sets CONFIG_EXT4_FS without CONFIG_EXT4_USE_FOR_EXT23, so
+# ext4 is the only on-disk filesystem this kernel can mount at all. NVMe is
+# absent from the list for the same reason, there is no NVMe driver built in.
+looks_like_rezz_disk() {
+    # Bail out on anything that carries a root filesystem. Plenty of Linux
+    # installs keep a /swapfile at the top level, and without this check one
+    # would match the swapfile test below and get swapon'd and rummaged
+    # through for packages. No persistent disk of ours has both of these.
+    test -d /mnt/disk/usr && test -d /mnt/disk/bin && return 1
+
+    # Freshly formatted: mkfs.ext4 leaves nothing behind but lost+found.
+    test -z "$(ls -A /mnt/disk 2>/dev/null | grep -vx 'lost+found')" && return 0
+
+    # Or already carrying the state restored further down.
+    test -d /mnt/disk/packages && return 0
+    test -d /mnt/disk/services && return 0
+    test -f /mnt/disk/swapfile && return 0
+    test -f /mnt/disk/font.conf && return 0
+    return 1
+}
+
 mkdir -p /mnt/disk
-mount /dev/vda /mnt/disk 2>/dev/null
+for disk in /dev/vda /dev/vda1 /dev/sda /dev/sda1 /dev/sdb /dev/sdb1; do
+    [ -b "$disk" ] || continue
+    mount -t ext4 "$disk" /mnt/disk 2>/dev/null || continue
+    looks_like_rezz_disk && break
+    umount /mnt/disk 2>/dev/null
+done
 
 # Restore persistent font configuration
 if [ -f /mnt/disk/font.conf ]; then
