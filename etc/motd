@@ -1,4 +1,5 @@
 
  [1;32mWelcome to RezzOS![0m
  Type 'help' or 'config' to launch the Control Center.
- For start GUI - startx.
+ Before using pkg, enter 'pkg update'
+ For start GUI - 'startx'.
