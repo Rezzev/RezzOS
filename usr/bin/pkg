@@ -2,7 +2,23 @@
 CACHE_DIR="/var/cache/pkg"
 PKG_DIR="/mnt/disk/packages"
 INSTALLED_LIST="$PKG_DIR/installed.list"
-[ -d "$PKG_DIR" ] || INSTALLED_LIST="/var/log/installed.list"
+
+# Decide where the list lives by whether the persistent disk is mounted, not by
+# whether the package directory happens to exist yet.
+#
+# On a freshly formatted disk it does not exist: install_single_pkg creates it
+# further down, on the first install. So the very first package of a new system
+# had its .apk copied onto the disk while its name went into /var/log, which is
+# initramfs, which is RAM. After a reboot init restored the package from
+# packages/ but pkg list no longer mentioned it and pkg remove could not find
+# it, for that one package, permanently.
+#
+# Creating the directory up front makes the two agree.
+if grep -q ' /mnt/disk ' /proc/mounts 2>/dev/null; then
+    mkdir -p "$PKG_DIR" 2>/dev/null
+else
+    INSTALLED_LIST="/var/log/installed.list"
+fi
 
 ALPINE_VER="v3.20"
 ARCH="x86_64"
