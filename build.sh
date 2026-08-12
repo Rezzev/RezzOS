@@ -253,9 +253,24 @@ cp -a "$REPO_DIR/usr/"* "$ROOTFS_DIR/usr/" 2>/dev/null || true
 cp -a "$REPO_DIR/etc/"* "$ROOTFS_DIR/etc/" 2>/dev/null || true
 [ -d "$REPO_DIR/root" ] && cp -a "$REPO_DIR/root/"* "$ROOTFS_DIR/root/" 2>/dev/null || true
 
-# Compile setconsolefont helper if C source exists
+# Compile the setconsolefont helper.
+#
+# -static matters. Without it the host's gcc links against the host's glibc,
+# so the binary asks the kernel for /lib64/ld-linux-x86-64.so.2 and libc.so.6.
+# The rootfs is musl only, it ships /lib/ld-musl-x86_64.so.1 and no glibc, so
+# the helper died with "not found" on every run. Both callers redirect that to
+# /dev/null, which is why nobody noticed.
+#
+# Static linking also means the helper does not care which libc the build host
+# has, which is the same reason swap-offset next to it is a static binary.
+#
+# Errors are no longer swallowed. If this stops compiling, that is worth
+# knowing at build time rather than shipping a console font that never applies.
 if [ -f "$REPO_DIR/usr/bin/setconsolefont.c" ]; then
-    gcc -O2 "$REPO_DIR/usr/bin/setconsolefont.c" -o "$ROOTFS_DIR/usr/bin/setconsolefont" 2>/dev/null || true
+    log "Compiling setconsolefont"
+    gcc -O2 -static "$REPO_DIR/usr/bin/setconsolefont.c" \
+        -o "$ROOTFS_DIR/usr/bin/setconsolefont"
+    chmod +x "$ROOTFS_DIR/usr/bin/setconsolefont"
 fi
 
 step "Downloading rezz-utils"
