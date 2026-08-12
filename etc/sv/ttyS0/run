@@ -1,0 +1,19 @@
+#!/bin/sh
+# Login prompt on the serial console.
+#
+# start.sh runs QEMU with -nographic and console=ttyS0, but getty only ran on
+# tty1 to tty4, which are virtual consoles you cannot see in that mode. The
+# system booted fine and printed to the serial port, yet there was no way to
+# type anything into it.
+#
+# Only start where the kernel actually made a serial console. /proc/consoles
+# lists the consoles in use, so this stays quiet on a machine that merely has
+# a serial port, and on one that has none at all.
+grep -q '^ttyS0' /proc/consoles 2>/dev/null || exec sleep 86400
+
+export TERM=vt100
+export PATH=/sbin:/bin:/usr/bin:/usr/sbin
+export HOME=/root
+cd /root
+
+exec /sbin/getty -L ttyS0 115200 vt100
