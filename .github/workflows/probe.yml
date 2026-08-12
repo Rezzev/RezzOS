@@ -5,13 +5,11 @@ on:
     branches: [experiment/check-setconsolefont]
 
 jobs:
-  roundtrip:
+  modes:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: fix/rootfs-nesting
 
       - name: Free disk
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
@@ -25,92 +23,54 @@ jobs:
 
       - uses: actions/cache@v4
         with: { path: dl_cache, key: 'rezzos-dl-${{ hashFiles(''build.sh'') }}', restore-keys: rezzos-dl- }
-
       - uses: actions/cache@v4
         with: { path: bzImage, key: 'rezzos-bzImage-${{ hashFiles(''build.sh'') }}' }
 
       - name: Build
         run: chmod +x build.sh && ./build.sh > build.log 2>&1 || { tail -40 build.log; exit 1; }
 
-      - name: Confirm boot/ no longer carries an image
+      - name: Modes in the packed rootfs
         run: |
-          echo "contents of boot/ in the packed rootfs:"
-          ls -la busybox-1.36.1/_install/boot/
-          test ! -e busybox-1.36.1/_install/boot/rootfs.cpio.gz \
-            && echo "OK: no nested image" || { echo "FAIL: still nested"; exit 1; }
-          echo "image size: $(stat -c%s rootfs.cpio.gz) bytes"
+          cd busybox-1.36.1/_install/usr/bin
+          echo "=== RezzOS tools, as they will ship ==="
+          for f in pkg rsv font swap systemctl rezzconfig rezzmon help poweroff reboot shutdown hibernate suspend halt fetch; do
+            [ -e "$f" ] || { printf '%-14s ABSENT\n' "$f"; continue; }
+            printf '%-14s %s %s\n' "$f" "$(stat -c%A "$f")" "$([ -x "$f" ] && echo EXECUTABLE || echo 'NOT EXECUTABLE')"
+          done
 
-      - name: Boot 1, run rezz-mkinitrd onto the persistent disk
+      - name: Boot and actually try to run them
         run: |
-          mkdir -p ov/etc/sv/mk ov/etc/runit/runsvdir/default
-          cat > ov/etc/sv/mk/run <<'P'
+          mkdir -p ov/etc/sv/t ov/etc/runit/runsvdir/default
+          cat > ov/etc/sv/t/run <<'P'
           #!/bin/sh
           exec >/dev/console 2>&1
           sleep 8
-          echo "MK start"
-          mkdir -p /mnt/disk/out
-          /usr/bin/rezz-mkinitrd /mnt/disk/out/new.cpio.gz && echo "MK ok" || echo "MK FAILED rc=$?"
-          ls -la /mnt/disk/out/ 2>&1 | sed 's/^/MK /'
-          sync
-          echo "MK DONE"
-          poweroff -f
-          P
-          chmod +x ov/etc/sv/mk/run
-          ln -sf /etc/sv/mk ov/etc/runit/runsvdir/default/mk
-          ( cd ov && find . -mindepth 1 | cpio -o -H newc --owner 0:0 --quiet ) | gzip -9 > ov.cpio.gz
-          cat rootfs.cpio.gz ov.cpio.gz > boot1.cpio.gz
-
-          timeout 300 qemu-system-x86_64 \
-            -kernel bzImage -initrd boot1.cpio.gz \
-            -append "console=ttyS0 random.trust_cpu=on" \
-            -drive file=disk.img,format=raw,if=virtio \
-            -m 1024M -display none -no-reboot -serial file:b1.log || true
-          tr -d '\r' < b1.log > b1.txt
-          grep "^MK" b1.txt || { echo "mkinitrd never reported"; tail -20 b1.txt; exit 1; }
-          grep -q "^MK ok" b1.txt || { echo "::error::rezz-mkinitrd failed"; exit 1; }
-
-      - name: Pull the generated image off the disk
-        run: |
-          mkdir -p mnt
-          sudo mount -o loop disk.img mnt
-          sudo cp mnt/out/new.cpio.gz .
-          sudo umount mnt
-          sudo chown "$USER" new.cpio.gz
-          echo "generated image: $(stat -c%s new.cpio.gz) bytes"
-          echo "it decompresses and contains an init:"
-          gzip -dc new.cpio.gz | cpio -t 2>/dev/null | grep -x './init'
-
-      - name: Boot 2, from the image the guest built
-        run: |
-          mkdir -p ov2/etc/sv/citest ov2/etc/runit/runsvdir/default
-          cat > ov2/etc/sv/citest/run <<'P'
-          #!/bin/sh
-          exec >/dev/console 2>&1
-          sleep 8
-          check() { if eval "$2" >/dev/null 2>&1; then echo "RT PASS $1"; else echo "RT FAIL $1"; fi; }
-          check supervisor  'pidof runsvdir'
-          check bash        'bash -c "exit 0"'
-          check pkg         'test -x /usr/bin/pkg'
-          check mkinitrd    'test -x /usr/bin/rezz-mkinitrd'
-          check disk        'grep -q " /mnt/disk " /proc/mounts'
-          echo "RT DONE"
+          for c in rsv font swap systemctl rezzmon help pkg; do
+            if [ -x "/usr/bin/$c" ]; then
+              echo "MODE $c executable"
+            else
+              echo "MODE $c NOT-EXECUTABLE"
+            fi
+          done
+          echo "--- trying to run them the way a user would ---"
+          rsv list      >/dev/null 2>&1 && echo "RUN rsv ok"       || echo "RUN rsv FAILED rc=$?"
+          font current  >/dev/null 2>&1 && echo "RUN font ok"      || echo "RUN font FAILED rc=$?"
+          swap status   >/dev/null 2>&1 && echo "RUN swap ok"      || echo "RUN swap FAILED rc=$?"
+          systemctl status syslogd >/dev/null 2>&1 && echo "RUN systemctl ok" || echo "RUN systemctl FAILED rc=$?"
+          help          >/dev/null 2>&1 && echo "RUN help ok"      || echo "RUN help FAILED rc=$?"
+          echo "MODE DONE"
           exec sleep 3600
           P
-          chmod +x ov2/etc/sv/citest/run
-          ln -sf /etc/sv/citest ov2/etc/runit/runsvdir/default/citest
-          ( cd ov2 && find . -mindepth 1 | cpio -o -H newc --owner 0:0 --quiet ) | gzip -9 > ov2.cpio.gz
-          cat new.cpio.gz ov2.cpio.gz > boot2.cpio.gz
+          chmod +x ov/etc/sv/t/run
+          ln -sf /etc/sv/t ov/etc/runit/runsvdir/default/t
+          ( cd ov && find . -mindepth 1 | cpio -o -H newc --owner 0:0 --quiet ) | gzip -9 > ov.cpio.gz
+          cat rootfs.cpio.gz ov.cpio.gz > t.cpio.gz
 
-          qemu-img create -f raw disk2.img 512M >/dev/null
-          mkfs.ext4 -F -q disk2.img
-
-          timeout 300 qemu-system-x86_64 \
-            -kernel bzImage -initrd boot2.cpio.gz \
+          timeout 240 qemu-system-x86_64 \
+            -kernel bzImage -initrd t.cpio.gz \
             -append "console=ttyS0 random.trust_cpu=on" \
-            -drive file=disk2.img,format=raw,if=virtio \
-            -m 1024M -display none -no-reboot -serial file:b2.log || true
-          tr -d '\r' < b2.log > b2.txt
-          echo "=========== SECOND BOOT ==========="
-          grep "^RT" b2.txt || { echo "the generated image did not reach userspace"; tail -25 b2.txt; exit 1; }
-          grep -q "^RT FAIL" b2.txt && { echo "::error::checks failed on the generated image"; exit 1; }
-          echo "The image built inside the guest boots and works."
+            -drive file=disk.img,format=raw,if=virtio \
+            -m 1024M -display none -no-reboot -serial file:s.log || true
+          tr -d '\r' < s.log > s.txt
+          echo "=========== IN A BOOTED SYSTEM ==========="
+          grep -E "^MODE|^RUN" s.txt || { echo "no report"; tail -20 s.txt; }
