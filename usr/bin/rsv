@@ -2,6 +2,15 @@
 
 SV_DIR="${SERVICE_DIR:-/etc/runit/runsvdir/default}"
 ALL_SV_DIR="${ALL_SERVICE_DIR:-/etc/sv}"
+DISK_SV_DIR="/mnt/disk/services"
+
+# init rebuilds the symlinks in SV_DIR from DISK_SV_DIR on every boot, so that
+# directory is what actually decides which services autostart. Only touch it
+# when the persistent disk is really mounted: init runs mkdir -p /mnt/disk
+# before it tries to mount anything, so the directory existing proves nothing.
+disk_is_mounted() {
+    grep -q ' /mnt/disk ' /proc/mounts 2>/dev/null
+}
 
 print_usage() {
     echo "RezzOS Runit Service Manager (rsv)"
@@ -101,6 +110,13 @@ enable_service() {
     mkdir -p "$SV_DIR"
     ln -sf "$ALL_SV_DIR/$name" "$SV_DIR/$name"
     echo "Enabled service '$name' -> $SV_DIR/$name"
+
+    if disk_is_mounted; then
+        mkdir -p "$DISK_SV_DIR"
+        touch "$DISK_SV_DIR/$name"
+    else
+        echo "Note: no persistent disk mounted, this lasts until the next reboot."
+    fi
 }
 
 disable_service() {
@@ -108,6 +124,13 @@ disable_service() {
     if [ -z "$name" ]; then
         echo "Error: Please specify a service name to disable."
         exit 1
+    fi
+
+    # Clear the disk marker even when the symlink is already gone. That marker
+    # is what init replays at boot, so leaving it behind brings the service
+    # back at the next boot and makes 'rsv disable' look like it did nothing.
+    if disk_is_mounted; then
+        rm -f "$DISK_SV_DIR/$name"
     fi
 
     if [ ! -e "$SV_DIR/$name" ]; then
