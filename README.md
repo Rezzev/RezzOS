@@ -201,6 +201,7 @@ Thanks to everyone who helps develop the project!
 - [@semen88pochuev-eng](https://github.com/semen88pochuev-eng) (rezzev) — project creator, architecture, build system, Lua integration, support [...]
 - [@Kenyka kenykovich](https://github.com/keeniGithub) — GUI (JWM), desktop integration, SSH, multi-user, service management, interface work [...]
 - [@neko_qt](https://github.com/neko-qt) — rezz utils, build improvements, kernel configuration, init fixes.
+- [@tanukis0408](https://github.com/tanukis0408) - updated and fixed pkg, other fixes
 - [@wqreloxz](https://github.com/wqreloxz) — service scripts, package manager, init improvements.
 - [@TOPDATOP](https://github.com/topdatop01) — wireless support (iwd, dhcpcd).
 - [@nevvixsz](https://github.com/nevvixsz) - devloper installer
