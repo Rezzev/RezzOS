@@ -22,6 +22,7 @@ usage() {
     echo "Usage:"
     echo "  pkg update                 - Refresh package indexes"
     echo "  pkg install <package>      - Install package"
+    echo "  pkg upgrade                - Upgrade all installed packages"
     echo "  pkg search <query>         - Search for packages"
     echo "  pkg info <package>         - Show package details"
     echo "  pkg list                   - List installed packages"
@@ -315,6 +316,60 @@ install_with_deps() {
     fi
 }
 
+upgrade_pkgs() {
+    if test ! -s "$INSTALLED_LIST"; then
+        echo "No packages"
+        return 0
+    fi
+
+    if test ! -f "$CACHE_DIR/APKINDEX_main" && test ! -f "$CACHE_DIR/APKINDEX_community"; then
+        echo -e "${RED}No package index. Run 'pkg update' first.${NC}"
+        return 1
+    fi
+
+    CHECKED=0
+    UPGRADED=0
+    FAILED=0
+
+    for APK in $(sort -u "$INSTALLED_LIST"); do
+        # Package files are named <name>-<version>-r<release>.apk. Alpine
+        # versions never contain a dash, so dropping the last two
+        # dash-separated fields leaves the package name.
+        NAME=$(echo "$APK" | sed 's/-[^-]*-r[0-9][0-9]*\.apk$//')
+        test -n "$NAME" || continue
+        test "$NAME" != "$APK" || continue
+
+        CHECKED=$((CHECKED + 1))
+
+        LATEST=$(find_pkg "$NAME") || {
+            echo -e "${YELLOW}Not in index, skipping: $NAME${NC}"
+            continue
+        }
+
+        test "$LATEST" != "$APK" || continue
+
+        echo -e "${YELLOW}$NAME: $APK -> $LATEST${NC}"
+
+        # A new version may pull in dependencies the old one did not have.
+        if install_with_deps "$NAME"; then
+            sed -i "/^${APK}$/d" "$INSTALLED_LIST" 2>/dev/null
+            rm -f "$PKG_DIR/$APK"
+            UPGRADED=$((UPGRADED + 1))
+        else
+            FAILED=$((FAILED + 1))
+        fi
+    done
+
+    echo
+    if test "$UPGRADED" -eq 0 && test "$FAILED" -eq 0; then
+        echo -e "${GREEN}Everything is up to date ($CHECKED checked)${NC}"
+    else
+        echo -e "${GREEN}Checked $CHECKED, upgraded $UPGRADED, failed $FAILED${NC}"
+    fi
+
+    test "$FAILED" -eq 0
+}
+
 remove_pkg() {
     test -z "$1" && echo "Specify package" && return 1
 
@@ -356,6 +411,7 @@ CMD="$1"
 case "$CMD" in
     update)  update_index ;;
     install) test -z "$2" && usage || { shift; for pkg in "$@"; do install_with_deps "$pkg"; done; } ;;
+    upgrade) upgrade_pkgs ;;
     search)  search_pkg "$2" ;;
     info)    info_pkg "$2" ;;
     list)    cat "$INSTALLED_LIST" 2>/dev/null || echo "No packages" ;;
