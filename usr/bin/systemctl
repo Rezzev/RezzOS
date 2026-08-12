@@ -13,6 +13,14 @@ RUN_DIR="/etc/runit/runsvdir/default"
 
 export SVDIR="$RUN_DIR"
 
+# init creates /mnt/disk with mkdir -p whether or not a disk actually mounted
+# there, so `[ -d /mnt/disk ]` is true even on a system with no persistent
+# storage at all. Everything outside /mnt/disk is initramfs, which is RAM, so
+# a write that lands there looks like it worked and is gone at the next boot.
+disk_is_mounted() {
+    grep -q ' /mnt/disk ' /proc/mounts 2>/dev/null
+}
+
 case "$ACTION" in
     enable)
         if [ ! -d "$SV_DIR/$SERVICE" ]; then
@@ -23,13 +31,16 @@ case "$ACTION" in
             echo "Service '$SERVICE' is already enabled."
         else
             ln -s "$SV_DIR/$SERVICE" "$RUN_DIR/$SERVICE"
+            echo "Created symlink: $RUN_DIR/$SERVICE -> $SV_DIR/$SERVICE"
             # Persist to disk if available
-            if [ -d /mnt/disk ]; then
+            if disk_is_mounted; then
                 mkdir -p /mnt/disk/services
                 touch "/mnt/disk/services/$SERVICE"
+                echo "Service '$SERVICE' enabled for autostart."
+            else
+                echo "Service '$SERVICE' is enabled until the next reboot."
+                echo "Autostart was not saved: no persistent disk is mounted at /mnt/disk."
             fi
-            echo "Created symlink: $RUN_DIR/$SERVICE -> $SV_DIR/$SERVICE"
-            echo "Service '$SERVICE' enabled for autostart."
         fi
         ;;
     disable)
@@ -38,7 +49,7 @@ case "$ACTION" in
         else
             rm -f "$RUN_DIR/$SERVICE"
             # Remove from persistent disk
-            if [ -d /mnt/disk/services ]; then
+            if disk_is_mounted; then
                 rm -f "/mnt/disk/services/$SERVICE"
             fi
             echo "Removed symlink: $RUN_DIR/$SERVICE"
