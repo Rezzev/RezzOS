@@ -35,7 +35,7 @@
     <!-- Options for program interfaces. -->
     <Tray x="0" y="0" autohide="off">
         <!-- FIXED: Removed jwm-blue icon and changed action to root:1 to open the Start menu -->
-        <TrayButton label="Menu">root:1</TrayButton>
+        <TrayButton icon="menu.png" label="Menu">root:1</TrayButton>
         <Spacer width="2"/>
         <!-- FIXED: Action changed to "desktop" so the "_" button minimizes all windows -->
         <TrayButton label="_">showdesktop</TrayButton>
