@@ -34,10 +34,8 @@
 
     <!-- Options for program interfaces. -->
     <Tray x="0" y="0" autohide="off">
-        <!-- FIXED: Removed jwm-blue icon and changed action to root:1 to open the Start menu -->
         <TrayButton icon="menu.png" label="Menu">root:1</TrayButton>
         <Spacer width="2"/>
-        <!-- FIXED: Action changed to "desktop" so the "_" button minimizes all windows -->
         <TrayButton label="_">showdesktop</TrayButton>
         <Spacer width="2"/>
         <Pager labeled="true"/>
@@ -46,80 +44,75 @@
         <Clock format="%d.%m.%Y %H:%M"></Clock>
     </Tray>
 
-    <!-- Visual Styles -->
-    <!-- FIXED: Added missing `<` character to WindowStyle tag -->
+    <!-- Visual Styles (Breeze Dark) -->
     <WindowStyle>
         <Font>Noto NotoSans-11:bold</Font>
         <Width>4</Width>
         <Height>21</Height>
         <Corner>3</Corner>
-        <!-- FIXED: <Foreground> replaced with <Text> -->
-        <Text>#FFFFFF</Text>
-        <Background>#555555</Background>
-        <Outline>#000000</Outline>
+        <Text>#BDC3C7</Text>
+        <Background>#232629</Background>
+        <Outline>#1a1c1f</Outline>
         <Opacity>1</Opacity>
         <Active>
-            <!-- FIXED: <Foreground> replaced with <Text> -->
-            <Text>#FFFFFF</Text>
-            <Background>#404552</Background>
-            <Outline>#000000</Outline>
+            <Text>#FCFCFC</Text>
+            <Background>#31363B</Background>
+            <Outline>#3DAEE9</Outline>
             <Opacity>1</Opacity>
         </Active>
-        <!-- FIXED: Standart window management buttons (Iconify, Maximize, Close) -->
         <Buttons>imx</Buttons>
     </WindowStyle>
     
     <TrayStyle group="true" list="all">
         <Font>NotoSans-11</Font>
-        <Background>#383c4a</Background>
-        <Foreground>#FFFFFF</Foreground>
-        <Outline>#000000</Outline>
-        <Opacity>0.9</Opacity>
+        <Background>#232629</Background>
+        <Foreground>#FCFCFC</Foreground>
+        <Outline>#1a1c1f</Outline>
+        <Opacity>0.95</Opacity>
     </TrayStyle>
     
     <TaskListStyle>
       <Font>NotoSans-11</Font>
       <Active>
-        <Foreground>#FFFFFF</Foreground>
-        <Background>#555555</Background>
+        <Foreground>#FCFCFC</Foreground>
+        <Background>#31363B</Background>
       </Active>
-      <Foreground>#FFFFFF</Foreground>
-      <Background>#333333</Background>
+      <Foreground>#BDC3C7</Foreground>
+      <Background>#232629</Background>
     </TaskListStyle>
     
     <PagerStyle>
-        <Outline>#000000</Outline>
-        <Foreground>#555555</Foreground>
-        <Background>#333333</Background>
-        <Text>#FFFFFF</Text>
+        <Outline>#1a1c1f</Outline>
+        <Foreground>#31363B</Foreground>
+        <Background>#232629</Background>
+        <Text>#BDC3C7</Text>
         <Active>
-            <Foreground>#0077CC</Foreground>
-            <Background>#004488</Background>
+            <Foreground>#FCFCFC</Foreground>
+            <Background>#3DAEE9</Background>
         </Active>
     </PagerStyle>
     
     <MenuStyle>
         <Font>NotoSans-11</Font>
-        <Foreground>#FFFFFF</Foreground>
-        <Background>#333333</Background>
-        <Outline>#000000</Outline>
+        <Foreground>#FCFCFC</Foreground>
+        <Background>#31363B</Background>
+        <Outline>#1a1c1f</Outline>
         <Active>
-            <Foreground>#FFFFFF</Foreground>
-            <Background>#5294e2</Background>
+            <Foreground>#FCFCFC</Foreground>
+            <Background>#3DAEE9</Background>
         </Active>
-        <Opacity>0.9</Opacity>
+        <Opacity>0.95</Opacity>
     </MenuStyle>
     
     <PopupStyle>
         <Font>NotoSans-11</Font>
-        <Foreground>#000000</Foreground>
-        <Background>#999999</Background>
+        <Foreground>#FCFCFC</Foreground>
+        <Background>#232629</Background>
     </PopupStyle>
 
     <!-- Virtual Desktops -->
     <Desktops width="4" height="1">
-        <!-- Default background -->
-        <Background type="solid">#112233</Background>
+        <Background type="solid">#1e2227</Background>
     </Desktops>
 
     <!-- Key bindings -->
