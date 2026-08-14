@@ -2,21 +2,25 @@
   README.md — RezzOS
   Improved and formatted version of the README in English
 -->
-
-<div align="center">
-
 <img src="docs/assets/baner.jpg" alt="RezzOS Banner" width="100%" />
 
 # <img width="40" height="40" src="https://github.com/user-attachments/assets/2ea53faa-fcd1-4380-b317-6dc3e521ccd4" alt="RezzOS logo" /> RezzOS
 
 **A minimalist Linux build based on the Linux 6.6.40 kernel and BusyBox**
 
-
 [![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://kernel.org)
 [![BusyBox](https://img.shields.io/badge/BusyBox-000000?style=for-the-badge&logo=busybox&logoColor=white)](https://busybox.net)
 [![Shell](https://img.shields.io/badge/Shell-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)](https://www.gnu.org/software/bash/)
 
-<img width="1438" height="811" alt="image" src="https://github.com/user-attachments/assets/49f8b972-04a9-4133-acf9-8a16d2d92cbd" />
+<img width="640" height="320" alt="image" src="https://github.com/user-attachments/assets/49f8b972-04a9-4133-acf9-8a16d2d92cbd" />
+
+
+
+
+
+
+
+<div align="center">
 
 
 <p><em>Additional documentation is in the <code>/docs</code> directory.</em></p>
