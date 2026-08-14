@@ -3,12 +3,12 @@
     <!-- Start Menu (Left Click) -->
     <IconPath>/usr/share/icons/RezzOS</IconPath>
     <RootMenu onroot="1">
+        <Program icon="terminal.png" label="Terminal">st</Program>
         <Program icon="browser.png" label="Links browser">links -g duckduckgo.com</Program>
-        <Program icon="/usr/share/icons/RezzOS/folder.png" label="File Manager">pcmanfm -n</Program>
-        <Program icon="/usr/share/icons/RezzOS/rezzpad.png" label="Notepad">rezzpad</Program>
-        <Program icon="/usr/share/icons/RezzOS/terminal.png" label="Terminal">st</Program>
-        <Program icon="/usr/share/icons/RezzOS/rview.png" label="Image viewer">rezzview</Program>
-        <Program icon="/usr/share/icons/RezzOS/rtop.png" label="Task Manager">st -e rtop</Program>
+        <Program icon="folder.png" label="File Manager">pcmanfm -n</Program>
+        <Program icon="Rutils.png" label="Notepad">rezzpad</Program>
+        <Program icon="Rutils.png" label="Image viewer">rezzview</Program>
+        <Program icon="Rutils.png" label="Task Manager">st -e rtop</Program>
         <Separator/>
         <Menu icon="/usr/share/icons/RezzOS/info.png" label="Power">
             <Program label="Suspend">sh -c 'zenity --info --title="RezzOS" --text="Suspending..." --timeout=2 &amp; suspend'</Program>
@@ -138,3 +138,4 @@
     <Key mask="A" key="Down">ddesktop</Key>
     <Key mask="CA" key="t">exec:st</Key>
 </JWM>
+
