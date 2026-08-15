@@ -14,18 +14,9 @@
 
 <img width="640" height="320" alt="image" src="https://github.com/user-attachments/assets/49f8b972-04a9-4133-acf9-8a16d2d92cbd" />
 
-
-
-
-
-
-
-<div align="center">
-
-
 <p><em>Additional documentation is in the <code>/docs</code> directory.</em></p>
 
-</div>
+
 
 ---
 
