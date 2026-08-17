@@ -1,0 +1,226 @@
+#!/bin/sh
+
+die()
+{
+    echo "rezz-user: $*" >&2
+    exit 1
+}
+
+need_root()
+{
+    [ "$(id -u)" = "0" ] || die "this command requires root"
+}
+
+user_exists()
+{
+    awk -F: -v user="$1" '$1 == user { found=1 } END { exit !found }' /etc/passwd
+}
+
+group_exists()
+{
+    awk -F: -v group="$1" '$1 == group { found=1 } END { exit !found }' /etc/group
+}
+
+usage()
+{
+    echo "usage:"
+    echo "  rezz-user list"
+    echo "  rezz-user add <name>"
+    echo "  rezz-user remove <name>"
+    echo "  rezz-user passwd <name>"
+    echo "  rezz-user lock <name>"
+    echo "  rezz-user unlock <name>"
+    echo "  rezz-user groups <name>"
+    echo "  rezz-user group-add <user> <group>"
+    echo "  rezz-user group-del <user> <group>"
+}
+
+list_users()
+{
+    echo "users:"
+
+    awk -F: '
+        $3 >= 1000 && $1 != "nobody" {
+            print "  " $1
+        }
+    ' /etc/passwd
+
+    echo
+    echo "system users:"
+
+    awk -F: '
+        $3 < 1000 {
+            print "  " $1
+        }
+    ' /etc/passwd
+}
+
+add_user()
+{
+    need_root
+
+    name="$1"
+
+    [ -n "$name" ] || die "username is required"
+
+    user_exists "$name" &&
+        die "user '$name' already exists"
+
+    adduser "$name" ||
+        die "failed to create user"
+
+    passwd "$name"
+}
+
+remove_user()
+{
+    need_root
+
+    name="$1"
+
+    [ -n "$name" ] || die "username is required"
+    [ "$name" = "root" ] && die "cannot remove root"
+
+    user_exists "$name" ||
+        die "user '$name' does not exist"
+
+    deluser "$name" ||
+        die "failed to remove user"
+
+    echo "user '$name' removed"
+}
+
+change_password()
+{
+    need_root
+
+    name="$1"
+
+    [ -n "$name" ] || die "username is required"
+
+    user_exists "$name" ||
+        die "user '$name' does not exist"
+
+    passwd "$name"
+}
+
+lock_user()
+{
+    need_root
+
+    name="$1"
+
+    [ -n "$name" ] || die "username is required"
+    [ "$name" = "root" ] && die "cannot lock root"
+
+    user_exists "$name" ||
+        die "user '$name' does not exist"
+
+    passwd -l "$name"
+}
+
+unlock_user()
+{
+    need_root
+
+    name="$1"
+
+    [ -n "$name" ] || die "username is required"
+
+    user_exists "$name" ||
+        die "user '$name' does not exist"
+
+    passwd -u "$name"
+}
+
+show_groups()
+{
+    name="$1"
+
+    [ -n "$name" ] || die "username is required"
+
+    user_exists "$name" ||
+        die "user '$name' does not exist"
+
+    id "$name"
+}
+
+group_add()
+{
+    need_root
+
+    name="$1"
+    group="$2"
+
+    [ -n "$name" ] || die "username is required"
+    [ -n "$group" ] || die "group is required"
+
+    user_exists "$name" ||
+        die "user '$name' does not exist"
+
+    group_exists "$group" ||
+        die "group '$group' does not exist"
+
+    addgroup "$name" "$group" ||
+        die "failed to add user to group"
+
+    echo "user '$name' added to group '$group'"
+}
+
+group_del()
+{
+    need_root
+
+    name="$1"
+    group="$2"
+
+    [ -n "$name" ] || die "username is required"
+    [ -n "$group" ] || die "group is required"
+
+    user_exists "$name" ||
+        die "user '$name' does not exist"
+
+    group_exists "$group" ||
+        die "group '$group' does not exist"
+
+    delgroup "$name" "$group" ||
+        die "failed to remove user from group"
+
+    echo "user '$name' removed from group '$group'"
+}
+
+case "$1" in
+    list)
+        list_users
+        ;;
+    add)
+        add_user "$2"
+        ;;
+    remove|del|delete)
+        remove_user "$2"
+        ;;
+    passwd|password)
+        change_password "$2"
+        ;;
+    lock)
+        lock_user "$2"
+        ;;
+    unlock)
+        unlock_user "$2"
+        ;;
+    groups)
+        show_groups "$2"
+        ;;
+    group-add)
+        group_add "$2" "$3"
+        ;;
+    group-del)
+        group_del "$2" "$3"
+        ;;
+    help|-h|--help|"")
+        usage
+        ;;
+    *)
+        die "unknown command '$1'"
+        ;;
+esac
