@@ -1,0 +1,456 @@
+#!/bin/sh
+
+usage()
+{
+    echo "usage:"
+    echo "  rezzhw"
+    echo "  rezzhw cpu"
+    echo "  rezzhw memory"
+    echo "  rezzhw pci"
+    echo "  rezzhw usb"
+    echo "  rezzhw disks"
+    echo "  rezzhw network"
+    echo "  rezzhw graphics"
+    echo "  rezzhw firmware"
+    echo "  rezzhw battery"
+    echo "  rezzhw thermal"
+    echo "  rezzhw mounts"
+    echo "  rezzhw all"
+}
+
+show_cpu()
+{
+    echo "CPU"
+
+    if [ -f /proc/cpuinfo ]; then
+        awk -F: '
+            /^processor/ && !seen[$2]++ {
+                print "  processor:" $2
+            }
+            /^model name/ && !model {
+                sub(/^[ \t]+/, "", $2)
+                print "  model:" $2
+                model=1
+            }
+            /^Hardware/ && !hardware {
+                sub(/^[ \t]+/, "", $2)
+                print "  hardware:" $2
+                hardware=1
+            }
+            /^CPU architecture/ && !arch {
+                sub(/^[ \t]+/, "", $2)
+                print "  architecture:" $2
+                arch=1
+            }
+            /^cpu MHz/ && !mhz {
+                sub(/^[ \t]+/, "", $2)
+                print "  frequency:" $2 " MHz"
+                mhz=1
+            }
+        ' /proc/cpuinfo
+    else
+        echo "  unavailable"
+    fi
+
+    echo
+}
+
+show_memory()
+{
+    echo "Memory"
+
+    if [ -f /proc/meminfo ]; then
+        awk '
+            /^MemTotal:/ {
+                print "  total:" $2 " " $3
+            }
+            /^MemFree:/ {
+                print "  free:" $2 " " $3
+            }
+            /^MemAvailable:/ {
+                print "  available:" $2 " " $3
+            }
+            /^SwapTotal:/ {
+                print "  swap total:" $2 " " $3
+            }
+            /^SwapFree:/ {
+                print "  swap free:" $2 " " $3
+            }
+        ' /proc/meminfo
+    else
+        echo "  unavailable"
+    fi
+
+    echo
+}
+
+show_kernel()
+{
+    echo "Kernel"
+
+    if [ -r /proc/version ]; then
+        echo "  $(cat /proc/version)"
+    fi
+
+    echo "  release: $(uname -r 2>/dev/null)"
+    echo "  machine: $(uname -m 2>/dev/null)"
+    echo
+}
+
+show_pci()
+{
+    echo "PCI"
+
+    if [ -d /sys/bus/pci/devices ]; then
+        found=0
+
+        for device in /sys/bus/pci/devices/*; do
+            [ -e "$device" ] || continue
+
+            found=1
+            name="${device##*/}"
+
+            vendor=""
+            device_id=""
+
+            [ -r "$device/vendor" ] &&
+                vendor="$(cat "$device/vendor")"
+
+            [ -r "$device/device" ] &&
+                device_id="$(cat "$device/device")"
+
+            printf "  %s" "$name"
+
+            [ -n "$vendor" ] &&
+                printf " vendor=%s" "$vendor"
+
+            [ -n "$device_id" ] &&
+                printf " device=%s" "$device_id"
+
+            echo
+        done
+
+        [ "$found" = "1" ] || echo "  no PCI devices"
+    else
+        echo "  unavailable"
+    fi
+
+    echo
+}
+
+show_usb()
+{
+    echo "USB"
+
+    if [ -d /sys/bus/usb/devices ]; then
+        found=0
+
+        for device in /sys/bus/usb/devices/*; do
+            [ -e "$device" ] || continue
+
+            case "${device##*/}" in
+                usb*|*:*)
+                    ;;
+                *)
+                    continue
+                    ;;
+            esac
+
+            found=1
+            name="${device##*/}"
+
+            manufacturer=""
+            product=""
+
+            [ -r "$device/manufacturer" ] &&
+                manufacturer="$(cat "$device/manufacturer" 2>/dev/null)"
+
+            [ -r "$device/product" ] &&
+                product="$(cat "$device/product" 2>/dev/null)"
+
+            printf "  %s" "$name"
+
+            [ -n "$manufacturer" ] &&
+                printf " manufacturer=%s" "$manufacturer"
+
+            [ -n "$product" ] &&
+                printf " product=%s" "$product"
+
+            echo
+        done
+
+        [ "$found" = "1" ] || echo "  no USB devices"
+    else
+        echo "  unavailable"
+    fi
+
+    echo
+}
+
+show_disks()
+{
+    echo "Block devices"
+
+    if [ -d /sys/class/block ]; then
+        for device in /sys/class/block/*; do
+            [ -e "$device" ] || continue
+
+            name="${device##*/}"
+            size=""
+
+            if [ -r "$device/size" ]; then
+                sectors="$(cat "$device/size")"
+                size="$((sectors / 2048)) MiB"
+            fi
+
+            printf "  %-15s %s\n" "$name" "$size"
+        done
+    else
+        echo "  unavailable"
+    fi
+
+    echo
+}
+
+show_network()
+{
+    echo "Network"
+
+    if [ -d /sys/class/net ]; then
+        for interface in /sys/class/net/*; do
+            [ -e "$interface" ] || continue
+
+            name="${interface##*/}"
+            state="unknown"
+            mac=""
+
+            [ -r "$interface/operstate" ] &&
+                state="$(cat "$interface/operstate")"
+
+            [ -r "$interface/address" ] &&
+                mac="$(cat "$interface/address")"
+
+            echo "  interface: $name"
+            echo "    state: $state"
+            echo "    mac: $mac"
+        done
+    else
+        echo "  unavailable"
+    fi
+
+    echo
+}
+
+show_graphics()
+{
+    echo "Graphics"
+
+    found=0
+
+    if [ -d /sys/class/drm ]; then
+        for device in /sys/class/drm/*; do
+            [ -e "$device" ] || continue
+
+            name="${device##*/}"
+
+            case "$name" in
+                card*|renderD*)
+                    found=1
+                    echo "  $name"
+                    ;;
+            esac
+        done
+    fi
+
+    if [ -d /sys/bus/pci/devices ]; then
+        for device in /sys/bus/pci/devices/*; do
+            [ -e "$device" ] || continue
+
+            if [ -d "$device/drm" ]; then
+                found=1
+                echo "  PCI graphics device: ${device##*/}"
+            fi
+        done
+    fi
+
+    [ "$found" = "1" ] || echo "  no graphics device detected"
+
+    echo
+}
+
+show_firmware()
+{
+    echo "Firmware"
+
+    if [ -d /sys/class/dmi/id ]; then
+        for item in bios_vendor bios_version bios_date sys_vendor product_name product_version board_name board_version; do
+            file="/sys/class/dmi/id/$item"
+
+            if [ -r "$file" ]; then
+                value="$(cat "$file" 2>/dev/null)"
+
+                [ -n "$value" ] &&
+                    echo "  $item: $value"
+            fi
+        done
+    else
+        echo "  DMI information unavailable"
+    fi
+
+    echo
+}
+
+show_battery()
+{
+    echo "Battery"
+
+    found=0
+
+    if [ -d /sys/class/power_supply ]; then
+        for battery in /sys/class/power_supply/BAT*; do
+            [ -e "$battery" ] || continue
+
+            found=1
+            name="${battery##*/}"
+
+            echo "  $name"
+
+            [ -r "$battery/status" ] &&
+                echo "    status: $(cat "$battery/status")"
+
+            [ -r "$battery/capacity" ] &&
+                echo "    capacity: $(cat "$battery/capacity")%"
+
+            [ -r "$battery/health" ] &&
+                echo "    health: $(cat "$battery/health")"
+        done
+    fi
+
+    [ "$found" = "1" ] || echo "  no battery detected"
+
+    echo
+}
+
+show_thermal()
+{
+    echo "Thermal"
+
+    found=0
+
+    if [ -d /sys/class/thermal ]; then
+        for zone in /sys/class/thermal/thermal_zone*; do
+            [ -e "$zone" ] || continue
+
+            found=1
+            name="${zone##*/}"
+            type=""
+            temp=""
+
+            [ -r "$zone/type" ] &&
+                type="$(cat "$zone/type")"
+
+            [ -r "$zone/temp" ] &&
+                temp="$(cat "$zone/temp")"
+
+            echo "  $name"
+
+            [ -n "$type" ] &&
+                echo "    type: $type"
+
+            if [ -n "$temp" ]; then
+                echo "    temperature: $((temp / 1000)) C"
+            fi
+        done
+    fi
+
+    [ "$found" = "1" ] || echo "  no thermal sensors detected"
+
+    echo
+}
+
+show_mounts()
+{
+    echo "Mounted filesystems"
+
+    if command -v mount >/dev/null 2>&1; then
+        mount
+    elif [ -r /proc/mounts ]; then
+        cat /proc/mounts
+    else
+        echo "  unavailable"
+    fi
+
+    echo
+}
+
+show_all()
+{
+    echo "RezzOS hardware diagnostic"
+    echo
+
+    show_kernel
+    show_cpu
+    show_memory
+    show_pci
+    show_usb
+    show_disks
+    show_network
+    show_graphics
+    show_firmware
+    show_battery
+    show_thermal
+    show_mounts
+}
+
+case "$1" in
+    "")
+        show_all
+        ;;
+    cpu)
+        show_cpu
+        ;;
+    memory|ram)
+        show_memory
+        ;;
+    kernel)
+        show_kernel
+        ;;
+    pci)
+        show_pci
+        ;;
+    usb)
+        show_usb
+        ;;
+    disks|storage)
+        show_disks
+        ;;
+    network|net)
+        show_network
+        ;;
+    graphics|gpu)
+        show_graphics
+        ;;
+    firmware|bios)
+        show_firmware
+        ;;
+    battery)
+        show_battery
+        ;;
+    thermal|temperature)
+        show_thermal
+        ;;
+    mounts)
+        show_mounts
+        ;;
+    all)
+        show_all
+        ;;
+    help|-h|--help)
+        usage
+        ;;
+    *)
+        echo "rezzhw: unknown command '$1'" >&2
+        usage
+        exit 1
+        ;;
+esac
