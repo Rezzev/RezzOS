@@ -1,0 +1,208 @@
+#!/bin/sh
+
+SERVICE_DIR="/etc/sv"
+ACTIVE_DIR="/var/service"
+
+die()
+{
+    echo "rezz-service: $*" >&2
+    exit 1
+}
+
+need_root()
+{
+    [ "$(id -u)" = "0" ] || die "this command requires root"
+}
+
+exists()
+{
+    [ -d "$SERVICE_DIR/$1" ]
+}
+
+enabled()
+{
+    [ -e "$ACTIVE_DIR/$1" ]
+}
+
+usage()
+{
+    echo "usage:"
+    echo "  rezz-service list"
+    echo "  rezz-service status <name>"
+    echo "  rezz-service start <name>"
+    echo "  rezz-service stop <name>"
+    echo "  rezz-service restart <name>"
+    echo "  rezz-service enable <name>"
+    echo "  rezz-service disable <name>"
+    echo "  rezz-service logs <name>"
+}
+
+list_services()
+{
+    echo "services:"
+
+    for service in "$SERVICE_DIR"/*; do
+        [ -d "$service" ] || continue
+
+        name="${service##*/}"
+
+        if enabled "$name"; then
+            state="enabled"
+        else
+            state="disabled"
+        fi
+
+        printf "  %-20s %s\n" "$name" "$state"
+    done
+}
+
+status_service()
+{
+    name="$1"
+
+    [ -n "$name" ] || die "service name is required"
+    exists "$name" || die "service '$name' does not exist"
+
+    echo "service: $name"
+
+    if enabled "$name"; then
+        echo "enabled: yes"
+    else
+        echo "enabled: no"
+    fi
+
+    if command -v sv >/dev/null 2>&1; then
+        sv status "$name" 2>/dev/null || true
+    fi
+}
+
+start_service()
+{
+    need_root
+
+    name="$1"
+
+    [ -n "$name" ] || die "service name is required"
+    exists "$name" || die "service '$name' does not exist"
+
+    if ! enabled "$name"; then
+        ln -s "$SERVICE_DIR/$name" "$ACTIVE_DIR/$name" ||
+            die "failed to enable service"
+    fi
+
+    sv up "$name"
+}
+
+stop_service()
+{
+    need_root
+
+    name="$1"
+
+    [ -n "$name" ] || die "service name is required"
+    exists "$name" || die "service '$name' does not exist"
+
+    sv down "$name"
+}
+
+restart_service()
+{
+    need_root
+
+    name="$1"
+
+    [ -n "$name" ] || die "service name is required"
+    exists "$name" || die "service '$name' does not exist"
+
+    sv restart "$name"
+}
+
+enable_service()
+{
+    need_root
+
+    name="$1"
+
+    [ -n "$name" ] || die "service name is required"
+    exists "$name" || die "service '$name' does not exist"
+
+    if enabled "$name"; then
+        echo "service '$name' is already enabled"
+        return 0
+    fi
+
+    ln -s "$SERVICE_DIR/$name" "$ACTIVE_DIR/$name" ||
+        die "failed to enable service"
+
+    echo "service '$name' enabled"
+}
+
+disable_service()
+{
+    need_root
+
+    name="$1"
+
+    [ -n "$name" ] || die "service name is required"
+
+    if ! enabled "$name"; then
+        echo "service '$name' is already disabled"
+        return 0
+    fi
+
+    sv down "$name" 2>/dev/null || true
+    rm -f "$ACTIVE_DIR/$name"
+
+    echo "service '$name' disabled"
+}
+
+show_logs()
+{
+    name="$1"
+
+    [ -n "$name" ] || die "service name is required"
+    exists "$name" || die "service '$name' does not exist"
+
+    if [ -d "$SERVICE_DIR/$name/log" ]; then
+        if [ -f "$SERVICE_DIR/$name/log/current" ]; then
+            cat "$SERVICE_DIR/$name/log/current"
+        else
+            echo "no current log"
+        fi
+    else
+        echo "service '$name' has no log service"
+    fi
+}
+
+case "$1" in
+    list)
+        list_services
+        ;;
+    status)
+        status_service "$2"
+        ;;
+    start)
+        start_service "$2"
+        ;;
+    stop)
+        stop_service "$2"
+        ;;
+    restart)
+        restart_service "$2"
+        ;;
+    enable)
+        enable_service "$2"
+        ;;
+    disable)
+        disable_service "$2"
+        ;;
+    logs)
+        show_logs "$2"
+        ;;
+    help|-h|--help|"")
+        usage
+        ;;
+    *)
+        die "unknown command '$1'"
+        ;;
+esac
