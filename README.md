@@ -103,6 +103,13 @@ mount /dev/sda1 /mnt
 cp -r /bin /sbin /usr /etc /lib /root /var /boot /mnt/
 mkdir -p /mnt/{dev,proc,sys,tmp}
 
+## build the initramfs for the target
+
+## RezzOS runs from its initramfs, so the image cannot contain a copy of
+## itself. Build one from the running system, straight onto the target disk.
+
+rezz-mkinitrd /mnt/boot/rootfs.cpio.gz
+
 ## installing bootloader
 
 extlinux --install /mnt/boot
