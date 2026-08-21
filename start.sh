@@ -7,6 +7,11 @@ if [ -f "font.conf" ]; then
     [ -n "$FONT_VAL" ] && FONT="$FONT_VAL"
 fi
 
+EXTRA_DRIVE=""
+if [ -f "target-disk.img" ]; then
+    EXTRA_DRIVE="-drive file=target-disk.img,format=raw,if=virtio"
+fi
+
 qemu-system-x86_64 \
     -kernel bzImage \
     -initrd rootfs.cpio.gz \
@@ -14,4 +19,5 @@ qemu-system-x86_64 \
     -netdev user,id=net0,hostfwd=tcp::2222-:22 -device virtio-net,netdev=net0 \
     -object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 \
     -drive file=disk.img,format=raw,if=virtio \
+    $EXTRA_DRIVE \
     -m 1024M -nographic

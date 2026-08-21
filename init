@@ -5,8 +5,11 @@ mount -t devtmpfs dev /dev
 mkdir -p /dev/pts
 mount -t devpts devpts /dev/pts -o mode=0620,ptmxmode=0666 2>/dev/null || mount -t devpts devpts /dev/pts 2>/dev/null || true
 
-mkdir -p /run
+mkdir -p /run /tmp /var/run /var/log /var/service
 mount -t tmpfs tmpfs /run
+mount -t tmpfs tmpfs /tmp
+chmod 1777 /tmp
+ln -sfn /etc/runit/runsvdir/default /var/service 2>/dev/null || true
 
 # Start udev for input devices (X11/libinput)
 # NOTE: udevd --daemon doesn't reliably return control in this initramfs
@@ -128,6 +131,29 @@ if [ -f /mnt/disk/font.conf ]; then
             /usr/bin/setconsolefont "$FONT" 2>/dev/null || true
         fi
     fi
+fi
+
+# Restore keyboard configuration
+if [ -f /mnt/disk/etc/keymap.conf ]; then
+    cp /mnt/disk/etc/keymap.conf /etc/keymap.conf 2>/dev/null || true
+fi
+
+# Restore user accounts and passwords if present on persistent disk
+if [ -f /mnt/disk/etc/passwd ]; then
+    cp -f /mnt/disk/etc/passwd /etc/passwd 2>/dev/null || true
+fi
+if [ -f /mnt/disk/etc/shadow ]; then
+    cp -f /mnt/disk/etc/shadow /etc/shadow 2>/dev/null || true
+    chmod 0600 /etc/shadow 2>/dev/null || true
+fi
+if [ -f /mnt/disk/etc/group ]; then
+    cp -f /mnt/disk/etc/group /etc/group 2>/dev/null || true
+fi
+
+# Restore persistent user home directories
+if [ -d /mnt/disk/home ]; then
+    mkdir -p /home
+    mount --bind /mnt/disk/home /home 2>/dev/null || cp -a /mnt/disk/home/. /home/ 2>/dev/null || true
 fi
 
 # Enable swap if present on disk

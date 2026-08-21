@@ -10,6 +10,10 @@
         <Program icon="Rutils.png" label="Image viewer">rezzview</Program>
         <Program icon="Rutils.png" label="Task Manager">st -e rtop</Program>
         <Separator/>
+        <Program icon="Rutils.png" label="Control Center">st -e rezzconfig</Program>
+        <Program icon="Rutils.png" label="Keyboard Layout">st -e rezzkeymap</Program>
+        <Program icon="Rutils.png" label="Install RezzOS to Disk">st -e rezzinstall</Program>
+        <Separator/>
         <Menu icon="/usr/share/icons/RezzOS/info.png" label="Power">
             <Program label="Suspend">sh -c 'zenity --info --title="RezzOS" --text="Suspending..." --timeout=2 &amp; suspend'</Program>
             <Program label="Hibernate">sh -c 'zenity --info --title="RezzOS" --text="Hibernating..." --timeout=3 &amp; hibernate'</Program>
@@ -50,17 +54,16 @@
         <Width>4</Width>
         <Height>21</Height>
         <Corner>3</Corner>
-        <Text>#BDC3C7</Text>
+        <Foreground>#BDC3C7</Foreground>
         <Background>#232629</Background>
         <Outline>#1a1c1f</Outline>
         <Opacity>1</Opacity>
         <Active>
-            <Text>#FCFCFC</Text>
+            <Foreground>#FCFCFC</Foreground>
             <Background>#31363B</Background>
             <Outline>#3DAEE9</Outline>
             <Opacity>1</Opacity>
         </Active>
-        <Buttons>imx</Buttons>
     </WindowStyle>
     
     <TrayStyle group="true" list="all">
