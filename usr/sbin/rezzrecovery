@@ -5,7 +5,7 @@ RECOVERY_FLAG="$RECOVERY_DIR/recovery"
 
 die()
 {
-    echo "rezz-recovery: $*" >&2
+    echo "rezzrecovery: $*" >&2
     exit 1
 }
 
@@ -17,15 +17,15 @@ need_root()
 usage()
 {
     echo "usage:"
-    echo "  rezz-recovery status"
-    echo "  rezz-recovery enter"
-    echo "  rezz-recovery leave"
-    echo "  rezz-recovery shell"
-    echo "  rezz-recovery services"
-    echo "  rezz-recovery mounts"
-    echo "  rezz-recovery logs"
-    echo "  rezz-recovery reboot"
-    echo "  rezz-recovery poweroff"
+    echo "  rezzrecovery status"
+    echo "  rezzrecovery enter"
+    echo "  rezzrecovery leave"
+    echo "  rezzrecovery shell"
+    echo "  rezzrecovery services"
+    echo "  rezzrecovery mounts"
+    echo "  rezzrecovery logs"
+    echo "  rezzrecovery reboot"
+    echo "  rezzrecovery poweroff"
 }
 
 status()

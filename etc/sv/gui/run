@@ -4,10 +4,20 @@
 export HOME=/root
 export USER=root
 export PATH=/sbin:/bin:/usr/bin:/usr/sbin
+export SVDIR=/etc/runit/runsvdir/default
+
+# If no display framebuffer / DRM device exists, do not start Xorg
+if [ ! -e /dev/fb0 ] && [ ! -e /dev/dri/card0 ]; then
+    sv down /etc/runit/runsvdir/default/gui 2>/dev/null || sv down gui 2>/dev/null || true
+    exit 0
+fi
 
 # Wait for udev to populate input devices
 udevadm settle 2>/dev/null || true
 
 cd /root
-startx
-sv down gui
+if command -v startx >/dev/null 2>&1; then
+    startx
+fi
+sleep 2
+sv down /etc/runit/runsvdir/default/gui 2>/dev/null || sv down gui 2>/dev/null || true

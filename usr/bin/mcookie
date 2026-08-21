@@ -1,0 +1,6 @@
+#!/bin/sh
+if [ -f /proc/sys/kernel/random/uuid ]; then
+    head -n 1 /proc/sys/kernel/random/uuid 2>/dev/null | tr -d '-'
+else
+    dd if=/dev/urandom bs=16 count=1 2>/dev/null | hexdump -e '16/1 "%02x"' 2>/dev/null || od -vAn -N16 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n'
+fi

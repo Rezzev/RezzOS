@@ -330,32 +330,80 @@ pkg_menu() {
     done
 }
 
+keyboard_menu() {
+    if command -v rezzkeymap >/dev/null 2>&1; then
+        rezzkeymap
+    else
+        header
+        echo -e "${BOLD}--- Keyboard & Language Layout ---${NC}"
+        echo "1) US / RU (Alt + Shift)"
+        echo "2) US / RU (Caps Lock)"
+        echo "3) US / RU (Ctrl + Shift)"
+        echo "4) US English only"
+        echo "0) Back"
+        echo -n "Select option [0-4]: "
+        read -r kchoice
+        case "$kchoice" in
+            1) setxkbmap -layout "us,ru" -option "grp:alt_shift_toggle,grp_led:scroll" 2>/dev/null || true ;;
+            2) setxkbmap -layout "us,ru" -option "grp:caps_toggle,grp_led:scroll" 2>/dev/null || true ;;
+            3) setxkbmap -layout "us,ru" -option "grp:ctrl_shift_toggle,grp_led:scroll" 2>/dev/null || true ;;
+            4) setxkbmap -layout "us" -option "" 2>/dev/null || true ;;
+        esac
+    fi
+    pause
+}
+
+install_menu() {
+    header
+    echo -e "${BOLD}${MAGENTA}--- RezzOS Disk Installer ---${NC}"
+    echo "Launch interactive installer to install RezzOS onto a hard drive, SSD or USB."
+    echo ""
+    echo "1) Launch rezzinstall"
+    echo "0) Back to Main Menu"
+    echo ""
+    echo -n "Select option [0-1]: "
+    read -r ICHOICE
+    case "$ICHOICE" in
+        1)
+            if [ -x /usr/bin/rezzinstall ]; then
+                /usr/bin/rezzinstall
+            else
+                echo -e "${RED}rezzinstall not found in /usr/bin!${NC}"
+                pause
+            fi
+            ;;
+        *) ;;
+    esac
+}
+
 while true; do
     header
     echo " 1) 🌐 Network Configuration (DHCP / Static IP / DNS)"
     echo " 2) 🏷️ Hostname & System Info"
     echo " 3) 🔤 Console Font Selection"
-    echo " 4) 💾 Swap Storage Manager"
-    echo " 5) ⚙️ Services Manager (runit)"
-    echo " 6) 👤 User & Password Management"
-    echo " 7) 📦 Package Quick Actions (pkg)"
-    echo " 8) 📊 Launch System Resource Monitor (rezzmon)"
-    echo " 9) ⚡ Power Options (Reboot / Shutdown)"
+    echo " 4) ⌨️ Keyboard & Language Layout (RU / EN)"
+    echo " 5) 💾 Swap Storage Manager"
+    echo " 6) ⚙️ Services Manager (runit)"
+    echo " 7) 👤 User & Password Management"
+    echo " 8) 📦 Package Quick Actions (pkg)"
+    echo " 9) 💿 Install RezzOS to Disk (rezzinstall)"
+    echo "10) ⚡ Power Options (Reboot / Shutdown)"
     echo " 0) ❌ Exit Control Center"
     echo ""
-    echo -n "Select an option [0-9]: "
+    echo -n "Select an option [0-10]: "
     read -r MAIN_CHOICE
 
     case "$MAIN_CHOICE" in
         1) net_menu ;;
         2) hostname_menu ;;
         3) font_menu ;;
-        4) swap_menu ;;
-        5) service_menu ;;
-        6) user_menu ;;
-        7) pkg_menu ;;
-        8) rezzmon watch 2>/dev/null || rezzmon ;;
-        9)
+        4) keyboard_menu ;;
+        5) swap_menu ;;
+        6) service_menu ;;
+        7) user_menu ;;
+        8) pkg_menu ;;
+        9) install_menu ;;
+        10)
             header
             echo -e "${BOLD}--- Power Control ---${NC}"
             echo "1) Reboot System"

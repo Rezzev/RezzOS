@@ -2,7 +2,7 @@
 
 die()
 {
-    echo "rezz-user: $*" >&2
+    echo "rezzuser: $*" >&2
     exit 1
 }
 
@@ -24,15 +24,15 @@ group_exists()
 usage()
 {
     echo "usage:"
-    echo "  rezz-user list"
-    echo "  rezz-user add <name>"
-    echo "  rezz-user remove <name>"
-    echo "  rezz-user passwd <name>"
-    echo "  rezz-user lock <name>"
-    echo "  rezz-user unlock <name>"
-    echo "  rezz-user groups <name>"
-    echo "  rezz-user group-add <user> <group>"
-    echo "  rezz-user group-del <user> <group>"
+    echo "  rezzuser list"
+    echo "  rezzuser add <name>"
+    echo "  rezzuser remove <name>"
+    echo "  rezzuser passwd <name>"
+    echo "  rezzuser lock <name>"
+    echo "  rezzuser unlock <name>"
+    echo "  rezzuser groups <name>"
+    echo "  rezzuser group-add <user> <group>"
+    echo "  rezzuser group-del <user> <group>"
 }
 
 list_users()

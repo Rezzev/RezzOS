@@ -95,9 +95,24 @@ CONFIG_VIRTIO_BLK=y
 CONFIG_VIRTIO_NET=y
 CONFIG_VIRTIO_CONSOLE=y
 CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_I2C=y
+CONFIG_AGP=y
+CONFIG_AGP_AMD64=y
+CONFIG_AGP_INTEL=y
+CONFIG_DRM=y
+CONFIG_DRM_KMS_HELPER=y
+CONFIG_DRM_DISPLAY_HELPER=y
+CONFIG_DRM_BOCHS=y
+CONFIG_DRM_VIRTIO_GPU=y
+CONFIG_DRM_SIMPLEDRM=y
+CONFIG_SYSFB_SIMPLEFB=y
 CONFIG_FB=y
 CONFIG_FB_VESA=y
-CONFIG_DRM=y
+CONFIG_FB_SIMPLE=y
+CONFIG_FB_EFI=y
+CONFIG_FRAMEBUFFER_CONSOLE=y
+CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
 CONFIG_UNIX98_PTYS=y
 CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
 CONFIG_PM=y
@@ -122,8 +137,6 @@ CONFIG_FONT_SUN8x16=y
 CONFIG_FONT_SUN12x22=y
 CONFIG_FONT_TER16x32=y
 CONFIG_FONT_6x8=y
-CONFIG_FRAMEBUFFER_CONSOLE=y
-CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
 KCONF
     make olddefconfig
     make -j"$JOBS"
@@ -143,8 +156,8 @@ cd "$ROOTFS_DIR"
 mkdir -p dev proc sys tmp mnt/disk var/log lib usr/lib usr/share/terminfo
 mkdir -p etc/runit/runsvdir/default
 mkdir -p boot
+rm -f boot/rootfs.cpio.gz
 cp "$REPO_DIR/bzImage" boot/ 2>/dev/null || true
-cp "$REPO_DIR/rootfs.cpio.gz" boot/ 2>/dev/null || true
 chmod +x init
 
 step "Downloading musl"
@@ -161,7 +174,7 @@ cp -r lib/* "$ROOTFS_DIR/lib/"
 
 step "Downloading Alpine packages (using local cache)"
 MAIN_GUI="libsm-1.2.4-r4.apk xz-libs-5.8.3-r0.apk dbus-x11-1.14.10-r1.apk dbus-libs-1.14.10-r1.apk libpng-1.6.57-r0.apk libffi-3.4.6-r0.apk mesa-24.0.9-r1.apk harfbuzz-8.5.0-r0.apk wayland-libs-client-1.22.0-r4.apk libgcc-13.2.1_git20240309-r1.apk pcre2-10.43-r0.apk libuuid-2.40.1-r1.apk libice-1.1.1-r6.apk libxdmcp-1.1.5-r1.apk libxt-1.3.0-r5.apk libxxf86vm-1.1.5-r6.apk libxau-1.0.11-r4.apk pango-1.52.2-r0.apk mcookie-2.40.1-r1.apk libxft-2.3.8-r3.apk libeconf-0.6.3-r0.apk libxinerama-1.1.5-r4.apk libpciaccess-0.18.1-r0.apk libxshmfence-1.3.2-r6.apk cairo-1.18.4-r0.apk font-alias-1.0.5-r0.apk brotli-libs-1.1.0-r2.apk font-terminus-4.49.1-r4.apk libmd-1.1.0-r0.apk encodings-1.0.7-r1.apk pixman-0.43.2-r0.apk libblkid-2.40.1-r1.apk font-liberation-2.1.5-r2.apk musl-1.2.5-r3.apk wayland-libs-server-1.22.0-r4.apk libxcb-1.16.1-r0.apk font-dejavu-2.37-r5.apk mkfontscale-1.2.2-r6.apk font-misc-misc-1.1.3-r1.apk libcrypto3-3.3.7-r0.apk udev-init-scripts-35-r1.apk graphite2-1.3.14-r6.apk libstdc++-13.2.1_git20240309-r1.apk libmount-2.40.1-r1.apk libdrm-2.4.120-r0.apk xkeyboard-config-2.41-r0.apk fribidi-1.0.15-r0.apk mesa-gbm-24.0.9-r1.apk mesa-gl-24.0.9-r1.apk hwdata-pci-0.382-r0.apk fontconfig-2.15.0-r1.apk kmod-libs-32-r0.apk freetype-2.13.2-r0.apk nettle-3.10.2-r0.apk libxmu-1.1.4-r2.apk util-macros-1.20.0-r0.apk libbsd-0.12.2-r0.apk libx11-1.8.9-r1.apk libepoxy-1.5.10-r1.apk mesa-glapi-24.0.9-r1.apk zlib-1.3.2-r0.apk tiff-4.6.0t-r0.apk dbus-1.14.10-r1.apk eudev-3.2.14-r2.apk xkbcomp-1.5.0-r0.apk libsharpyuv-1.3.2-r0.apk libxrender-0.9.11-r5.apk libfontenc-1.1.8-r0.apk mesa-egl-24.0.9-r1.apk libjpeg-turbo-3.0.3-r0.apk libxext-1.3.6-r2.apk gdk-pixbuf-2.42.12-r0.apk libbz2-1.0.8-r6.apk libxfixes-6.0.1-r4.apk libintl-0.22.5-r0.apk ncurses-terminfo-base-6.4_p20240420-r2.apk libexpat-2.8.1-r0.apk eudev-libs-3.2.14-r2.apk gmp-6.3.0-r1.apk glib-2.80.5-r0.apk libwebp-1.3.2-r0.apk libxpm-3.5.19-r0.apk libxrandr-1.5.4-r1.apk libxml2-2.12.10-r0.apk zstd-libs-1.5.6-r0.apk cairo-gobject-1.18.4-r0.apk shared-mime-info-2.4-r0.apk libxkbfile-1.1.3-r0.apk font-cursor-misc-1.0.4-r1.apk"
-MAIN_PACKAGES="libeconf-0.6.3-r0.apk zstd-libs-1.5.6-r0.apk xz-libs-5.8.3-r0.apk ncurses-terminfo-base-6.4_p20240420-r2.apk dhcpcd-10.0.6-r1.apk libncursesw-6.4_p20240420-r2.apk libevent-2.1.12-r7.apk tmux-3.4-r1.apk readline-8.2.10-r0.apk bash-5.2.26-r0.apk nano-8.0-r0.apk dropbear-2024.85-r0.apk dropbear-ssh-2024.85-r0.apk zlib-1.3.2-r0.apk musl-dev-1.2.5-r3.apk musl-1.2.5-r3.apk make-4.4.1-r2.apk lua5.3-5.3.6-r6.apk lua5.3-libs-5.3.6-r6.apk linenoise-1.0-r5.apk"
+MAIN_PACKAGES="libeconf-0.6.3-r0.apk zstd-libs-1.5.6-r0.apk xz-libs-5.8.3-r0.apk ncurses-terminfo-base-6.4_p20240420-r2.apk dhcpcd-10.0.6-r1.apk libncursesw-6.4_p20240420-r2.apk libevent-2.1.12-r7.apk tmux-3.4-r1.apk readline-8.2.10-r0.apk bash-5.2.26-r0.apk nano-8.0-r0.apk dropbear-2024.85-r0.apk dropbear-ssh-2024.85-r0.apk zlib-1.3.2-r0.apk musl-dev-1.2.5-r3.apk musl-1.2.5-r3.apk make-4.4.1-r2.apk lua5.3-5.3.6-r6.apk lua5.3-libs-5.3.6-r6.apk linenoise-1.0-r5.apk syslinux-6.04_pre1-r15.apk e2fsprogs-1.47.0-r5.apk e2fsprogs-libs-1.47.0-r5.apk libcom_err-1.47.0-r5.apk"
 for pkg in $MAIN_PACKAGES $MAIN_GUI; do
     if [ ! -s "$CACHE_DIR/$pkg" ]; then
         rm -f "$CACHE_DIR/$pkg"
@@ -234,7 +247,7 @@ if [ -f sbin/apk.static ]; then
     mkdir -p "$ROOTFS_DIR/etc/apk" "$ROOTFS_DIR/lib/apk/db" "$ROOTFS_DIR/var/cache/apk"
     touch "$ROOTFS_DIR/etc/apk/world"
     fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" --initdb -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted update
-    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm zenity neofetch adwaita-icon-theme menu-cache gvfs
+    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm zenity neofetch adwaita-icon-theme menu-cache gvfs mesa-dri-gallium
 fi
 
 # Restore custom busybox and remove conflicting Alpine busybox symlinks for runit
@@ -310,7 +323,10 @@ if [ -f "$ROOTFS_DIR/usr/bin/neatvi" ]; then
 fi
 
 # Make xinitrc executable and alias xterm to st
-[ -f "$ROOTFS_DIR/etc/X11/xinit/xinitrc" ] && chmod +x "$ROOTFS_DIR/etc/X11/xinit/xinitrc" 2>/dev/null || true
+if [ -f "$ROOTFS_DIR/etc/X11/xinit/xinitrc" ]; then
+    chmod +x "$ROOTFS_DIR/etc/X11/xinit/xinitrc" 2>/dev/null || true
+    [ ! -f "$ROOTFS_DIR/root/.xinitrc" ] && cp -f "$ROOTFS_DIR/etc/X11/xinit/xinitrc" "$ROOTFS_DIR/root/.xinitrc" 2>/dev/null || true
+fi
 [ -f "$ROOTFS_DIR/root/.xinitrc" ] && chmod +x "$ROOTFS_DIR/root/.xinitrc" 2>/dev/null || true
 [ -f "$ROOTFS_DIR/usr/bin/st" ] && ln -sf /usr/bin/st "$ROOTFS_DIR/usr/bin/xterm" 2>/dev/null || true
 
@@ -322,6 +338,11 @@ fi
 # Ensure rezzconfig alias exists
 [ -f "$ROOTFS_DIR/usr/bin/rezzconfig" ] && ln -sf /usr/bin/rezzconfig "$ROOTFS_DIR/usr/bin/config" 2>/dev/null || true
 [ -f "$ROOTFS_DIR/usr/bin/rezzconfig" ] && ln -sf /usr/bin/rezzconfig "$ROOTFS_DIR/bin/config" 2>/dev/null || true
+
+# Ensure rezzinstall and rezzkeymap aliases exist
+[ -f "$ROOTFS_DIR/usr/bin/rezzinstall" ] && ln -sf /usr/bin/rezzinstall "$ROOTFS_DIR/usr/bin/install-rezzos" 2>/dev/null || true
+[ -f "$ROOTFS_DIR/usr/bin/rezzinstall" ] && ln -sf /usr/bin/rezzinstall "$ROOTFS_DIR/sbin/rezzinstall" 2>/dev/null || true
+[ -f "$ROOTFS_DIR/usr/bin/rezzkeymap" ] && ln -sf /usr/bin/rezzkeymap "$ROOTFS_DIR/usr/bin/keymap" 2>/dev/null || true
 
 # Ensure sudo permissions and executable symlinks
 if [ -f "$ROOTFS_DIR/usr/bin/sudo" ]; then

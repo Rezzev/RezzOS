@@ -31,14 +31,17 @@
 | `rsv disable <name>` | Disable service (remove auto-start symlink) |
 | `rsv create <name> "<cmd>"` | Create a new custom service in `/etc/sv` |
 
-## System & Monitoring
+## System & Setup
 | Command | Description |
 |---------|----------|
+| `rezzinstall` / `install-rezzos` | Interactive TUI installer to install RezzOS onto disk/SSD with initial setup |
 | `rezzconfig` / `config` | Interactive TUI control center & system configuration |
+| `rezzkeymap [set\|ru\|us]` | Keyboard & language layout switcher (RU/EN, toggle hotkeys) |
+| `rezzuser` | User management utility (add, remove, passwd, lock, groups) |
 | `rezzfetch` | System info banner & specs |
-| `rezz-recovery` | RezzOS recovery utility. Allows you to check the system, enter the recovery shell, and reboot. |
-| `rezz-user` | User management utilitys |
 | `rezzhw` | Hardware diagnostics utility |
+| `rezzdoctor` | System diagnostic & health check |
+| `rezzrecovery` | RezzOS recovery utility. Allows you to check the system, enter the recovery shell, and reboot. |
 | `swap create [size]` | Create & activate swap file on persistent disk |
 | `swap status` | Check swap memory status |
 
