@@ -135,20 +135,19 @@ if [ -f /mnt/disk/swapfile ]; then
     swapon /mnt/disk/swapfile 2>/dev/null || true
 fi
 
-# Restore packages from disk
-if [ -d /mnt/disk/packages ]; then
-    mkdir -p /tmp/pkg
-    for pkg in /mnt/disk/packages/*.apk; do
-        [ -f "$pkg" ] || continue
-        cd /tmp/pkg
-        tar -xzf "$pkg" 2>/dev/null
-        [ -d usr ] && cp -r usr/* /usr/ 2>/dev/null
-        [ -d bin ] && cp -r bin/* /bin/ 2>/dev/null
-        [ -d lib ] && cp -r lib/* /lib/ 2>/dev/null
-        rm -rf /tmp/pkg/*
-    done
-    rm -rf /tmp/pkg
-    cd /
+# Restore packages from disk.
+#
+# This used to unpack *.apk archives from /mnt/disk/packages by hand, copying
+# only usr/, bin/, lib/ with no ownership tracking and no protection against
+# clobbering base-system files. RezzOS's own package manager (pkg) now owns
+# that job: it verifies sha256 against index.txt, refuses to overwrite files
+# in PROTECTED_FILES (ld-musl, busybox, runit...), and handles arbitrary
+# paths (etc/, usr/share/, usr/libexec/...), which apps like dillo and
+# badwolf need. pkg itself ships as part of the base image, so it's already
+# present at this point in boot, before anything from /mnt/disk/packages is
+# placed back onto the fresh RAM root.
+if [ -x /usr/bin/pkg ]; then
+    /usr/bin/pkg restore
 fi
 
 # Restore enabled services from persistent disk
