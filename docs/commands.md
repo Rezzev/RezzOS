@@ -36,8 +36,8 @@
 |---------|----------|
 | `rezzconfig` / `config` | Interactive TUI control center & system configuration |
 | `rezzfetch` | System info banner & specs |
-| `rezz-recovery` | RezzOS recovery utility. Allows you to check the system, enter the recovery shell, and reboot. |
-| `rezz-user` | User management utilitys |
+| `rezzrecovery` | RezzOS recovery utility. Allows you to check the system, enter the recovery shell, and reboot. |
+| `rezzuser` | User management utilitys |
 | `rezzhw` | Hardware diagnostics utility |
 | `swap create [size]` | Create & activate swap file on persistent disk |
 | `swap status` | Check swap memory status |
