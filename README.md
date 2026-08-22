@@ -72,64 +72,10 @@ For execution in RAM(default):
 
 For loading from disk:
 - Follow the steps outlined above.
-- After starting the system, enter these commands:
+- After starting the system, enter these command:
 ```bash
-## installing packages
-
-pkg update
-pkg install syslinux
-pkg install e2fsprogs
-pkg install e2fsprogs-libs
-pkg install libcom_err
-
-## Disk partitioning
-
-fdisk /you/disk
-## o 
-## n (new chapter) → p → 1 → Enter → Enter
-## a 
-## w
-
-## Formating
-
-mkfs.ext4 -F /you/disk
-
-## Mount
-
-mount /dev/sda1 /mnt
-
-## copy system
-
-cp -r /bin /sbin /usr /etc /lib /root /var /boot /mnt/
-mkdir -p /mnt/{dev,proc,sys,tmp}
-
-## installing bootloader
-
-extlinux --install /mnt/boot
-dd if=/usr/share/syslinux/mbr.bin of=/dev/sda bs=440 count=1
-
-## config bootloader
-
-cat > /mnt/boot/extlinux.conf << 'EOF'
-DEFAULT rezzos
-LABEL rezzos
-    LINUX /boot/bzImage
-    APPEND quiet loglevel=0 nokaslr
-    INITRD /boot/rootfs.cpio.gz
-EOF
-
-## Unmount and reboot
-umount /mnt
-reboot -f
+rezzinstall
 ```
-
-## Development
-RezzOS provides a minimal development environment inside the image:
-- TCC (Tiny C Compiler) with musl headers
-- Lua 5.3 — rapid scripting and execution
-- Compile and run C / Lua programs directly inside the system
-
----
 
 ## Building from source
 The simplest way is to use the included build script:
@@ -161,9 +107,7 @@ echo "nameserver 8.8.8.8" > /etc/resolv.conf
 On real hardware DHCP is used. If the network does not come up:
 
 ```bash
-ifconfig eth0 up
-udhcpc -i eth0
-echo "nameserver 8.8.8.8" > /etc/resolv.conf
+dhcpcd eth0
 ```
 
 Before using the package manager run:
@@ -184,11 +128,9 @@ Run from the repository root:
 
 ---
 
-## Useful links
-- Repository: https://github.com/semen88pochuev-eng/RezzOS
-- BusyBox: https://busybox.net/
-- Linux kernel: https://kernel.org/
-- Alpine Linux: https://alpinelinux.org/
+## links
+- Main repository: [open](https://github.com/semen88pochuev-eng/RezzOS)
+- Pkg repository: [open](https://github.com/Rezzev/RezzOS-Packages)
 
 ---
 
