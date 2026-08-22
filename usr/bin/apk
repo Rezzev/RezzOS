@@ -1,48 +1,29 @@
 #!/bin/sh
-CACHE_DIR="/var/cache/pkg"
-PKG_DIR="/mnt/disk/packages"
+CACHE_DIR="/var/cache/apk"
+PKG_DIR="/mnt/disk/apk-packages"
 INSTALLED_LIST="$PKG_DIR/installed.list"
 
 # Decide where the list lives by whether the persistent disk is mounted, not by
-# whether the package directory happens to exist yet. See original comment:
-# creating the directory up front makes disk-mounted vs RAM-fallback agree.
+# whether the package directory happens to exist yet.
+#
+# On a freshly formatted disk it does not exist: install_single_pkg creates it
+# further down, on the first install. So the very first package of a new system
+# had its .apk copied onto the disk while its name went into /var/log, which is
+# initramfs, which is RAM. After a reboot init restored the package from
+# packages/ but apk list no longer mentioned it and apk remove could not find
+# it, for that one package, permanently.
+#
+# Creating the directory up front makes the two agree.
 if grep -q ' /mnt/disk ' /proc/mounts 2>/dev/null; then
     mkdir -p "$PKG_DIR" 2>/dev/null
 else
-    INSTALLED_LIST="/var/log/installed.list"
+    INSTALLED_LIST="/var/log/apk-installed.list"
 fi
 
-# --- Your repo, not Alpine's ---
-REPO_INDEX="https://raw.githubusercontent.com/semen88pochuev-eng/RezzOS-Packages/main/index.txt"
-INDEX="$CACHE_DIR/index.txt"
+ALPINE_VER="v3.20"
 ARCH="x86_64"
-CERT_BUNDLE="/etc/ssl/certs/ca-certificates.crt"
-
-# Files that make up the base system itself. No package, ever, under any
-# circumstances, is allowed to overwrite these through the normal install
-# path — this is what got clobbered when a git package shipped its own copy
-# of ld-musl and silently replaced the system's libc. Add paths here, not
-# whole packages: it's specific files that are dangerous, not names.
-PROTECTED_FILES="
-/lib/ld-musl-x86_64.so.1
-/bin/busybox
-/sbin/busybox
-/usr/bin/busybox
-/sbin/init
-/sbin/runit
-/usr/sbin/runit
-/bin/runit
-/usr/bin/runsvdir
-/sbin/runsvdir
-"
-
-is_protected() {
-    f="$1"
-    for p in $PROTECTED_FILES; do
-        test "$f" = "$p" && return 0
-    done
-    return 1
-}
+REPO_MAIN="https://dl-cdn.alpinelinux.org/alpine/${ALPINE_VER}/main/${ARCH}"
+REPO_COMMUNITY="https://dl-cdn.alpinelinux.org/alpine/${ALPINE_VER}/community/${ARCH}"
 
 BLUE=$(printf '\033[0;34m')
 GREEN=$(printf '\033[0;32m')
@@ -50,78 +31,69 @@ RED=$(printf '\033[0;31m')
 YELLOW=$(printf '\033[1;33m')
 NC=$(printf '\033[0m')
 
-mkdir -p "$CACHE_DIR" /tmp/pkg 2>/dev/null
+mkdir -p "$CACHE_DIR" /tmp/apk 2>/dev/null
 
 usage() {
-    echo -e "${BLUE}=== RezzOS Package Manager (apk) ===${NC}"
+    echo -e "${BLUE}=== RezzOS Alpine Client (apk) ===${NC}"
+    echo "Downloads packages directly from Alpine's real repositories."
     echo "Usage:"
-    echo "  apk update                 - Refresh package index"
+    echo "  apk update                 - Refresh package indexes"
     echo "  apk install <package>      - Install package"
     echo "  apk upgrade                - Upgrade all installed packages"
     echo "  apk search <query>         - Search for packages"
     echo "  apk info <package>         - Show package details"
     echo "  apk list                   - List installed packages"
     echo "  apk remove <package>       - Remove package"
-    echo "  apk restore                - Re-place installed packages from cache (boot use)"
 }
 
 download_file() {
     URL="$1"
     OUTPUT="$2"
 
-    if [ -f "$CERT_BUNDLE" ]; then
-        SPIDER_TLS_OPTS=""
-    else
-        SPIDER_TLS_OPTS="--no-check-certificate"
-    fi
-
-    HEADERS=$(wget -S --spider $SPIDER_TLS_OPTS "$URL" 2>&1)
+    # get full size from headers
+    HEADERS=$(wget -S --spider "$URL" 2>&1)
     TOTAL=$(printf '%s\n' "$HEADERS" |
         awk 'tolower($1) == "content-length:" { n=$2 } END { print n+0 }')
 
     rm -f "$OUTPUT"
 
-    # Verify HTTPS certificates for real once the cert bundle exists.
-    # Before that (e.g. installing ca-certificates itself for the first
-    # time), there's nothing to verify against — fall back with a visible
-    # warning instead of silently skipping verification forever.
-    if [ -f "$CERT_BUNDLE" ]; then
-        WGET_TLS_OPTS=""
-    else
-        echo -e "${YELLOW}Warning: no cert bundle at $CERT_BUNDLE yet, HTTPS not verified for this download${NC}"
-        WGET_TLS_OPTS="--no-check-certificate"
-    fi
-
-    wget $WGET_TLS_OPTS "$URL" -O "$OUTPUT" >/dev/null 2>&1 &
+    # start the download
+    wget --no-check-certificate "$URL" -O "$OUTPUT" >/dev/null 2>&1 &
     PID=$!
 
     BAR_WIDTH=30
 
     while kill -0 "$PID" 2>/dev/null; do
         if [ -f "$OUTPUT" ]; then
-            CURRENT=$(wc -c < "$OUTPUT")
+           CURRENT=$(wc -c < "$OUTPUT")
         else
             CURRENT=0
         fi
 
         if [ "$TOTAL" -gt 0 ]; then
             PERCENT=$((CURRENT * 100 / TOTAL))
+
             FILLED=$((PERCENT * BAR_WIDTH / 100))
             EMPTY=$((BAR_WIDTH - FILLED))
+
             BAR=""
+
             i=0
             while [ "$i" -lt "$FILLED" ]; do
                 BAR="${BAR}="
                 i=$((i + 1))
             done
+
             if [ "$FILLED" -lt "$BAR_WIDTH" ]; then
                 BAR="${BAR}>"
                 EMPTY=$((EMPTY - 1))
             fi
+
             while [ "$EMPTY" -gt 0 ]; do
                 BAR="${BAR}-"
                 EMPTY=$((EMPTY - 1))
             done
+
             printf '\r[%s] %3d%%' "$BAR" "$PERCENT"
         else
             printf '\rDownloaded: %s bytes' "$CURRENT"
@@ -140,7 +112,8 @@ download_file() {
     fi
     if [ "$RET" -eq 0 ] && [ "$CURRENT" -gt 0 ]; then
         if [ "$TOTAL" -gt 0 ]; then
-            printf '\r[%s] 100%%\n' "=============================="
+            printf '\r[%s] 100%%\n' \
+                "=============================="
         else
             printf '\rDownloaded: %s bytes\n' "$CURRENT"
         fi
@@ -153,20 +126,23 @@ download_file() {
 }
 
 update_index() {
-    echo "Fetching index... "
-    if download_file "$REPO_INDEX" "$INDEX"; then
+    echo "Fetching main index... "
+    if download_file "$REPO_MAIN/APKINDEX.tar.gz" "$CACHE_DIR/APKINDEX_main.tar.gz"; then
+        tar -xzf "$CACHE_DIR/APKINDEX_main.tar.gz" -C "$CACHE_DIR" 2>/dev/null
+        mv "$CACHE_DIR/APKINDEX" "$CACHE_DIR/APKINDEX_main" 2>/dev/null
         echo -e "${GREEN}OK${NC}"
     else
         echo -e "${RED}FAILED${NC}"
-        return 1
     fi
-}
 
-# Returns the last matching line for a package name, i.e. the newest entry
-# appended to index.txt. Format: name|version|arch|url|sha256
-get_pkg_line() {
-    test -f "$INDEX" || return 1
-    grep "^$1|" "$INDEX" | grep "|$ARCH|" | tail -1
+    echo "Fetching community index... "
+    if download_file "$REPO_COMMUNITY/APKINDEX.tar.gz" "$CACHE_DIR/APKINDEX_community.tar.gz"; then
+        tar -xzf "$CACHE_DIR/APKINDEX_community.tar.gz" -C "$CACHE_DIR" 2>/dev/null
+        mv "$CACHE_DIR/APKINDEX" "$CACHE_DIR/APKINDEX_community" 2>/dev/null
+        echo -e "${GREEN}OK${NC}"
+    else
+        echo -e "${RED}FAILED${NC}"
+    fi
 }
 
 search_pkg() {
@@ -175,18 +151,29 @@ search_pkg() {
         echo -e "${RED}Specify something to search for.${NC}"
         return 1
     fi
-    test -f "$INDEX" || { echo -e "${RED}No index. Run 'apk update' first.${NC}"; return 1; }
 
     echo -e "${YELLOW}Searching for '$QUERY'...${NC}"
 
-    RESULTS=$(awk -F'|' -v q="$QUERY" '
-        index(tolower($1), tolower(q)) > 0 {
-            printf "%-20s %s\n", $1, $2
-        }
-    ' "$INDEX" | sort -u)
+    RESULTS=$(
+        for idx in "$CACHE_DIR/APKINDEX_main" "$CACHE_DIR/APKINDEX_community"; do
+            test -f "$idx" || continue
+            awk -v q="$QUERY" '
+                function emit() {
+                    if (name != "" && index(tolower(name), tolower(q)) > 0)
+                        printf "%-34s %-20s %s\n", name, ver, desc
+                    name = ""; ver = ""; desc = ""
+                }
+                /^P:/ { emit(); name = substr($0, 3); next }
+                /^V:/ { ver  = substr($0, 3); next }
+                /^T:/ { desc = substr($0, 3); next }
+                END   { emit() }
+            ' "$idx"
+        done | sort -u
+    )
 
     if test -z "$RESULTS"; then
         echo -e "${RED}No package matches '$QUERY'.${NC}"
+        echo "Run 'apk update' first if you have not refreshed the indexes."
         return 1
     fi
 
@@ -201,204 +188,251 @@ info_pkg() {
         echo -e "${RED}Specify a package.${NC}"
         return 1
     fi
-    test -f "$INDEX" || { echo -e "${RED}No index. Run 'apk update' first.${NC}"; return 1; }
 
-    LINE=$(get_pkg_line "$NAME")
-    if test -z "$LINE"; then
-        echo -e "${RED}No package named '$NAME'.${NC}"
-        echo "Try 'apk search $NAME', or 'apk update' if the index is stale."
+    for idx in "$CACHE_DIR/APKINDEX_main" "$CACHE_DIR/APKINDEX_community"; do
+        test -f "$idx" || continue
+        REPO=$(basename "$idx" | sed 's/^APKINDEX_//')
+
+        awk -v want="P:$NAME" -v repo="$REPO" '
+            function human(b) {
+                b = b + 0
+                if (b <= 0)       return "unknown"
+                if (b >= 1048576) return sprintf("%.1f MiB", b / 1048576)
+                if (b >= 1024)    return sprintf("%.1f KiB", b / 1024)
+                return b " B"
+            }
+            function show(label, value) {
+                if (value != "") printf "  %-13s %s\n", label, value
+            }
+            $0 == want   { found = 1 }
+            found && /^$/ { exit }
+            found {
+                key = substr($0, 1, 1)
+                val = substr($0, 3)
+                if      (key == "P") name  = val
+                else if (key == "V") ver   = val
+                else if (key == "T") desc  = val
+                else if (key == "U") url   = val
+                else if (key == "L") lic   = val
+                else if (key == "A") arch  = val
+                else if (key == "S") dl    = val
+                else if (key == "I") inst  = val
+                else if (key == "m") maint = val
+                else if (key == "D") deps  = val
+            }
+            END {
+                if (name == "") exit 1
+
+                printf "\n  %s %s\n\n", name, ver
+                show("Description:", desc)
+                show("Repository:",  repo)
+                show("Architecture:", arch)
+                show("License:",     lic)
+                show("Homepage:",    url)
+                show("Maintainer:",  maint)
+                show("Download:",    human(dl))
+                show("Installed:",   human(inst))
+
+                if (deps == "") {
+                    printf "  %-13s none\n", "Depends on:"
+                } else {
+                    n = split(deps, d, " ")
+                    line = ""
+                    label = "Depends on:"
+                    for (i = 1; i <= n; i++) {
+                        if (length(line) + length(d[i]) + 1 > 62) {
+                            printf "  %-13s %s\n", label, line
+                            label = ""
+                            line = ""
+                        }
+                        line = (line == "") ? d[i] : line " " d[i]
+                    }
+                    if (line != "") printf "  %-13s %s\n", label, line
+                }
+                printf "\n"
+            }
+        ' "$idx" && return 0
+    done
+
+    echo -e "${RED}No package named '$NAME'.${NC}"
+    echo "Try 'apk search $NAME', or 'apk update' if the indexes are stale."
+    return 1
+}
+
+find_pkg() {
+    NAME="$1"
+    for idx in "$CACHE_DIR/APKINDEX_main" "$CACHE_DIR/APKINDEX_community"; do
+        test -f "$idx" || continue
+        VER=$(grep -A1 "P:$NAME$" "$idx" | grep "^V:" | head -1 | sed 's/V://')
+        if test -n "$VER"; then
+            echo "${NAME}-${VER}.apk"
+            return 0
+        fi
+    done
+    return 1
+}
+
+get_deps() {
+    NAME="$1"
+    for idx in "$CACHE_DIR/APKINDEX_main" "$CACHE_DIR/APKINDEX_community"; do
+        test -f "$idx" || continue
+
+        grep -q "^P:$NAME$" "$idx" || continue
+
+        DEPS=$(awk -v want="P:$NAME" '
+            $0 == want { found = 1; next }
+            found && /^$/ { exit }
+            found && /^D:/ { sub(/^D:/, ""); print; exit }
+        ' "$idx")
+
+        for dep in $DEPS; do
+            case "$dep" in
+                so:*|cmd:*|pc:*|dbus:*|/bin/*|/sbin/*|/usr/*) continue ;;
+            esac
+            dep_name=$(echo "$dep" | sed 's/[<>=].*//')
+            if echo "$dep_name" | grep -qE '^[a-zA-Z]' && ! echo "$dep_name" | grep -q '/'; then
+                test "$dep_name" != "$NAME" && echo "$dep_name"
+            fi
+        done
+        return 0
+    done
+    return 1
+}
+
+install_single_pkg() {
+    PKG="$1"
+    if echo "$PKG" | grep -q "\.apk$"; then
+        APK="$PKG"
+    else
+        APK=$(find_pkg "$PKG")
+    fi
+
+    test -z "$APK" && echo -e "${RED}Not found: $PKG${NC}" && return 1
+
+    echo -e "${YELLOW}Installing $APK...${NC}"
+    mkdir -p "$PKG_DIR" /tmp/apk_dl
+
+    download_file "$REPO_MAIN/$APK" "/tmp/apk_dl/$APK" || \
+    download_file "$REPO_COMMUNITY/$APK" "/tmp/apk_dl/$APK"
+
+    if test ! -s "/tmp/apk_dl/$APK"; then
+        echo -e "${RED}Download failed for $APK${NC}"
         return 1
     fi
 
-    VER=$(echo "$LINE" | cut -d'|' -f2)
-    PARCH=$(echo "$LINE" | cut -d'|' -f3)
-    URL=$(echo "$LINE" | cut -d'|' -f4)
-    SHA=$(echo "$LINE" | cut -d'|' -f5)
+    cd /tmp || return 1
 
-    printf "\n  %s %s\n\n" "$NAME" "$VER"
-    printf "  %-13s %s\n" "Architecture:" "$PARCH"
-    printf "  %-13s %s\n" "Source:" "$URL"
-    printf "  %-13s %s\n" "SHA256:" "$SHA"
-    printf "\n"
-}
+    TMP_DIR=$(mktemp -d /tmp/apk_extract.XXXXXX) || return 1
 
-# Extracts $1 (a local .tar.gz already on disk) and places its files onto
-# the root filesystem for package $2, respecting PROTECTED_FILES and file
-# ownership. Shared by install_single_pkg (fresh install/upgrade) and
-# restore_installed (boot-time re-placement from the cache disk).
-place_package_files() {
-    ARCHIVE="$1"
-    NAME="$2"
+    cd "$TMP_DIR" || {
+        rm -rf "$TMP_DIR"
+        return 1
+    }
 
-    TMP_DIR=$(mktemp -d /tmp/pkg_extract.XXXXXX) || return 1
     cleanup_tmp() {
         cd /tmp 2>/dev/null
         rm -rf "$TMP_DIR"
     }
-    cd "$TMP_DIR" || { rm -rf "$TMP_DIR"; return 1; }
 
-    if ! tar -xzf "$ARCHIVE"; then
-        echo -e "${RED}Failed to extract $(basename "$ARCHIVE")${NC}"
+    if ! tar -xzf "/tmp/apk_dl/$APK"; then
+        echo -e "${RED}Failed to extract $APK${NC}"
         cleanup_tmp
         return 1
     fi
 
-    OWN_FILES="/tmp/pkg_ownfiles.$$"
-    : > "$OWN_FILES"
-    OLD_ENTRY=$(grep "^${NAME}|" "$INSTALLED_LIST" 2>/dev/null | head -1)
-    if test -n "$OLD_ENTRY"; then
-        OLD_FILE_ARCHIVE=$(echo "$OLD_ENTRY" | cut -d'|' -f3)
-        if test -f "$PKG_DIR/$OLD_FILE_ARCHIVE"; then
-            tar -tzf "$PKG_DIR/$OLD_FILE_ARCHIVE" 2>/dev/null | sed 's#^\./##' > "$OWN_FILES"
-        fi
+    if test -d usr && ! cp -r usr/. /usr/; then
+        echo -e "${RED}Failed to install usr files from $APK${NC}"
+        cleanup_tmp
+        return 1
     fi
 
-    SKIPPED=0
-    INSTALL_FAILED=0
-    FILE_LIST="/tmp/pkg_filelist.$$"
-    (cd "$TMP_DIR" && find . -type f ! -name '.PKGINFO' -o -type l ! -name '.PKGINFO') | sed 's#^\./##' > "$FILE_LIST"
-
-    while IFS= read -r rel; do
-        test -n "$rel" || continue
-        target="/$rel"
-        src="$TMP_DIR/$rel"
-
-        if is_protected "$target"; then
-            echo -e "${YELLOW}Skipped (protected system file): $target${NC}"
-            SKIPPED=$((SKIPPED + 1))
-            continue
-        fi
-
-        if test -e "$target" || test -L "$target"; then
-            if ! grep -qxF "$rel" "$OWN_FILES" 2>/dev/null; then
-                echo -e "${YELLOW}Skipped (already provided by another package or the base system): $target${NC}"
-                SKIPPED=$((SKIPPED + 1))
-                continue
-            fi
-        fi
-
-        mkdir -p "$(dirname "$target")" 2>/dev/null
-        if ! cp -a "$src" "$target"; then
-            echo -e "${RED}Failed to write $target${NC}"
-            INSTALL_FAILED=1
-        else
-            # Free the temp copy immediately — for a package with hundreds
-            # of MB of extracted files (webkit, icu...), holding both the
-            # extracted tree and the placed copy at once can blow past a
-            # capped root filesystem even when the archive itself is small
-            # after compression.
-            rm -f "$src"
-        fi
-    done < "$FILE_LIST"
-
-    rm -f "$OWN_FILES" "$FILE_LIST"
-
-    if test "$SKIPPED" -gt 0; then
-        echo -e "${YELLOW}$SKIPPED file(s) skipped to avoid overwriting existing files${NC}"
+    if test -d lib && ! cp -r lib/. /lib/; then
+        echo -e "${RED}Failed to install lib files from $APK${NC}"
+        cleanup_tmp
+        return 1
     fi
+
+    if test -d bin && ! cp -r bin/. /bin/; then
+        echo -e "${RED}Failed to install bin files from $APK${NC}"
+        cleanup_tmp
+        return 1
+    fi
+
+    if test -d sbin && ! cp -r sbin/. /sbin/; then
+        echo -e "${RED}Failed to install sbin files from $APK${NC}"
+        cleanup_tmp
+        return 1
+    fi
+
+    if ! cp "/tmp/apk_dl/$APK" "$PKG_DIR/"; then
+        echo -e "${RED}Failed to save $APK${NC}"
+        cleanup_tmp
+        return 1
+    fi
+
+    if ! echo "$APK" >> "$INSTALLED_LIST"; then
+        echo -e "${RED}Failed to update installed package list${NC}"
+        cleanup_tmp
+        return 1
+    fi
+
+    echo -e "${GREEN}Done: $APK${NC}"
 
     cleanup_tmp
-
-    test "$INSTALL_FAILED" -eq 0
-}
-
-install_single_pkg() {
-    NAME="$1"
-    LINE=$(get_pkg_line "$NAME")
-
-    test -z "$LINE" && echo -e "${RED}Not found: $NAME${NC}" && return 1
-
-    VER=$(echo "$LINE" | cut -d'|' -f2)
-    URL=$(echo "$LINE" | cut -d'|' -f4)
-    SHA=$(echo "$LINE" | cut -d'|' -f5)
-    FILE=$(basename "$URL")
-
-    echo -e "${YELLOW}Installing $NAME $VER...${NC}"
-    mkdir -p "$PKG_DIR" /tmp/pkg_dl
-
-    if ! download_file "$URL" "/tmp/pkg_dl/$FILE"; then
-        echo -e "${RED}Download failed for $NAME${NC}"
-        return 1
-    fi
-
-    # Verify integrity/authenticity before touching anything on disk.
-    ACTUAL_SHA=$(sha256sum "/tmp/pkg_dl/$FILE" | cut -d' ' -f1)
-    if [ "$ACTUAL_SHA" != "$SHA" ]; then
-        echo -e "${RED}SHA256 mismatch for $NAME! Expected $SHA, got $ACTUAL_SHA${NC}"
-        rm -f "/tmp/pkg_dl/$FILE"
-        return 1
-    fi
-
-    mkdir -p "$PKG_DIR"
-    # Move the archive onto persistent storage before extracting. If
-    # /mnt/disk is a real mount (not the capped RAM root), this frees up
-    # rootfs space right away instead of holding the compressed archive
-    # there for the whole install — matters a lot for large packages.
-    if ! mv "/tmp/pkg_dl/$FILE" "$PKG_DIR/$FILE"; then
-        echo -e "${RED}Failed to save $FILE${NC}"
-        return 1
-    fi
-
-    if ! place_package_files "$PKG_DIR/$FILE" "$NAME"; then
-        echo -e "${RED}Some files from $FILE failed to install${NC}"
-        return 1
-    fi
-
-    # installed.list format: name|version|filename|sha256
-    sed -i "/^${NAME}|/d" "$INSTALLED_LIST" 2>/dev/null
-    if ! echo "${NAME}|${VER}|${FILE}|${SHA}" >> "$INSTALLED_LIST"; then
-        echo -e "${RED}Failed to update installed package list${NC}"
-        return 1
-    fi
-
-    echo -e "${GREEN}Done: $NAME $VER${NC}"
     return 0
 }
 
-# Re-places every installed package's files from the already-downloaded
-# archive on $PKG_DIR, without touching the network. Meant to run once at
-# boot, after /mnt/disk is mounted and before anything that depends on the
-# installed packages starts — the RAM root comes up empty every time, so
-# whatever isn't part of the base image has to be put back explicitly.
-restore_installed() {
-    if test ! -s "$INSTALLED_LIST"; then
-        echo "No packages to restore"
-        return 0
+install_with_deps() {
+    PKG_NAME="$1"
+    INSTALLED=""
+
+    if ! find_pkg "$PKG_NAME" >/dev/null; then
+        echo -e "${RED}Not found: $PKG_NAME${NC}"
+        return 1
     fi
 
-    OK=0
-    FAILED=0
+    install_deps_recursive() {
+        local name="$1"
+        local deps
 
-    while IFS='|' read -r NAME VER FILE SHA; do
-        test -n "$NAME" || continue
-        ARCHIVE="$PKG_DIR/$FILE"
+        deps=$(get_deps "$name") || return 1
 
-        if test ! -f "$ARCHIVE"; then
-            echo -e "${RED}Missing cached archive for $NAME, skipping: $ARCHIVE${NC}"
-            FAILED=$((FAILED + 1))
-            continue
-        fi
-
-        if test -n "$SHA"; then
-            ACTUAL_SHA=$(sha256sum "$ARCHIVE" | cut -d' ' -f1)
-            if [ "$ACTUAL_SHA" != "$SHA" ]; then
-                echo -e "${RED}SHA256 mismatch for cached $NAME, skipping${NC}"
-                FAILED=$((FAILED + 1))
+        for dep in $deps; do
+            if echo "$INSTALLED" | grep -q " $dep "; then
                 continue
             fi
-        fi
 
-        if place_package_files "$ARCHIVE" "$NAME"; then
-            echo -e "${GREEN}Restored: $NAME $VER${NC}"
-            OK=$((OK + 1))
-        else
-            echo -e "${RED}Failed to restore: $NAME${NC}"
-            FAILED=$((FAILED + 1))
-        fi
-    done < "$INSTALLED_LIST"
+            if grep -q "^${dep}-" "$INSTALLED_LIST" 2>/dev/null; then
+                continue
+            fi
 
-    echo -e "${GREEN}Restored $OK, failed $FAILED${NC}"
-    test "$FAILED" -eq 0
+            INSTALLED="$INSTALLED $dep "
+
+            if ! install_deps_recursive "$dep"; then
+                echo -e "${RED}Failed to resolve dependency: $dep${NC}"
+                return 1
+            fi
+
+            echo "Installing dependency: $dep"
+
+            if ! install_single_pkg "$dep"; then
+                echo -e "${RED}Failed to install dependency: $dep${NC}"
+                return 1
+            fi
+        done
+
+        return 0
+    }
+
+    if ! install_deps_recursive "$PKG_NAME"; then
+        echo -e "${RED}Failed to install dependencies for $PKG_NAME${NC}"
+        return 1
+    fi
+
+    if ! install_single_pkg "$PKG_NAME"; then
+        echo -e "${RED}Failed to install $PKG_NAME${NC}"
+        return 1
+    fi
 }
 
 upgrade_pkgs() {
@@ -406,7 +440,8 @@ upgrade_pkgs() {
         echo "No packages"
         return 0
     fi
-    if test ! -f "$INDEX"; then
+
+    if test ! -f "$CACHE_DIR/APKINDEX_main" && test ! -f "$CACHE_DIR/APKINDEX_community"; then
         echo -e "${RED}No package index. Run 'apk update' first.${NC}"
         return 1
     fi
@@ -415,29 +450,30 @@ upgrade_pkgs() {
     UPGRADED=0
     FAILED=0
 
-    while IFS='|' read -r NAME VER FILE SHA; do
+    for APK in $(sort -u "$INSTALLED_LIST"); do
+        NAME=$(echo "$APK" | sed 's/-[^-]*-r[0-9][0-9]*\.apk$//')
         test -n "$NAME" || continue
+        test "$NAME" != "$APK" || continue
+
         CHECKED=$((CHECKED + 1))
 
-        LINE=$(get_pkg_line "$NAME")
-        if test -z "$LINE"; then
+        LATEST=$(find_pkg "$NAME") || {
             echo -e "${YELLOW}Not in index, skipping: $NAME${NC}"
             continue
-        fi
+        }
 
-        LATEST_VER=$(echo "$LINE" | cut -d'|' -f2)
-        test "$LATEST_VER" = "$VER" && continue
+        test "$LATEST" != "$APK" || continue
 
-        echo -e "${YELLOW}$NAME: $VER -> $LATEST_VER${NC}"
+        echo -e "${YELLOW}$NAME: $APK -> $LATEST${NC}"
 
-        OLD_FILE="$FILE"
-        if install_single_pkg "$NAME"; then
-            rm -f "$PKG_DIR/$OLD_FILE"
+        if install_with_deps "$NAME"; then
+            sed -i "/^${APK}$/d" "$INSTALLED_LIST" 2>/dev/null
+            rm -f "$PKG_DIR/$APK"
             UPGRADED=$((UPGRADED + 1))
         else
             FAILED=$((FAILED + 1))
         fi
-    done < "$INSTALLED_LIST"
+    done
 
     echo
     if test "$UPGRADED" -eq 0 && test "$FAILED" -eq 0; then
@@ -452,43 +488,45 @@ upgrade_pkgs() {
 remove_pkg() {
     test -z "$1" && echo "Specify package" && return 1
 
-    for NAME in "$@"; do
-        ENTRY=$(grep "^${NAME}|" "$INSTALLED_LIST" 2>/dev/null | head -1)
-        if test -z "$ENTRY"; then
-            echo -e "${RED}Not installed: $NAME${NC}"
+    for PKG in "$@"; do
+        if echo "$PKG" | grep -q "\.apk$"; then
+            APK="$PKG"
+        else
+            APK=$(grep "^${PKG}-" "$INSTALLED_LIST" 2>/dev/null | head -1)
+        fi
+
+        if test -z "$APK"; then
+            echo -e "${RED}Not installed: $PKG${NC}"
             continue
         fi
 
-        FILE=$(echo "$ENTRY" | cut -d'|' -f3)
-        APK_FILE="$PKG_DIR/$FILE"
-
+        APK_FILE="$PKG_DIR/$APK"
         if test ! -f "$APK_FILE"; then
-            echo -e "${RED}Package file not found: $FILE${NC}"
-            sed -i "/^${NAME}|/d" "$INSTALLED_LIST" 2>/dev/null
+            echo -e "${RED}Package file not found: $APK${NC}"
+            sed -i "/^${APK}$/d" "$INSTALLED_LIST" 2>/dev/null
             continue
         fi
 
-        echo -e "${YELLOW}Removing $NAME...${NC}"
+        echo -e "${YELLOW}Removing $APK...${NC}"
 
-        # Collect every path owned by other installed packages so shared
-        # files aren't pulled out from under something still installed.
-        KEPT="/tmp/pkg_kept.$$"
+        KEPT="/tmp/apk_kept.$$"
         : > "$KEPT"
-        while IFS='|' read -r ONAME OVER OFILE OSHA; do
-            test "$ONAME" != "$NAME" || continue
-            test -f "$PKG_DIR/$OFILE" || continue
-            tar -tzf "$PKG_DIR/$OFILE" 2>/dev/null | sed 's#^\./##' >> "$KEPT"
-        done < "$INSTALLED_LIST"
+        for OTHER in $(sort -u "$INSTALLED_LIST" 2>/dev/null); do
+            test "$OTHER" != "$APK" || continue
+            test -f "$PKG_DIR/$OTHER" || continue
+            tar -tzf "$PKG_DIR/$OTHER" 2>/dev/null | sed 's#^\./##' >> "$KEPT"
+        done
         sort -u "$KEPT" -o "$KEPT" 2>/dev/null
 
-        OWNED="/tmp/pkg_owned.$$"
+        OWNED="/tmp/apk_owned.$$"
         tar -tzf "$APK_FILE" 2>/dev/null > "$OWNED"
 
         SHARED=0
         while IFS= read -r file; do
             file=${file#./}
+
             case "$file" in
-                ""|.PKGINFO) continue ;;
+                ""|.PKGINFO|.SIGN.*|.pre-*|.post-*|.trigger*) continue ;;
             esac
 
             target="/$file"
@@ -509,28 +547,19 @@ remove_pkg() {
         fi
 
         rm -f "$APK_FILE"
-        sed -i "/^${NAME}|/d" "$INSTALLED_LIST" 2>/dev/null
-        echo -e "${GREEN}Removed: $NAME${NC}"
+        sed -i "/^${APK}$/d" "$INSTALLED_LIST" 2>/dev/null
+        echo -e "${GREEN}Removed: $APK${NC}"
     done
-}
-
-list_pkgs() {
-    if test ! -s "$INSTALLED_LIST"; then
-        echo "No packages"
-        return 0
-    fi
-    awk -F'|' '{ printf "%-20s %s\n", $1, $2 }' "$INSTALLED_LIST"
 }
 
 CMD="$1"
 case "$CMD" in
     update)  update_index ;;
-    install) test -z "$2" && usage || { shift; for pkg in "$@"; do install_single_pkg "$pkg"; done; } ;;
+    install) test -z "$2" && usage || { shift; for pkg in "$@"; do install_with_deps "$pkg"; done; } ;;
     upgrade) upgrade_pkgs ;;
     search)  search_pkg "$2" ;;
     info)    info_pkg "$2" ;;
-    list)    list_pkgs ;;
+    list)    cat "$INSTALLED_LIST" 2>/dev/null || echo "No packages" ;;
     remove)  test -z "$2" && echo "Specify package" || { shift; remove_pkg "$@"; } ;;
-    restore) restore_installed ;;
     *)       usage ;;
 esac
