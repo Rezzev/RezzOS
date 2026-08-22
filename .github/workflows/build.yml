@@ -95,6 +95,7 @@ jobs:
           check disk-writable       'touch /mnt/disk/.citest && rm -f /mnt/disk/.citest'
           check bash-runs           'bash -c "exit 0"'
           check pkg-present         'test -x /usr/bin/pkg'
+          check dropbear-running    'pidof dropbear'
 
           echo "CITEST DONE"
 
