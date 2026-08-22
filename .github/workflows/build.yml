@@ -46,12 +46,13 @@ jobs:
           restore-keys: rezzos-dl-
 
       # build.sh reuses an existing ./bzImage unless FORCE_REBUILD_KERNEL=1.
-      # The kernel config lives inline in build.sh, so its hash is the right key.
+      # The kernel config is kernel.config plus the inline KCONF block in
+      # build.sh, so hashing both files is the right key.
       - name: Cache compiled kernel
         uses: actions/cache@v4
         with:
           path: bzImage
-          key: rezzos-bzImage-${{ hashFiles('build.sh') }}
+          key: rezzos-bzImage-${{ hashFiles('build.sh', 'kernel.config') }}
 
       - name: Build
         run: |
