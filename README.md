@@ -195,7 +195,7 @@ Run from the repository root:
 ## Contacts and contributors
 Thanks to everyone who helps develop the project!
 
-- [@semen88pochuev-eng](https://github.com/semen88pochuev-eng) (rezzev) — project creator, architecture, build system, Lua integration, support [...]
+- [@Rezzev](https://github.com/Rezzev) — project creator, architecture, build system, Lua integration, support [...]
 - [@Kenyka kenykovich](https://github.com/keeniGithub) — GUI (JWM), desktop integration, SSH, multi-user, service management, interface work [...]
 - [@neko_qt](https://github.com/neko-qt) — rezz utils, build improvements, kernel configuration, init fixes.
 - [@tanukis0408](https://github.com/tanukis0408) - updated and fixed pkg, other fixes
