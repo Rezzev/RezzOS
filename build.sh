@@ -35,7 +35,7 @@ log() {
 
 mkdir -p "$CACHE_DIR"
 
-if [ ! -f "$REPO_DIR/init" ] || [ ! -d "$REPO_DIR/etc" ] || [ ! -d "$REPO_DIR/usr" ]; then
+if [ ! -f "$REPO_DIR/init" ] || [ ! -d "$REPO_DIR/etc" ] || [ ! -d "$REPO_DIR/usr" ] || [ ! -f "$REPO_DIR/kernel.config" ]; then
     echo "Run this script from the root of a cloned RezzOS repository."
     exit 1
 fi
@@ -88,7 +88,7 @@ else
 
     step "Building kernel"
     cd "$KERNEL_DIR"
-    make x86_64_defconfig
+    cp "$REPO_DIR/kernel.config" .config
     cat >> .config << 'KCONF'
 CONFIG_VIRTIO_PCI=y
 CONFIG_VIRTIO_BLK=y
@@ -229,6 +229,36 @@ for pkg in $EDGE_COMMUNITY_PACKAGES; do
     [ -d lib ] && cp -r lib/* "$ROOTFS_DIR/lib/" 2>/dev/null || true
     [ -d etc ] && cp -r etc/* "$ROOTFS_DIR/etc/" 2>/dev/null || true
 done
+
+# Wi-Fi firmware, pinned to exact versions (Depends: None on each, so the
+# linux-firmware metapackage with every blob in existence is not pulled in).
+#
+# Intel Wi-Fi blobs live in the "uncategorized" linux-firmware-other package
+# (81 MB apk, 205 MB installed - audio, GPUs, everything nobody shipped a
+# dedicated subpackage for), so it gets a selective copy of iwlwifi* instead
+# of a full unpack. Blobs ship as *.zst - CONFIG_FW_LOADER_COMPRESS_ZSTD in
+# kernel.config makes the kernel able to load them.
+FIRMWARE_PACKAGES="linux-firmware-ath10k-20240811-r0.apk linux-firmware-rtlwifi-20240811-r0.apk"
+for pkg in $FIRMWARE_PACKAGES; do
+    if [ ! -s "$CACHE_DIR/$pkg" ]; then
+        rm -f "$CACHE_DIR/$pkg"
+        wget "$ALPINE_MAIN/$pkg" -O "$CACHE_DIR/$pkg" || { echo "Failed to download $pkg from $ALPINE_MAIN"; exit 1; }
+    fi
+    mkdir -p /tmp/p
+    cd /tmp/p
+    rm -rf ./*
+    tar -xzf "$CACHE_DIR/$pkg"
+    [ -d lib ] && cp -r lib/* "$ROOTFS_DIR/lib/" 2>/dev/null || true
+done
+
+if [ ! -s "$CACHE_DIR/linux-firmware-other-20240811-r0.apk" ]; then
+    rm -f "$CACHE_DIR/linux-firmware-other-20240811-r0.apk"
+    wget "$ALPINE_MAIN/linux-firmware-other-20240811-r0.apk" -O "$CACHE_DIR/linux-firmware-other-20240811-r0.apk" || { echo "Failed to download linux-firmware-other"; exit 1; }
+fi
+rm -rf /tmp/p && mkdir -p /tmp/p && cd /tmp/p
+tar -xzf "$CACHE_DIR/linux-firmware-other-20240811-r0.apk"
+cp lib/firmware/iwlwifi-* "$ROOTFS_DIR/lib/firmware/" 2>/dev/null || true
+cd "$REPO_DIR"
 
 step "Installing GUI apps and dependencies using apk.static"
 if [ ! -s "$CACHE_DIR/apk-tools-static.apk" ]; then

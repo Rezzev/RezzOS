@@ -46,12 +46,13 @@ jobs:
           restore-keys: rezzos-dl-
 
       # build.sh reuses an existing ./bzImage unless FORCE_REBUILD_KERNEL=1.
-      # The kernel config lives inline in build.sh, so its hash is the right key.
+      # The kernel config is kernel.config plus the inline KCONF block in
+      # build.sh, so hashing both files is the right key.
       - name: Cache compiled kernel
         uses: actions/cache@v4
         with:
           path: bzImage
-          key: rezzos-bzImage-${{ hashFiles('build.sh') }}
+          key: rezzos-bzImage-${{ hashFiles('build.sh', 'kernel.config') }}
 
       - name: Build
         run: |
@@ -95,6 +96,7 @@ jobs:
           check disk-writable       'touch /mnt/disk/.citest && rm -f /mnt/disk/.citest'
           check bash-runs           'bash -c "exit 0"'
           check pkg-present         'test -x /usr/bin/pkg'
+          check dropbear-running    'pidof dropbear'
 
           echo "CITEST DONE"
 
@@ -113,13 +115,21 @@ jobs:
         run: |
           # TCG only - hosted runners give no reliable /dev/kvm.
           # QEMU never exits on its own here, so `timeout` ending it is expected.
-          timeout 180 qemu-system-x86_64 \
+          #
+          # The guest must hold the initramfs AND its unpacked root at once.
+          # The image outgrew 1024M: run #76 (green) shipped a 126 MB artifact,
+          # run #86 (failing) 194 MB five days later, and the unpack started
+          # dying with "Initramfs unpacking failed: write error" before any
+          # in-guest check could run. 2048M matches what start-gui.sh already
+          # assumes. The timeout gets the same headroom against further image
+          # growth: under TCG the boot window shrinks as the image grows.
+          timeout 300 qemu-system-x86_64 \
             -kernel bzImage \
             -initrd rootfs-test.cpio.gz \
             -append "console=ttyS0 random.trust_cpu=on" \
             -drive file=disk.img,format=raw,if=virtio \
             -netdev user,id=net0 -device virtio-net,netdev=net0 \
-            -m 1024M -display none -no-reboot \
+            -m 2048M -display none -no-reboot \
             -serial file:serial.log || true
 
           echo "--------- serial output ---------"

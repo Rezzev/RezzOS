@@ -30,6 +30,16 @@ if ! grep -q "^user:" /etc/passwd 2>/dev/null; then
     echo "user:x:1000:1000:User:/home/user:/bin/bash" >> /etc/passwd
 fi
 
+# D-Bus drops privileges to this user (see its system.conf); the netdev
+# group is referenced by dbus/iwd policy files and must exist.
+if ! grep -q "^messagebus:" /etc/passwd 2>/dev/null; then
+    echo "messagebus:x:101:" >> /etc/group
+    echo "messagebus:x:101:101:messagebus:/nonexistent:/bin/false" >> /etc/passwd
+fi
+if ! grep -q "^netdev:" /etc/group 2>/dev/null; then
+    echo "netdev:x:102:" >> /etc/group
+fi
+
 # /etc/passwd ships with the user account already in it, so the branch above
 # never runs and /home/user was never created. Give the home directory its own
 # condition and seed it from /etc/skel, the way adduser would, so logging in as
@@ -154,6 +164,15 @@ fi
 if [ -d /mnt/disk/home ]; then
     mkdir -p /home
     mount --bind /mnt/disk/home /home 2>/dev/null || cp -a /mnt/disk/home/. /home/ 2>/dev/null || true
+fi
+
+# Saved Wi-Fi networks: iwd keeps its profiles under /var/lib/iwd. When the
+# data disk carries a copy, bind-mount it so anything iwd writes at runtime
+# lands on disk directly and survives reboots.
+if [ -d /mnt/disk/var/lib/iwd ]; then
+    mkdir -p /var/lib/iwd
+    mount --bind /mnt/disk/var/lib/iwd /var/lib/iwd 2>/dev/null \
+        || cp -a /mnt/disk/var/lib/iwd/. /var/lib/iwd/ 2>/dev/null || true
 fi
 
 # Enable swap if present on disk

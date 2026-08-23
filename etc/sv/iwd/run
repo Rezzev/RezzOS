@@ -1,2 +1,12 @@
 #!/bin/sh
-exec /usr/lib/iwd/iwd
+# iwd serves iwctl over the system D-Bus; wait until the bus is up.
+# Absolute service dir: bare names resolve via /var/service, which this
+# image does not ship. Bounded loop - exit non-zero and let runsv restart
+# us instead of hanging forever.
+n=0
+until sv check /etc/runit/runsvdir/default/dbus >/dev/null 2>&1 || [ "$n" -ge 60 ]; do
+    sleep 0.5
+    n=$((n + 1))
+done
+[ "$n" -lt 60 ] || exit 1
+exec /usr/libexec/iwd
