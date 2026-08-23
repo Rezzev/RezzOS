@@ -166,6 +166,15 @@ if [ -d /mnt/disk/home ]; then
     mount --bind /mnt/disk/home /home 2>/dev/null || cp -a /mnt/disk/home/. /home/ 2>/dev/null || true
 fi
 
+# Saved Wi-Fi networks: iwd keeps its profiles under /var/lib/iwd. When the
+# data disk carries a copy, bind-mount it so anything iwd writes at runtime
+# lands on disk directly and survives reboots.
+if [ -d /mnt/disk/var/lib/iwd ]; then
+    mkdir -p /var/lib/iwd
+    mount --bind /mnt/disk/var/lib/iwd /var/lib/iwd 2>/dev/null \
+        || cp -a /mnt/disk/var/lib/iwd/. /var/lib/iwd/ 2>/dev/null || true
+fi
+
 # Enable swap if present on disk
 if [ -f /mnt/disk/swapfile ]; then
     swapon /mnt/disk/swapfile 2>/dev/null || true

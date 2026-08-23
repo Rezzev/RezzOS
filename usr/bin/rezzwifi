@@ -1,0 +1,147 @@
+#!/bin/sh
+# rezzwifi - Wi-Fi management utility for RezzOS.
+# Thin wrapper over iwctl: makes sure the iwd stack is up, then exposes
+# the everyday operations (scan/list/connect) with readable output.
+
+SVDIR=/etc/runit/runsvdir/default
+
+usage() {
+    echo "RezzOS Wi-Fi manager"
+    echo ""
+    echo "Usage:"
+    echo "  rezzwifi status              Show adapter and connection state"
+    echo "  rezzwifi scan                Scan and list available networks"
+    echo "  rezzwifi list                List results of the last scan"
+    echo "  rezzwifi connect <SSID> [pass]   Connect (hidden input if no pass)"
+    echo "  rezzwifi disconnect          Disconnect from current network"
+    echo "  rezzwifi known               List saved networks"
+    echo "  rezzwifi forget <SSID>       Forget a saved network"
+    exit 1
+}
+
+die() {
+    echo "Error: $1" >&2
+    exit "${2:-1}"
+}
+
+[ "$(id -u)" -eq 0 ] || die "run as root"
+
+ensure_stack() {
+    for svc in dbus iwd dhcpcd; do
+        if ! pidof "$svc" >/dev/null 2>&1 && [ ! -e "$SVDIR/$svc" ]; then
+            rsv enable "$svc" >/dev/null 2>&1
+        fi
+        sv start "$SVDIR/$svc" >/dev/null 2>&1 || true
+    done
+}
+
+find_station() {
+    DEV=""
+    for d in /sys/class/net/*; do
+        case "$(basename "$d")" in
+            wlan*) DEV="$(basename "$d")"; break ;;
+        esac
+    done
+    [ -n "$DEV" ] || die "no Wi-Fi adapter found (driver/firmware missing?)"
+}
+
+require_iwd() {
+    ensure_stack
+    find_station
+    pidof iwd >/dev/null 2>&1 || die "iwd is not running; try: rsv enable dbus && rsv enable iwd"
+}
+
+sync_profiles() {
+    grep -q ' /mnt/disk ' /proc/mounts 2>/dev/null || return 0
+    mkdir -p /mnt/disk/var/lib/iwd 2>/dev/null || return 0
+    cp -a /var/lib/iwd/*.psk /mnt/disk/var/lib/iwd/ 2>/dev/null || true
+}
+
+cmd_status() {
+    require_iwd
+    iwctl station "$DEV" show
+    ip addr show "$DEV" | grep 'inet ' || echo "no IP address assigned yet"
+}
+
+cmd_scan() {
+    require_iwd
+    echo "Scanning on $DEV..."
+    iwctl station "$DEV" scan
+    sleep 2
+    cmd_list
+}
+
+cmd_list() {
+    require_iwd
+    iwctl station "$DEV" get-networks
+}
+
+cmd_connect() {
+    [ -n "$1" ] || usage
+    SSID="$1"
+    PASS="$2"
+
+    require_iwd
+
+    if iwctl --dont-ask station "$DEV" connect "$SSID" >/dev/null 2>&1; then
+        :
+    else
+        [ -n "$PASS" ] || {
+            printf 'passphrase for "%s": ' "$SSID"
+            stty -echo
+            IFS= read -r PASS
+            stty echo
+            echo ""
+        }
+        if [ ${#PASS} -lt 8 ] || [ ${#PASS} -gt 63 ]; then
+            die "passphrase must be 8-63 characters"
+        fi
+        iwctl --passphrase "$PASS" station "$DEV" connect "$SSID" || \
+            die "connection to \"$SSID\" failed"
+    fi
+
+    n=0
+    while [ $n -lt 6 ]; do
+        sleep 2
+        if iwctl station "$DEV" show 2>/dev/null | grep -q connected; then
+            echo "Connected to \"$SSID\"."
+            sync_profiles
+            ip addr show "$DEV" | grep -q 'inet ' && return 0
+        fi
+        n=$((n + 1))
+    done
+    echo "Associated, but no IP address yet; dhcpcd may still be running."
+    exit 0
+}
+
+cmd_disconnect() {
+    require_iwd
+    iwctl station "$DEV" disconnect
+    echo "Disconnected."
+}
+
+cmd_known() {
+    require_iwd
+    iwctl known-networks list
+}
+
+cmd_forget() {
+    [ -n "$1" ] || usage
+    require_iwd
+    iwctl known-networks "$1" forget || die "network \"$1\" not found in saved networks"
+    if grep -q ' /mnt/disk ' /proc/mounts 2>/dev/null; then
+        rm -f "/mnt/disk/var/lib/iwd/$1.psk" 2>/dev/null || true
+    fi
+    echo "Forgot network \"$1\"."
+}
+
+case "$1" in
+    status)     shift; cmd_status "$@" ;;
+    scan)       shift; cmd_scan "$@" ;;
+    list)       shift; cmd_list "$@" ;;
+    connect)    shift; cmd_connect "$@" ;;
+    disconnect) shift; cmd_disconnect "$@" ;;
+    known)      shift; cmd_known "$@" ;;
+    forget)     shift; cmd_forget "$@" ;;
+    *)          usage ;;
+esac
