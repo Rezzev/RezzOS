@@ -1,7 +1,13 @@
 #!/bin/sh
-mkdir -p /etc/dropbear
-mkdir -p /var/log
-while ! ifconfig eth0 2>/dev/null | grep -q "inet "; do
-    sleep 0.5
-done
-exec /usr/sbin/dropbear -F -E -E >/var/log/dropbear.log 2>&1 </dev/null
+mkdir -p /etc/dropbear /var/log
+
+# No interface wait here: dropbear binds 0.0.0.0 without any configured
+# address, so SSH picks up connectivity whenever it arrives (eth0 via init,
+# wlan0 via iwd+dhcpcd, renamed links). Waiting on eth0 only meant wifi-only
+# machines never got SSH while 'rsv list' reported the service as active.
+#
+# -R generates the host keys on the first connection. Alpine-built dropbear
+# exits right away when no key files exist ("No hostkeys available"), and the
+# stage-one boot script that used to create them is not part of the boot
+# path, so without this the service crashed in a restart loop.
+exec /usr/sbin/dropbear -F -E -R >/var/log/dropbear.log 2>&1 </dev/null
