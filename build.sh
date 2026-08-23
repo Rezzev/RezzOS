@@ -35,7 +35,7 @@ log() {
 
 mkdir -p "$CACHE_DIR"
 
-if [ ! -f "$REPO_DIR/init" ] || [ ! -d "$REPO_DIR/etc" ] || [ ! -d "$REPO_DIR/usr" ]; then
+if [ ! -f "$REPO_DIR/init" ] || [ ! -d "$REPO_DIR/etc" ] || [ ! -d "$REPO_DIR/usr" ] || [ ! -f "$REPO_DIR/kernel.config" ]; then
     echo "Run this script from the root of a cloned RezzOS repository."
     exit 1
 fi
@@ -88,7 +88,7 @@ else
 
     step "Building kernel"
     cd "$KERNEL_DIR"
-    make x86_64_defconfig
+    cp "$REPO_DIR/kernel.config" .config
     cat >> .config << 'KCONF'
 CONFIG_VIRTIO_PCI=y
 CONFIG_VIRTIO_BLK=y
