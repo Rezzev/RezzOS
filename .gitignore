@@ -16,3 +16,6 @@ dl_cache/
 
 # build and boot logs
 *.log
+
+# editors
+.idea/
