@@ -1,0 +1,83 @@
+#!/bin/sh
+
+ZONEINFO=/usr/share/zoneinfo
+PERSIST_DIR=/mnt/disk/etc
+
+usage() {
+    echo "RezzOS timezone helper"
+    echo ""
+    echo "Usage:"
+    echo "  rezztz                    Show current zone and clock"
+    echo "  rezztz list <Region>      List zones in a region (e.g. Asia)"
+    echo "  rezztz set <Region/City>  Set the timezone and persist it"
+    exit 1
+}
+
+die() {
+    echo "Error: $1" >&2
+    exit "${2:-1}"
+}
+
+need_root() {
+    [ "$(id -u)" -eq 0 ] || die "run as root"
+}
+
+cmd_current() {
+    z=
+    [ -r /etc/timezone ] && z=$(head -n 1 /etc/timezone 2>/dev/null)
+    if [ -z "$z" ]; then
+        rl=$(readlink /etc/localtime 2>/dev/null)
+        case "$rl" in
+            "$ZONEINFO"/*) z=${rl#"$ZONEINFO"/} ;;
+        esac
+    fi
+    [ -n "$z" ] || { [ -e /etc/localtime ] && z="custom (copied /etc/localtime)"; }
+    [ -n "$z" ] || z="UTC (/etc/localtime not set)"
+    echo "$z  $(date)"
+}
+
+cmd_list() {
+    [ -n "$1" ] || {
+        echo "Usage: rezztz list <Region>"
+        echo "Regions:"
+        for d in "$ZONEINFO"/*; do
+            case "$(basename "$d")" in posix|right) continue ;; esac
+            [ -d "$d" ] && basename "$d"
+        done
+        exit 1
+    }
+    [ -d "$ZONEINFO/$1" ] || die "unknown region '$1' (see 'rezztz list')"
+    cd "$ZONEINFO/$1" || die "cannot read $ZONEINFO/$1"
+    find . -type f | sed 's|^\./||' | sort | while read -r z; do
+        echo "$1/$z"
+    done
+}
+
+valid_zone() {
+    echo "$1" | grep -qE '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$' || return 1
+    [ -f "$ZONEINFO/$1" ]
+}
+
+cmd_set() {
+    need_root
+    [ -n "$1" ] || usage
+    valid_zone "$1" || die "'$1' is not a timezone (try: rezztz list <region>)"
+    ln -sf "$ZONEINFO/$1" /etc/localtime
+    echo "$1" > /etc/timezone
+    if grep -q " /mnt/disk " /proc/mounts 2>/dev/null; then
+        mkdir -p "$PERSIST_DIR"
+        cp -f "$ZONEINFO/$1" "$PERSIST_DIR/localtime"
+        echo "$1" > "$PERSIST_DIR/timezone"
+    fi
+    echo "Timezone set to $1"
+    cmd_current
+}
+
+case "${1:-}" in
+    "")             cmd_current ;;
+    current)        cmd_current ;;
+    list)           shift; cmd_list "$@" ;;
+    set)            shift; cmd_set "$@" ;;
+    -h|--help|help) usage ;;
+    *)              usage ;;
+esac

@@ -148,6 +148,15 @@ if [ -f /mnt/disk/etc/keymap.conf ]; then
     cp /mnt/disk/etc/keymap.conf /etc/keymap.conf 2>/dev/null || true
 fi
 
+# Restore persistent timezone. A copy, not a symlink: the disk may be
+# absent on the next boot and the RAM root always has its own zoneinfo.
+if [ -f /mnt/disk/etc/localtime ]; then
+    cp -f /mnt/disk/etc/localtime /etc/localtime 2>/dev/null || true
+    if [ -f /mnt/disk/etc/timezone ]; then
+        cp -f /mnt/disk/etc/timezone /etc/timezone 2>/dev/null || true
+    fi
+fi
+
 # Restore user accounts and passwords if present on persistent disk
 if [ -f /mnt/disk/etc/passwd ]; then
     cp -f /mnt/disk/etc/passwd /etc/passwd 2>/dev/null || true
