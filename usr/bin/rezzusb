@@ -1,0 +1,238 @@
+#!/bin/sh
+
+MNT_ROOT=/mnt/usb
+SUPPORTED="vfat ext4 iso9660 exfat"
+
+usage() {
+    echo "RezzOS USB / removable disk helper"
+    echo ""
+    echo "Usage:"
+    echo "  rezzusb list                         List disks and partitions"
+    echo "  rezzusb status                       Show volumes mounted by rezzusb"
+    echo "  rezzusb mount  <dev>                 Mount a partition (e.g. sdb1)"
+    echo "  rezzusb umount <dev|path>            Unmount it"
+    echo "  rezzusb eject  <disk>                Unmount all partitions and eject"
+    echo ""
+    echo "Devices may be given as sdb1 or /dev/sdb1."
+    exit 1
+}
+
+die() {
+    echo "Error: $1" >&2
+    exit "${2:-1}"
+}
+
+need_root() {
+    [ "$(id -u)" -eq 0 ] || die "run as root"
+}
+
+norm_dev() {
+    n=$1
+    case "$n" in
+        "") die "device name required" ;;
+        /dev/*) echo "$n" ;;
+        /mnt/usb/*)
+            b=$(basename "$n")
+            echo "/dev/$b"
+            ;;
+        *) echo "/dev/$n" ;;
+    esac
+}
+
+dev_name() {
+    basename "$(norm_dev "$1")"
+}
+
+is_skip_disk() {
+    case "$1" in
+        loop*|ram*|zram*|dm-*|md*|fd*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+parent_disk() {
+    name=$(dev_name "$1")
+    if [ -d "/sys/block/$name" ]; then
+        echo "$name"
+        return
+    fi
+    if [ -e "/sys/class/block/$name/partition" ]; then
+        basename "$(dirname "$(readlink -f "/sys/class/block/$name")")"
+        return
+    fi
+    echo "$name"
+}
+
+persist_src() {
+    awk '$2 == "/mnt/disk" { print $1; exit }' /proc/mounts
+}
+
+is_persist() {
+    src=$(persist_src)
+    [ -n "$src" ] || return 1
+    want=$(parent_disk "$1")
+    got=$(parent_disk "$src")
+    [ "$want" = "$got" ]
+}
+
+mounted_at() {
+    awk -v d="$(norm_dev "$1")" '$1 == d { print $2; exit }' /proc/mounts
+}
+
+blk_field() {
+    dev=$(norm_dev "$1")
+    field=$2
+    busybox blkid "$dev" 2>/dev/null \
+        | sed -n "s/.*${field}=\"\([^\"]*\)\".*/\1/p"
+}
+
+size_of() {
+    name=$(dev_name "$1")
+    [ -r "/sys/class/block/$name/size" ] || { echo "?"; return; }
+    sectors=$(cat "/sys/class/block/$name/size")
+    bytes=$((sectors * 512))
+    if [ "$bytes" -ge 1073741824 ]; then
+        echo "$((bytes / 1073741824)).$(((bytes % 1073741824) * 10 / 1073741824))G"
+    elif [ "$bytes" -ge 1048576 ]; then
+        echo "$((bytes / 1048576))M"
+    else
+        echo "${bytes}B"
+    fi
+}
+
+fs_supported() {
+    fs=$1
+    [ -n "$fs" ] || return 1
+    for s in $SUPPORTED; do
+        [ "$s" = "$fs" ] && return 0
+    done
+    return 1
+}
+
+list_parts() {
+    disk=$1
+    found=
+    for p in /sys/block/"$disk"/"$disk"*; do
+        [ -e "$p" ] || continue
+        found=1
+        basename "$p"
+    done
+    [ -n "$found" ] || echo "$disk"
+}
+
+print_row() {
+    printf "%-10s %-8s %-10s %-12s %s%s\n" "$1" "$2" "$3" "$4" "$5" "$6"
+}
+
+cmd_list() {
+    print_row DEV SIZE FS LABEL MOUNT ""
+    for d in /sys/block/*; do
+        [ -e "$d" ] || continue
+        disk=$(basename "$d")
+        is_skip_disk "$disk" && continue
+        note=
+        is_persist "$disk" && note="   (system disk, skipped)"
+        for part in $(list_parts "$disk"); do
+            fs=$(blk_field "$part" TYPE)
+            label=$(blk_field "$part" LABEL)
+            [ -n "$fs" ] || fs="-"
+            [ -n "$label" ] || label="-"
+            mnt=$(mounted_at "$part")
+            [ -n "$mnt" ] || mnt="-"
+            print_row "$part" "$(size_of "$part")" "$fs" "$label" "$mnt" "$note"
+        done
+    done
+}
+
+cmd_status() {
+    awk -v p="$MNT_ROOT/" '$2 ~ "^" p {print $1, $2, $3}' /proc/mounts | while read -r dev mnt fs; do
+        label=$(blk_field "$dev" LABEL)
+        [ -n "$label" ] || label="-"
+        printf "%s  %s  %s  %s\n" "$(basename "$dev")" "$mnt" "$fs" "$label"
+    done
+    grep -q " $MNT_ROOT/" /proc/mounts 2>/dev/null || echo "(nothing mounted under $MNT_ROOT)"
+}
+
+cmd_mount() {
+    need_root
+    [ -n "$1" ] || usage
+    dev=$(norm_dev "$1")
+    name=$(dev_name "$dev")
+    [ -b "$dev" ] || die "$dev is not a block device"
+    is_persist "$dev" && \
+        die "$dev is the persistent system disk (/mnt/disk). Refusing to mount."
+    already=$(mounted_at "$dev")
+    [ -z "$already" ] || die "$dev is already mounted at $already"
+    fs=$(blk_field "$dev" TYPE)
+    [ -n "$fs" ] || die "no filesystem on $dev (partition table only? try ${name}1)"
+    fs_supported "$fs" || \
+        die "filesystem '$fs' is not supported by this kernel (need: $SUPPORTED)"
+    dest="$MNT_ROOT/$name"
+    mkdir -p "$dest" || die "cannot create $dest"
+    opts="rw"
+    case "$fs" in
+        vfat|msdos|fat) opts="rw,utf8,umask=000,shortname=mixed" ;;
+        iso9660)        opts="ro" ;;
+    esac
+    if ! mount -t "$fs" -o "$opts" "$dev" "$dest"; then
+        rmdir "$dest" 2>/dev/null || true
+        die "mount $dev failed"
+    fi
+    label=$(blk_field "$dev" LABEL)
+    extra=$fs
+    [ -n "$label" ] && extra="$fs, $label"
+    echo "Mounted $dev at $dest ($extra)"
+}
+
+cmd_umount() {
+    need_root
+    [ -n "$1" ] || usage
+    target=$1
+    dest=
+    case "$target" in
+        /mnt/usb/*) dest=$target ;;
+        *)
+            dev=$(norm_dev "$target")
+            dest=$(mounted_at "$dev")
+            [ -n "$dest" ] || die "$dev is not mounted"
+            ;;
+    esac
+    umount "$dest" || die "$dest is busy. Close files and try again."
+    rmdir "$dest" 2>/dev/null || true
+    echo "Unmounted $dest"
+}
+
+cmd_eject() {
+    need_root
+    [ -n "$1" ] || usage
+    disk=$(parent_disk "$1")
+    [ -d "/sys/block/$disk" ] || die "/dev/$disk is not a disk"
+    is_persist "$disk" && die "/dev/$disk is the system disk"
+    fail=
+    for part in $(list_parts "$disk"); do
+        dest=$(mounted_at "$part")
+        [ -n "$dest" ] || continue
+        if umount "$dest"; then
+            rmdir "$dest" 2>/dev/null || true
+            echo "Unmounted $dest"
+        else
+            echo "Error: $dest is busy" >&2
+            fail=1
+        fi
+    done
+    [ -z "$fail" ] || die "could not unmount all partitions of /dev/$disk"
+    # busybox eject(1) is optional; sync is what actually makes yank-safe
+    sync
+    busybox eject "/dev/$disk" 2>/dev/null || true
+    echo "Safe to unplug /dev/$disk"
+}
+
+case "${1:-list}" in
+    list)           cmd_list ;;
+    status)         cmd_status ;;
+    mount)          shift; cmd_mount "$@" ;;
+    umount|unmount) shift; cmd_umount "$@" ;;
+    eject)          shift; cmd_eject "$@" ;;
+    -h|--help|help) usage ;;
+    *)              usage ;;
+esac
