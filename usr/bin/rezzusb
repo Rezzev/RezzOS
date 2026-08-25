@@ -12,6 +12,7 @@ usage() {
     echo "  rezzusb mount  <dev>                 Mount a partition (e.g. sdb1)"
     echo "  rezzusb umount <dev|path>            Unmount it"
     echo "  rezzusb eject  <disk>                Unmount all partitions and eject"
+    echo "  rezzusb format <dev> [vfat|exfat|ext4]  Format a partition or disk (default: vfat)"
     echo ""
     echo "Devices may be given as sdb1 or /dev/sdb1."
     exit 1
@@ -221,10 +222,35 @@ cmd_eject() {
         fi
     done
     [ -z "$fail" ] || die "could not unmount all partitions of /dev/$disk"
-    # busybox eject(1) is optional; sync is what actually makes yank-safe
     sync
     busybox eject "/dev/$disk" 2>/dev/null || true
     echo "Safe to unplug /dev/$disk"
+}
+
+cmd_format() {
+    need_root
+    [ -n "$1" ] || usage
+    dev=$(norm_dev "$1")
+    fs=${2:-vfat}
+    case "$fs" in
+        vfat|exfat|ext4) ;;
+        *) die "unsupported filesystem '$fs' (vfat, exfat, ext4)" ;;
+    esac
+    [ -b "$dev" ] || die "$dev is not a block device"
+    is_persist "$dev" && \
+        die "$dev is the persistent system disk (/mnt/disk). Refusing to format."
+    already=$(mounted_at "$dev")
+    [ -z "$already" ] || die "$dev is mounted at $already. Unmount it first."
+    command -v "mkfs.$fs" >/dev/null 2>&1 || die "mkfs.$fs not found in this system"
+    printf 'Format %s (%s) as %s? ALL DATA WILL BE LOST. Type "yes": ' "$dev" "$(size_of "$dev")" "$fs"
+    read -r ans
+    [ "$ans" = "yes" ] || die "aborted"
+    case "$fs" in
+        vfat) mkfs.vfat -I "$dev"  ;;
+        exfat) mkfs.exfat "$dev"   ;;
+        ext4) mkfs.ext4 -F "$dev"  ;;
+    esac || die "mkfs.$fs failed on $dev"
+    echo "Formatted $dev as $fs. Mount it: rezzusb mount $(dev_name "$dev")"
 }
 
 case "${1:-list}" in
@@ -233,6 +259,7 @@ case "${1:-list}" in
     mount)          shift; cmd_mount "$@" ;;
     umount|unmount) shift; cmd_umount "$@" ;;
     eject)          shift; cmd_eject "$@" ;;
+    format)         shift; cmd_format "$@" ;;
     -h|--help|help) usage ;;
     *)              usage ;;
 esac
