@@ -194,7 +194,7 @@ for pkg in $MAIN_PACKAGES $MAIN_GUI; do
 done
 
 COMM_GUI="mtdev-1.1.6-r3.apk libinput-libs-1.25.0-r0.apk xorg-server-common-21.1.14-r0.apk xrdb-1.2.2-r0.apk jwm-2.4.3-r0.apk libevdev-1.13.1-r0.apk setxkbmap-1.3.4-r0.apk st-0.9.2-r0.apk xinit-1.4.2-r1.apk libxcvt-0.1.2-r0.apk xmodmap-1.0.11-r1.apk xorg-server-21.1.14-r0.apk xf86-video-fbdev-0.5.0-r6.apk xf86-video-vesa-2.6.0-r4.apk librsvg-2.58.5-r0.apk xauth-1.1.3-r0.apk xf86-input-libinput-1.4.0-r1.apk libxfont2-2.0.6-r4.apk"
-COMMUNITY_PACKAGES="runit-2.1.2-r7.apk neatvi-15-r0.apk sudo-1.9.15_p5-r0.apk iwd-2.17-r0.apk "
+COMMUNITY_PACKAGES="runit-2.1.2-r7.apk neatvi-15-r0.apk sudo-1.9.15_p5-r0.apk iwd-2.17-r0.apk exfatprogs-1.2.2-r0.apk "
 for pkg in $COMMUNITY_PACKAGES $COMM_GUI; do
     if [ ! -s "$CACHE_DIR/$pkg" ]; then
         rm -f "$CACHE_DIR/$pkg"
