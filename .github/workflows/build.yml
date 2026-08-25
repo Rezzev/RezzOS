@@ -103,7 +103,15 @@ jobs:
           check rezzusb-list-sees-vdb       'rezzusb list | grep -q "^vdb"'
           check rezzusb-fsck-refuses-mounted 'rezzusb mount vdb && ! rezzusb fsck vdb'
           check rezzusb-umount              'rezzusb umount vdb'
-          check rezzusb-fsck-clean          'rezzusb fsck vdb'
+
+          # e2fsck's own words must reach serial.log when this fails -
+          # a bare FAIL here is undiagnosable from CI alone.
+          if fsck_out=$(rezzusb fsck vdb 2>&1); then
+              echo "CITEST PASS rezzusb-fsck-clean"
+          else
+              echo "CITEST FAIL rezzusb-fsck-clean"
+              echo "$fsck_out"
+          fi
 
           echo "CITEST DONE"
 

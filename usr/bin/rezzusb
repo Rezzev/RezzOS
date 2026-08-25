@@ -69,6 +69,16 @@ persist_src() {
     awk '$2 == "/mnt/disk" { print $1; exit }' /proc/mounts
 }
 
+# Service environments may run without /sbin or /usr/sbin in PATH, where
+# the real fsck.*/mkfs.* binaries live (busybox applets are fine, they
+# symlink into /bin). Resolve once, call by absolute path.
+resolve_tool() {
+    command -v "$1" 2>/dev/null && return 0
+    [ -x "/sbin/$1" ] && { echo "/sbin/$1"; return 0; }
+    [ -x "/usr/sbin/$1" ] && { echo "/usr/sbin/$1"; return 0; }
+    return 1
+}
+
 is_persist() {
     src=$(persist_src)
     [ -n "$src" ] || return 1
@@ -242,14 +252,16 @@ cmd_format() {
         die "$dev is the persistent system disk (/mnt/disk). Refusing to format."
     already=$(mounted_at "$dev")
     [ -z "$already" ] || die "$dev is mounted at $already. Unmount it first."
-    command -v "mkfs.$fs" >/dev/null 2>&1 || die "mkfs.$fs not found in this system"
+    if ! mkfs_path=$(resolve_tool "mkfs.$fs"); then
+        die "mkfs.$fs not found in this system"
+    fi
     printf 'Format %s (%s) as %s? ALL DATA WILL BE LOST. Type "yes": ' "$dev" "$(size_of "$dev")" "$fs"
     read -r ans
     [ "$ans" = "yes" ] || die "aborted"
     case "$fs" in
-        vfat) mkfs.vfat -I "$dev"  ;;
-        exfat) mkfs.exfat "$dev"   ;;
-        ext4) mkfs.ext4 -F "$dev"  ;;
+        vfat) "$mkfs_path" -I "$dev"  ;;
+        exfat) "$mkfs_path" "$dev"   ;;
+        ext4) "$mkfs_path" -F "$dev"  ;;
     esac || die "mkfs.$fs failed on $dev"
     echo "Formatted $dev as $fs. Mount it: rezzusb mount $(dev_name "$dev")"
 }
@@ -273,9 +285,11 @@ cmd_fsck() {
         vfat|msdos|fat) tool=fsck.vfat ;;
         *)              die "no fsck for filesystem '$fs'" ;;
     esac
-    command -v "$tool" >/dev/null 2>&1 || die "$tool not found in this system"
+    if ! tool_path=$(resolve_tool "$tool"); then
+        die "$tool not found in this system"
+    fi
     echo "Checking $dev ($fs) with $tool..."
-    "$tool" "$@" "$dev"
+    "$tool_path" "$@" "$dev"
 }
 
 case "${1:-list}" in
