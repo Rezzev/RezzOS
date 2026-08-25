@@ -13,6 +13,7 @@ usage() {
     echo "  rezzusb umount <dev|path>            Unmount it"
     echo "  rezzusb eject  <disk>                Unmount all partitions and eject"
     echo "  rezzusb format <dev> [vfat|exfat|ext4]  Format a partition or disk (default: vfat)"
+    echo "  rezzusb fsck   <dev> [fsck args...]  Check & repair a filesystem (ext4, exfat, vfat)"
     echo ""
     echo "Devices may be given as sdb1 or /dev/sdb1."
     exit 1
@@ -253,6 +254,30 @@ cmd_format() {
     echo "Formatted $dev as $fs. Mount it: rezzusb mount $(dev_name "$dev")"
 }
 
+cmd_fsck() {
+    need_root
+    [ -n "$1" ] || usage
+    dev=$(norm_dev "$1")
+    name=$(dev_name "$dev")
+    shift
+    [ -b "$dev" ] || die "$dev is not a block device"
+    is_persist "$dev" && \
+        die "$dev is the persistent system disk (/mnt/disk). Refusing to fsck."
+    already=$(mounted_at "$dev")
+    [ -z "$already" ] || die "$dev is mounted at $already. Unmount it first."
+    fs=$(blk_field "$dev" TYPE)
+    [ -n "$fs" ] || die "no filesystem on $dev (partition table only? try ${name}1)"
+    case "$fs" in
+        ext2|ext3|ext4) tool=fsck.ext4 ;;
+        exfat)          tool=fsck.exfat ;;
+        vfat|msdos|fat) tool=fsck.vfat ;;
+        *)              die "no fsck for filesystem '$fs'" ;;
+    esac
+    command -v "$tool" >/dev/null 2>&1 || die "$tool not found in this system"
+    echo "Checking $dev ($fs) with $tool..."
+    "$tool" "$@" "$dev"
+}
+
 case "${1:-list}" in
     list)           cmd_list ;;
     status)         cmd_status ;;
@@ -260,6 +285,7 @@ case "${1:-list}" in
     umount|unmount) shift; cmd_umount "$@" ;;
     eject)          shift; cmd_eject "$@" ;;
     format)         shift; cmd_format "$@" ;;
+    fsck)           shift; cmd_fsck "$@" ;;
     -h|--help|help) usage ;;
     *)              usage ;;
 esac

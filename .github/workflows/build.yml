@@ -98,6 +98,13 @@ jobs:
           check pkg-present         'test -x /usr/bin/pkg'
           check dropbear-running    'pidof dropbear'
 
+          # rezzusb against the second virtio drive (stick.img, whole-disk
+          # ext4, no partition table) that the workflow attaches as /dev/vdb.
+          check rezzusb-list-sees-vdb       'rezzusb list | grep -q "^vdb"'
+          check rezzusb-fsck-refuses-mounted 'rezzusb mount vdb && ! rezzusb fsck vdb'
+          check rezzusb-umount              'rezzusb umount vdb'
+          check rezzusb-fsck-clean          'rezzusb fsck vdb'
+
           echo "CITEST DONE"
 
           # Print once. runsv would restart this script the moment it exits.
@@ -110,6 +117,13 @@ jobs:
           ( cd overlay && find . -mindepth 1 | cpio -o -H newc --owner 0:0 --quiet ) \
             | gzip -9 > overlay.cpio.gz
           cat rootfs.cpio.gz overlay.cpio.gz > rootfs-test.cpio.gz
+
+      - name: Build the test USB stick image
+        run: |
+          # Whole-disk ext4, no partition table: appears in the guest as
+          # /dev/vdb and exercises rezzusb list/mount/fsck without sfdisk.
+          truncate -s 64M stick.img
+          mke2fs -F -t ext4 -L CITEST stick.img
 
       - name: Boot smoke test
         run: |
@@ -128,6 +142,7 @@ jobs:
             -initrd rootfs-test.cpio.gz \
             -append "console=ttyS0 random.trust_cpu=on" \
             -drive file=disk.img,format=raw,if=virtio \
+            -drive file=stick.img,format=raw,if=virtio \
             -netdev user,id=net0 -device virtio-net,netdev=net0 \
             -m 2048M -display none -no-reboot \
             -serial file:serial.log || true
