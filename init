@@ -5,6 +5,15 @@ mount -t devtmpfs dev /dev
 mkdir -p /dev/pts
 mount -t devpts devpts /dev/pts -o mode=0620,ptmxmode=0666 2>/dev/null || mount -t devpts devpts /dev/pts 2>/dev/null || true
 
+# Boot mode. A kernel-mounted real root shows up in /proc/mounts as /dev/<node>
+root_src=$(awk '$2=="/" {print $1; exit}' /proc/mounts 2>/dev/null)
+case "$root_src" in
+    /dev/*) MODE=disk ;;
+    *)      MODE=live ;;
+esac
+
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
 mkdir -p /run /tmp /var/run /var/log /var/service
 mount -t tmpfs tmpfs /run
 mount -t tmpfs tmpfs /tmp
@@ -21,10 +30,29 @@ if [ -x /sbin/udevd ]; then
     timeout 10 udevadm settle
 fi
 
-hostname rezzos
+# Installed system: fstab mounts the data partition at /mnt/disk and any
+# swap the user added later. Live systems reach the same state through the
+# disk-scan loop below instead.
+if [ "$MODE" = disk ]; then
+    mount -a 2>/dev/null || true
+    swapon -a 2>/dev/null || true
+fi
+
+# Installed systems carry the hostname in /etc/hostname (written by the
+# installer). Live systems get the default and restore a saved one from the
+# data disk further down.
+if [ "$MODE" = disk ]; then
+    SAVED_HN=$(head -n 1 /etc/hostname 2>/dev/null | tr -d '[:space:]')
+    case "$SAVED_HN" in
+        ""|*[!a-zA-Z0-9.-]*) hostname rezzos ;;
+        *) hostname "$SAVED_HN" ;;
+    esac
+else
+    hostname rezzos
+fi
 echo 0 > /proc/sys/kernel/printk
 
-# Create group and user safely
+if [ "$MODE" = live ]; then
 if ! grep -q "^user:" /etc/passwd 2>/dev/null; then
     echo "user:x:1000:" >> /etc/group
     echo "user:x:1000:1000:User:/home/user:/bin/bash" >> /etc/passwd
@@ -49,6 +77,7 @@ if [ ! -d /home/user ]; then
     [ -d /etc/skel ] && cp -a /etc/skel/. /home/user/ 2>/dev/null
     chown -R 1000:1000 /home/user
     chmod 755 /home/user
+fi
 fi
 
 # Network - DHCP for real hardware, static fallback for QEMU
@@ -103,6 +132,10 @@ looks_like_rezz_disk() {
     test -f /mnt/disk/font.conf && return 0
     return 1
 }
+
+# Everything from here to the GTK caches runs on live systems only: an
+# installed system already has all of this in its real /etc and /home.
+if [ "$MODE" = live ]; then
 
 mkdir -p /mnt/disk
 for disk in /dev/vda /dev/vda1 /dev/sda /dev/sda1 /dev/sdb /dev/sdb1; do
@@ -184,11 +217,6 @@ if [ -d /mnt/disk/var/lib/iwd ]; then
         || cp -a /mnt/disk/var/lib/iwd/. /var/lib/iwd/ 2>/dev/null || true
 fi
 
-# Enable swap if present on disk
-if [ -f /mnt/disk/swapfile ]; then
-    swapon /mnt/disk/swapfile 2>/dev/null || true
-fi
-
 # Restore packages from disk.
 #
 # This used to unpack *.apk archives from /mnt/disk/packages by hand, copying
@@ -204,13 +232,21 @@ if [ -x /usr/bin/pkg ]; then
     /usr/bin/pkg restore
 fi
 
-# Restore enabled services from persistent disk
+fi # MODE=live
+
+# Swap on the data partition works in BOTH modes: a live system reaches the
+# file through the scan-mount above, an installed one through fstab's
+# /mnt/disk entry brought up by mount -a.
+if [ -f /mnt/disk/swapfile ]; then
+    swapon /mnt/disk/swapfile 2>/dev/null || true
+fi
+
 if [ -d /mnt/disk/services ]; then
     for svc in /mnt/disk/services/*; do
         [ -f "$svc" ] || continue
         svc_name=$(basename "$svc")
         if [ -d "/etc/sv/$svc_name" ]; then
-            ln -s "/etc/sv/$svc_name" "/etc/runit/runsvdir/default/$svc_name" 2>/dev/null || true
+            ln -sfn "/etc/sv/$svc_name" "/etc/runit/runsvdir/default/$svc_name" 2>/dev/null || true
         fi
     done
 fi
