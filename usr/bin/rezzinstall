@@ -39,7 +39,7 @@ check_root() {
 
 check_dependencies() {
     local missing=""
-    for cmd in cp dd fdisk sync; do
+    for cmd in cp dd sync sfdisk grub-install mkfs.ext4; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
             missing="$missing $cmd"
         fi
@@ -174,38 +174,35 @@ select_target() {
     echo ""
 }
 
-select_partition_mode() {
-    echo -e "${BOLD}${YELLOW}Partitioning Options:${NC}"
-    echo "  1) Wipe disk and create new MBR partition table (Entire Disk - Recommended)"
-    echo "  2) Install to an existing partition (Advanced)"
-    echo ""
-    printf "Choose mode [1-2] (default: 1): "
-    read -r part_mode
-    [ -z "$part_mode" ] && part_mode="1"
-
-    if [ "$part_mode" = "1" ]; then
-        AUTO_PART=1
-        if echo "$CHOSEN_DISK" | grep -q -E '(nvme|mmcblk)'; then
-            TARGET_PART="${CHOSEN_DISK}p1"
-        else
-            TARGET_PART="${CHOSEN_DISK}1"
-        fi
+select_layout() {
+    # Firmware decides the partition table: BIOS boots from MBR, UEFI needs
+    # GPT plus a FAT32 ESP. Everything else about the layout is fixed.
+    if [ -d /sys/firmware/efi ]; then
+        FW="uefi"
+        echo -e "${BOLD}${YELLOW}Partitioning Options:${NC}"
+        echo "  Automatic GPT layout on the whole disk:"
+        echo "    p1  EFI system partition   256 MB"
+        echo "    p2  RezzOS root            rest minus data below"
+        echo "    p3  RezzOS data (/mnt/disk)"
     else
-        AUTO_PART=0
-        echo -e "\n${BOLD}Existing partitions on $CHOSEN_DISK:${NC}"
-        ls -l "${CHOSEN_DISK}"* 2>/dev/null || fdisk -l "$CHOSEN_DISK" 2>/dev/null || true
-        echo ""
-        while true; do
-            printf "Enter target partition (e.g. %s1): " "$CHOSEN_DISK"
-            read -r manual_part
-            if [ -b "$manual_part" ]; then
-                TARGET_PART="$manual_part"
-                break
-            else
-                echo -e "${RED}Error: Partition '$manual_part' does not exist.${NC}"
-            fi
-        done
+        FW="bios"
+        echo -e "${BOLD}${YELLOW}Partitioning Options:${NC}"
+        echo "  Automatic MBR layout on the whole disk:"
+        echo "    p1  RezzOS root (bootable) rest minus data below"
+        echo "    p2  RezzOS data (/mnt/disk)"
     fi
+
+    printf "Data partition size [default: half the free space, e.g. 20G]: "
+    read -r DATA_SIZE_INPUT
+    DATA_SECTORS=""
+    case "$DATA_SIZE_INPUT" in
+        "") ;;
+        *[!0-9GgMm]*|*[0-9]*[!0-9GgMm]*)
+            echo -e "${RED}Invalid size '$DATA_SIZE_INPUT'. Use e.g. 20G or 512M.${NC}"
+            exit 1 ;;
+        *G|*g) n=${DATA_SIZE_INPUT%[Gg]}; DATA_SECTORS=$((n * 2097152)) ;;
+        *M|*m) n=${DATA_SIZE_INPUT%[Mm]}; DATA_SECTORS=$((n * 2048)) ;;
+    esac
 }
 
 initial_setup_wizard() {
@@ -298,15 +295,15 @@ confirm_installation() {
     echo -e "${BOLD}${YELLOW}                     Installation Summary                       ${NC}"
     echo -e "${CYAN}================================================================${NC}"
     printf "  Target Disk:      ${GREEN}%s${NC}\n" "$CHOSEN_DISK"
-    printf "  Target Partition: ${GREEN}%s${NC}\n" "$TARGET_PART"
-    printf "  Partition Mode:   ${GREEN}%s${NC}\n" "$([ "$AUTO_PART" = "1" ] && echo "Entire Disk (Wipe & Create MBR)" || echo "Existing Partition")"
+    printf "  Firmware / Table: ${GREEN}%s (%s)${NC}\n" "$FW" "$([ "$FW" = "uefi" ] && echo GPT || echo MBR)"
+    printf "  Data partition:   ${GREEN}%s${NC}\n" "$([ -n "$DATA_SECTORS" ] && echo "$((DATA_SECTORS * 512 / 1073741824)) GB" || echo "all free space")"
     printf "  Hostname:         ${GREEN}%s${NC}\n" "$CFG_HOSTNAME"
     printf "  Root Password:    ${GREEN}[Configured]${NC}\n"
     printf "  User Account:     ${GREEN}%s${NC}\n" "$CFG_USERNAME"
     printf "  Keyboard Layout:  ${GREEN}%s (%s)${NC}\n" "$CFG_KEYMAP" "$CFG_KEYMAP_OPT"
     printf "  Console Font:     ${GREEN}%s${NC}\n" "$CFG_FONT"
     echo -e "${CYAN}----------------------------------------------------------------${NC}"
-    echo -e "${RED}${BOLD}WARNING: ALL DATA ON $TARGET_PART (AND $CHOSEN_DISK) WILL BE ERASED!${NC}"
+    echo -e "${RED}${BOLD}WARNING: ALL DATA ON $CHOSEN_DISK WILL BE ERASED!${NC}"
     echo ""
     printf "Are you sure you want to proceed with installation? Type '${BOLD}yes${NC}' to continue: "
     read -r confirm
@@ -325,8 +322,8 @@ hash_password() {
     elif command -v openssl >/dev/null 2>&1; then
         openssl passwd -6 "$pass" 2>/dev/null
     else
-        # Fallback
-        echo "$pass"
+        echo -e "${RED}Error: no password hashing tool found (need cryptpw, mkpasswd or openssl).${NC}" >&2
+        exit 1
     fi
 }
 
@@ -335,11 +332,54 @@ perform_installation() {
     echo -e "${CYAN}================================================================${NC}"
     echo -e "${BOLD}${GREEN}                   Starting Installation...                     ${NC}"
     echo -e "${CYAN}================================================================${NC}"
+    ROOT_HASH=$(hash_password "$CFG_ROOT_PASS")
+    USER_HASH=$(hash_password "$CFG_USER_PASS")
 
-    # Step 1: Unmount target partition and disk if mounted
-    echo -e "\n[1/7] ${BOLD}Preparing storage device...${NC}"
-    for mount_pt in $(grep "$CHOSEN_DISK" /proc/mounts 2>/dev/null | awk '{print $2}'); do
-        umount -f "$mount_pt" 2>/dev/null || true
+    fail() {
+        echo -e "${RED}Installation failed: $1${NC}" >&2
+        [ -d "$TARGET_MOUNT/boot/efi" ] && umount "$TARGET_MOUNT/boot/efi" 2>/dev/null
+        [ -d "$TARGET_MOUNT" ] && umount -f "$TARGET_MOUNT" 2>/dev/null
+        exit 1
+    }
+
+    # Never wipe a disk that hosts the persistent data of the RUNNING system.
+    DATA_SRC=$(awk '$2=="/mnt/disk" {print $1; exit}' /proc/mounts 2>/dev/null)
+    if [ -n "$DATA_SRC" ]; then
+        DATA_PARENT=$(printf '%s' "$DATA_SRC" | sed 's/[0-9]*$//; s/p$//')
+        if [ "$DATA_PARENT" = "$CHOSEN_DISK" ]; then
+            fail "/mnt/disk lives on $CHOSEN_DISK. Reinstall from bootable media instead."
+        fi
+    fi
+
+    TOTAL_SECTORS=$(cat "/sys/block/$(basename "$CHOSEN_DISK")/size" 2>/dev/null || echo 0)
+    [ "$TOTAL_SECTORS" -gt 0 ] 2>/dev/null || fail "cannot read disk size"
+
+    if [ "$FW" = "uefi" ]; then
+        ESP_SECTORS=524288   # 256 MiB ESP
+        USED=$((ESP_SECTORS + 2048))
+    else
+        ESP_SECTORS=0
+        USED=2048
+    fi
+    AVAILABLE=$((TOTAL_SECTORS - USED))
+    # Default data partition: half of what is left after the ESP.
+    [ -n "$DATA_SECTORS" ] || DATA_SECTORS=$((AVAILABLE / 2))
+    # 1 MiB safety gap: an exact-to-the-last-sector layout leaves zero
+    # tolerance for sfdisk's own end-of-partition alignment, and the very
+    # first E2E run died on exactly that ("No free sectors available").
+    SAFETY_SECTORS=2048
+    ROOT_SECTORS=$((AVAILABLE - DATA_SECTORS - SAFETY_SECTORS))
+    [ "$ROOT_SECTORS" -ge $((2 * 2097152)) ] 2>/dev/null || \
+        fail "root partition would get only $((ROOT_SECTORS * 512 / 1073741824)) GB (need >= 2 GB). Shrink the data partition."
+
+    case "$CHOSEN_DISK" in
+        *[0-9]) SEP=p ;;
+        *)      SEP="" ;;
+    esac
+
+    echo -e "\n[1/9] ${BOLD}Preparing storage device...${NC}"
+    for mnt_pt in $(awk -v d="$CHOSEN_DISK" 'index($1, d) == 1 {print $2}' /proc/mounts); do
+        umount -f "$mnt_pt" 2>/dev/null || true
     done
     for p in "${CHOSEN_DISK}"* "${CHOSEN_DISK}p"*; do
         [ -b "$p" ] || continue
@@ -348,148 +388,138 @@ perform_installation() {
     umount -f "$TARGET_MOUNT" 2>/dev/null || true
     mkdir -p "$TARGET_MOUNT"
 
-    # Step 2: Partitioning if auto mode selected
-    if [ "$AUTO_PART" = "1" ]; then
-        echo -e "[2/7] ${BOLD}Writing MBR partition table to $CHOSEN_DISK...${NC}"
-        # Wipe first 1MB of partition table
-        dd if=/dev/zero of="$CHOSEN_DISK" bs=512 count=2048 2>/dev/null || true
-        sync
+    # old piped interactive fdisk was fragile beyond repair.
+    echo -e "[2/9] ${BOLD}Writing partition table ($([ "$FW" = uefi ] && echo GPT || echo MBR)) to $CHOSEN_DISK...${NC}"
+    dd if=/dev/zero of="$CHOSEN_DISK" bs=512 count=2048 2>/dev/null || true
+    sync
+    PART_SCRIPT=/tmp/rezz-part.sfdisk
+    if [ "$FW" = "uefi" ]; then
+        cat > "$PART_SCRIPT" <<EOF
+label: gpt
+name=esp, size=$ESP_SECTORS, type=uefi
+name=root, size=$ROOT_SECTORS, type=linux
+name=data, type=linux
+EOF
+    else
+        cat > "$PART_SCRIPT" <<EOF
+label: dos
+start=2048, size=$ROOT_SECTORS, type=83, bootable
+type=83
+EOF
+    fi
+    # The LAST partition deliberately has no size field: sfdisk fills the
+    # remainder of the disk, so an alignment quirk can never trigger
+    # "No free sectors available" again.
+    # Capture sfdisk's own words: a bare non-zero exit tells nothing, and its
+    # stderr is exactly what we need when this step goes red.
+    SFD_OUT=$(sfdisk -f "$CHOSEN_DISK" < "$PART_SCRIPT" 2>&1) \
+        || { echo "$SFD_OUT" >&2; echo "--- partition script was: ---" >&2; cat "$PART_SCRIPT" >&2; fail "partitioning with sfdisk"; }
+    sync
+    blockdev --rereadpt "$CHOSEN_DISK" 2>/dev/null || true
+    sleep 1
+    timeout 5 udevadm settle 2>/dev/null || true
 
-        local part_ok=0
-        if command -v sfdisk >/dev/null 2>&1; then
-            if echo ',,L,*' | sfdisk "$CHOSEN_DISK" >/dev/null 2>&1; then
-                part_ok=1
+    if [ "$FW" = "uefi" ]; then
+        ESP_PART="${CHOSEN_DISK}${SEP}1"
+        ROOT_PART="${CHOSEN_DISK}${SEP}2"
+        DATA_PART="${CHOSEN_DISK}${SEP}3"
+    else
+        ROOT_PART="${CHOSEN_DISK}${SEP}1"
+        DATA_PART="${CHOSEN_DISK}${SEP}2"
+    fi
+    # Ready = the node exists AND the kernel already reports a non-zero size
+    # for it. A bare -b check races the partition-table refresh: mkfs then
+    # opens a zero-sized node and dies without a useful message.
+    wait_ready() {
+        local n="$1" i=0 sz=""
+        while [ "$i" -lt 20 ]; do
+            if [ -b "$n" ]; then
+                sz=$(cat "/sys/class/block/$(basename "$n")/size" 2>/dev/null || echo 0)
+                [ "$sz" -gt 0 ] 2>/dev/null && return 0
             fi
-        fi
-
-        if [ "$part_ok" -eq 0 ]; then
-            printf "o\nn\np\n1\n\n\na\nw\n" | fdisk "$CHOSEN_DISK" >/dev/null 2>&1 && part_ok=1 || true
-        fi
-
-        if [ "$part_ok" -eq 0 ]; then
-            printf "o\nn\np\n1\n\n\nw\n" | fdisk "$CHOSEN_DISK" >/dev/null 2>&1 && part_ok=1 || true
-        fi
-
-        if [ "$part_ok" -eq 0 ]; then
-            echo -e "${RED}Failed to partition disk with fdisk.${NC}"
-            exit 1
-        fi
-
-        # Re-read partition table
-        blockdev --rereadpt "$CHOSEN_DISK" 2>/dev/null || true
-        sync
-        sleep 1
-
-        # Wait for target partition device node to appear
-        for i in 1 2 3 4 5; do
-            [ -b "$TARGET_PART" ] && break
-            sleep 0.5
+            sleep 0.5; i=$((i+1))
         done
+        fail "partition $n never became ready"
+    }
+    wait_ready "$ROOT_PART"
+    wait_ready "$DATA_PART"
+    [ "$FW" = "uefi" ] && wait_ready "$ESP_PART"
 
-        if [ ! -b "$TARGET_PART" ]; then
-            if [ -b "${CHOSEN_DISK}1" ]; then
-                TARGET_PART="${CHOSEN_DISK}1"
-            elif [ -b "${CHOSEN_DISK}p1" ]; then
-                TARGET_PART="${CHOSEN_DISK}p1"
-            fi
-        fi
-    else
-        echo -e "[2/7] ${BOLD}Using existing partition $TARGET_PART...${NC}"
+    echo -e "[3/9] ${BOLD}Creating filesystems (ext4$([ "$FW" = uefi ] && echo ", vfat"))...${NC}"
+    MKFS_OUT=$(mkfs.ext4 -F -L REZZOS_ROOT "$ROOT_PART" 2>&1) \
+        || { echo "$MKFS_OUT" >&2; fail "mkfs.ext4 on $ROOT_PART"; }
+    MKFS_OUT=$(mkfs.ext4 -F -L REZZOS_DATA "$DATA_PART" 2>&1) \
+        || { echo "$MKFS_OUT" >&2; fail "mkfs.ext4 on $DATA_PART"; }
+    if [ "$FW" = "uefi" ]; then
+        MKFS_OUT=$(mkdosfs -n REZZOS_EFI -F32 "$ESP_PART" 2>&1) \
+            || { echo "$MKFS_OUT" >&2; fail "mkdosfs on $ESP_PART"; }
     fi
 
-    # Step 3: Formatting filesystem
-    echo -e "[3/7] ${BOLD}Formatting $TARGET_PART as ext4...${NC}"
-    if command -v mkfs.ext4 >/dev/null 2>&1; then
-        mkfs.ext4 -F -L "REZZOS" "$TARGET_PART" >/dev/null 2>&1 || {
-            echo -e "${RED}Formatting failed.${NC}"
-            exit 1
-        }
-    elif command -v mke2fs >/dev/null 2>&1; then
-        mke2fs -t ext4 -F -L "REZZOS" "$TARGET_PART" >/dev/null 2>&1 || {
-            echo -e "${RED}Formatting failed.${NC}"
-            exit 1
-        }
-    else
-        echo -e "${RED}Error: Neither mkfs.ext4 nor mke2fs is available.${NC}"
-        exit 1
+    echo -e "[4/9] ${BOLD}Mounting target filesystems...${NC}"
+    mount -t ext4 "$ROOT_PART" "$TARGET_MOUNT" || fail "mount $ROOT_PART"
+    if [ "$FW" = "uefi" ]; then
+        mkdir -p "$TARGET_MOUNT/boot/efi"
+        mount -t vfat "$ESP_PART" "$TARGET_MOUNT/boot/efi" || fail "mount $ESP_PART"
     fi
 
-    # Step 4: Mounting filesystem
-    echo -e "[4/7] ${BOLD}Mounting target filesystem to $TARGET_MOUNT...${NC}"
-    mount -t ext4 "$TARGET_PART" "$TARGET_MOUNT"
-
-    # Step 5: Copying system files
-    echo -e "[5/7] ${BOLD}Copying system files to target...${NC}"
-    for dir in bin sbin usr etc lib var boot root; do
-        if [ -d "/$dir" ]; then
-            printf "  Copying /%-6s ... " "$dir"
-            cp -a "/$dir" "$TARGET_MOUNT/" 2>/dev/null || true
-            echo -e "${GREEN}Done${NC}"
-        fi
+    echo -e "[5/9] ${BOLD}Copying system files...${NC}"
+    for dir in bin sbin usr etc lib var boot root home; do
+        [ -d "/$dir" ] || continue
+        cp -a "/$dir" "$TARGET_MOUNT/" 2>/dev/null || fail "copy /$dir to target"
     done
-
-    # Ensure essential directories exist
     mkdir -p "$TARGET_MOUNT/dev" "$TARGET_MOUNT/proc" "$TARGET_MOUNT/sys" \
-             "$TARGET_MOUNT/tmp" "$TARGET_MOUNT/run" "$TARGET_MOUNT/mnt/disk" \
-             "$TARGET_MOUNT/home" "$TARGET_MOUNT/boot" "$TARGET_MOUNT/var/log" \
-             "$TARGET_MOUNT/mnt/disk/packages" "$TARGET_MOUNT/mnt/disk/services"
+             "$TARGET_MOUNT/run" "$TARGET_MOUNT/tmp" "$TARGET_MOUNT/mnt/disk" \
+             "$TARGET_MOUNT/var/log" "$TARGET_MOUNT/mnt/disk/packages" \
+             "$TARGET_MOUNT/mnt/disk/services"
     chmod 1777 "$TARGET_MOUNT/tmp"
-
-    # Ensure init script is installed
     [ -f /init ] && cp -f /init "$TARGET_MOUNT/init" && chmod +x "$TARGET_MOUNT/init"
 
-    # Step 6: Applying configuration
-    echo -e "[6/7] ${BOLD}Configuring system, users and localization...${NC}"
+    # Pre-build desktop caches so first boot does not regenerate them.
+    if [ -x /usr/bin/glib-compile-schemas ]; then
+        glib-compile-schemas "$TARGET_MOUNT/usr/share/glib-2.0/schemas" >/dev/null 2>&1 || true
+    fi
+    if [ -x /usr/bin/gdk-pixbuf-query-loaders ]; then
+        gdk-pixbuf-query-loaders > "$TARGET_MOUNT/usr/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache" 2>/dev/null || true
+    fi
 
-    # Hostname
+    echo -e "[6/9] ${BOLD}Configuring system, users and localization...${NC}"
     echo "$CFG_HOSTNAME" > "$TARGET_MOUNT/etc/hostname"
-    cat > "$TARGET_MOUNT/etc/hosts" << EOF
+    cat > "$TARGET_MOUNT/etc/hosts" <<EOF
 127.0.0.1   localhost $CFG_HOSTNAME
 ::1         localhost ip6-localhost ip6-loopback
 EOF
-
-    # Font
     echo "FONT=$CFG_FONT" > "$TARGET_MOUNT/etc/font.conf"
-    echo "FONT=$CFG_FONT" > "$TARGET_MOUNT/mnt/disk/font.conf" 2>/dev/null || true
-
-    # Keymap
-    cat > "$TARGET_MOUNT/etc/keymap.conf" << EOF
+    cat > "$TARGET_MOUNT/etc/keymap.conf" <<EOF
 LAYOUT="$CFG_KEYMAP"
 TOGGLE="$CFG_KEYMAP_OPT"
 EOF
 
-    # Passwords and Users
-    ROOT_HASH=$(hash_password "$CFG_ROOT_PASS")
-    USER_HASH=$(hash_password "$CFG_USER_PASS")
-
-    # /etc/passwd
-    cat > "$TARGET_MOUNT/etc/passwd" << EOF
+    cat > "$TARGET_MOUNT/etc/passwd" <<EOF
 root:x:0:0:root:/root:/bin/bash
 $CFG_USERNAME:x:1000:1000:$CFG_USERNAME:/home/$CFG_USERNAME:/bin/bash
+messagebus:x:101:101:messagebus:/nonexistent:/bin/false
 nobody:x:65534:65534:nobody:/:/sbin/nologin
 EOF
-
-    # /etc/group
-    cat > "$TARGET_MOUNT/etc/group" << EOF
+    cat > "$TARGET_MOUNT/etc/group" <<EOF
 root:x:0:root
 wheel:x:10:root,$CFG_USERNAME
 sudo:x:27:root,$CFG_USERNAME
 audio:x:29:$CFG_USERNAME
 video:x:44:$CFG_USERNAME
 input:x:107:$CFG_USERNAME
+messagebus:x:101:
+netdev:x:102:$CFG_USERNAME
 $CFG_USERNAME:x:1000:
 nobody:x:65534:
 EOF
-
-    # /etc/shadow
-    cat > "$TARGET_MOUNT/etc/shadow" << EOF
+    cat > "$TARGET_MOUNT/etc/shadow" <<EOF
 root:$ROOT_HASH:19800:0:99999:7:::
 $CFG_USERNAME:$USER_HASH:19800:0:99999:7:::
+messagebus:*:19800:0:99999:7:::
 nobody:*:19800:0:99999:7:::
 EOF
     chmod 0600 "$TARGET_MOUNT/etc/shadow"
 
-    # User Home Directory
     mkdir -p "$TARGET_MOUNT/home/$CFG_USERNAME"
     if [ -d "$TARGET_MOUNT/etc/skel" ]; then
         cp -a "$TARGET_MOUNT/etc/skel/." "$TARGET_MOUNT/home/$CFG_USERNAME/" 2>/dev/null || true
@@ -497,43 +527,70 @@ EOF
     chown -R 1000:1000 "$TARGET_MOUNT/home/$CFG_USERNAME" 2>/dev/null || true
     chmod 755 "$TARGET_MOUNT/home/$CFG_USERNAME"
 
-    # Persistent storage mirrors (for init script compatibility)
-    mkdir -p "$TARGET_MOUNT/mnt/disk/etc" "$TARGET_MOUNT/mnt/disk/home"
-    cp -f "$TARGET_MOUNT/etc/hostname" "$TARGET_MOUNT/mnt/disk/etc/hostname" 2>/dev/null || true
-    cp -f "$TARGET_MOUNT/etc/passwd" "$TARGET_MOUNT/mnt/disk/etc/passwd" 2>/dev/null || true
-    cp -f "$TARGET_MOUNT/etc/shadow" "$TARGET_MOUNT/mnt/disk/etc/shadow" 2>/dev/null || true
-    cp -f "$TARGET_MOUNT/etc/group" "$TARGET_MOUNT/mnt/disk/etc/group" 2>/dev/null || true
-    cp -f "$TARGET_MOUNT/etc/keymap.conf" "$TARGET_MOUNT/mnt/disk/etc/keymap.conf" 2>/dev/null || true
+    # Root device identity for grub.cfg and fstab. GPT exposes per-partition
+    # GUIDs via sfdisk -d. MBR PARTUUID is derived from the disk signature
+    # (little-endian DWORD at byte 440) exactly like the kernel formats it.
+    if [ "$FW" = "uefi" ]; then
+        ROOT_ID=$(sfdisk -d "$CHOSEN_DISK" 2>/dev/null | awk -v d="$ROOT_PART:" '$1 == d {for(i=1;i<=NF;i++) if($i ~ /^uuid=/){sub("uuid=","",$i); print $i; exit}}')
+        [ -n "$ROOT_ID" ] || fail "cannot read GPT PARTUUID of $ROOT_PART"
+    else
+        HEX=$(dd if="$CHOSEN_DISK" bs=1 skip=440 count=4 2>/dev/null | od -An -tx1 | tr -d ' \n')
+        [ "${#HEX}" -eq 8 ] 2>/dev/null || fail "cannot read MBR disk signature"
+        ROOT_ID="$(printf '%s' "$HEX" | sed 's/\(..\)\(..\)\(..\)\(..\)/\4\3\2\1/')-01"
+    fi
+    DATA_UUID=$(blkid "$DATA_PART" 2>/dev/null | sed -n 's/.*UUID="\([^"]*\)".*/\1/p')
+    [ -n "$DATA_UUID" ] || fail "cannot read filesystem UUID of $DATA_PART"
 
-    # Step 7: Installing Bootloader (Syslinux / Extlinux)
-    echo -e "[7/7] ${BOLD}Installing bootloader...${NC}"
-    mkdir -p "$TARGET_MOUNT/boot"
-
-    # Create extlinux.conf
-    cat > "$TARGET_MOUNT/boot/extlinux.conf" << EOF
-DEFAULT rezzos
-PROMPT 0
-TIMEOUT 20
-
-LABEL rezzos
-    MENU LABEL RezzOS Linux (6.6.40)
-    LINUX /boot/bzImage
-    APPEND quiet loglevel=0 nokaslr fbcon=font:$CFG_FONT
-    INITRD /boot/rootfs.cpio.gz
+    cat > "$TARGET_MOUNT/etc/fstab" <<EOF
+PARTUUID=$ROOT_ID  /         ext4  rw,noatime   0 1
+UUID=$DATA_UUID    /mnt/disk ext4  rw,noatime   0 2
 EOF
+    echo -e "[7/9] ${BOLD}Installing GRUB ($FW)...${NC}"
+    mkdir -p "$TARGET_MOUNT/boot/grub"
+    cat > "$TARGET_MOUNT/boot/grub/grub.cfg" <<EOF
+set default=0
+set timeout=3
 
-    # Install extlinux
-    if command -v extlinux >/dev/null 2>&1; then
-        extlinux --install "$TARGET_MOUNT/boot" >/dev/null 2>&1 || true
+menuentry "RezzOS Linux" {
+    linux /boot/bzImage root=PARTUUID=$ROOT_ID rw init=/init quiet loglevel=3 console=tty0 console=ttyS0,115200n8 fbcon=font:$CFG_FONT random.trust_cpu=on
+}
+EOF
+    if [ "$FW" = "bios" ]; then
+        grub-install --boot-directory="$TARGET_MOUNT/boot" --target=i386-pc "$CHOSEN_DISK" >/dev/null 2>&1 \
+            || fail "grub-install (BIOS)"
+    else
+        grub-install --boot-directory="$TARGET_MOUNT/boot" --efi-directory="$TARGET_MOUNT/boot/efi" \
+            --target=x86_64-efi --removable --no-nvram "$CHOSEN_DISK" >/dev/null 2>&1 \
+            || fail "grub-install (UEFI)"
     fi
 
-    # Write MBR boot code
-    if [ -f /usr/share/syslinux/mbr.bin ]; then
-        dd if=/usr/share/syslinux/mbr.bin of="$CHOSEN_DISK" bs=440 count=1 conv=notrunc >/dev/null 2>&1 || true
+    echo -e "[8/9] ${BOLD}Seeding persistent data partition...${NC}"
+    DDIR="$TARGET_MOUNT/mnt/disk"
+    mkdir -p "$DDIR/etc" "$DDIR/home" "$DDIR/packages" "$DDIR/services"
+    cp -f "$TARGET_MOUNT/etc/hostname" "$DDIR/etc/hostname" 2>/dev/null || true
+    cp -f "$TARGET_MOUNT/etc/keymap.conf" "$DDIR/etc/keymap.conf" 2>/dev/null || true
+    cp -f "$TARGET_MOUNT/etc/font.conf" "$DDIR/etc/font.conf" 2>/dev/null || true
+    cp -f "$TARGET_MOUNT/etc/passwd" "$DDIR/etc/passwd" 2>/dev/null || true
+    cp -f "$TARGET_MOUNT/etc/group" "$DDIR/etc/group" 2>/dev/null || true
+    cp -f "$TARGET_MOUNT/etc/shadow" "$DDIR/etc/shadow" 2>/dev/null || true
+    chmod 0600 "$DDIR/etc/shadow" 2>/dev/null || true
+
+    echo -e "[9/9] ${BOLD}Verifying installation...${NC}"
+    [ -s "$TARGET_MOUNT/boot/bzImage" ]       || fail "verify: kernel image missing on target"
+    [ -s "$TARGET_MOUNT/boot/grub/grub.cfg" ] || fail "verify: grub.cfg missing on target"
+    grep -q "PARTUUID=$ROOT_ID" "$TARGET_MOUNT/boot/grub/grub.cfg" || fail "verify: wrong root= in grub.cfg"
+    [ -x "$TARGET_MOUNT/init" ]               || fail "verify: /init missing or not executable"
+    [ -s "$TARGET_MOUNT/etc/fstab" ]          || fail "verify: fstab missing"
+    if [ "$FW" = "uefi" ]; then
+        [ -s "$TARGET_MOUNT/boot/efi/EFI/BOOT/BOOTX64.EFI" ] || fail "verify: BOOTX64.EFI missing on ESP"
+    else
+        [ -f "$TARGET_MOUNT/boot/grub/i386-pc/core.img" ] || fail "verify: GRUB BIOS core.img missing"
     fi
+    [ -s "$DDIR/etc/passwd" ]                 || fail "verify: data partition seeding failed"
 
     echo -e "  ${GREEN}Syncing and unmounting target disk...${NC}"
     sync
+    [ "$FW" = "uefi" ] && umount "$TARGET_MOUNT/boot/efi" 2>/dev/null || true
     umount "$TARGET_MOUNT" 2>/dev/null || true
     rmdir "$TARGET_MOUNT" 2>/dev/null || true
 
@@ -541,7 +598,7 @@ EOF
     echo -e "${CYAN}================================================================${NC}"
     echo -e "${BOLD}${GREEN}        RezzOS has been successfully installed! 🎉              ${NC}"
     echo -e "${CYAN}================================================================${NC}"
-    echo -e "Installed on: ${GREEN}$TARGET_PART${NC}"
+    echo -e "Installed on: ${GREEN}$ROOT_PART${NC} (root), ${GREEN}$DATA_PART${NC} (data)"
     echo -e "Hostname:     ${GREEN}$CFG_HOSTNAME${NC}"
     echo -e "User account: ${GREEN}$CFG_USERNAME${NC}"
     echo ""
@@ -567,7 +624,7 @@ main() {
     check_root
     check_dependencies
     select_target
-    select_partition_mode
+    select_layout
     initial_setup_wizard
     confirm_installation
     perform_installation
