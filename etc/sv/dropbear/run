@@ -1,13 +1,20 @@
 #!/bin/sh
+
 mkdir -p /etc/dropbear /var/log
 
-# No interface wait here: dropbear binds 0.0.0.0 without any configured
-# address, so SSH picks up connectivity whenever it arrives (eth0 via init,
-# wlan0 via iwd+dhcpcd, renamed links). Waiting on eth0 only meant wifi-only
-# machines never got SSH while 'rsv list' reported the service as active.
-#
-# -R generates the host keys on the first connection. Alpine-built dropbear
-# exits right away when no key files exist ("No hostkeys available"), and the
-# stage-one boot script that used to create them is not part of the boot
-# path, so without this the service crashed in a restart loop.
+for t in rsa ecdsa ed25519; do
+    k="/etc/dropbear/dropbear_${t}_host_key"
+    [ -s "$k" ] && continue
+    if [ -s "/mnt/disk/etc/dropbear/dropbear_${t}_host_key" ]; then
+        cp -f "/mnt/disk/etc/dropbear/dropbear_${t}_host_key" "$k" 2>/dev/null || true
+    else
+        dropbearkey -t "$t" -f "$k" >/dev/null 2>&1 || true
+    fi
+done
+
+if [ -d /mnt/disk/etc ]; then
+    mkdir -p /mnt/disk/etc/dropbear
+    cp -f /etc/dropbear/dropbear_*_host_key /mnt/disk/etc/dropbear/ 2>/dev/null || true
+fi
+
 exec /usr/sbin/dropbear -F -E -R >/var/log/dropbear.log 2>&1 </dev/null

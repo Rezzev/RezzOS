@@ -260,6 +260,21 @@ tar -xzf "$CACHE_DIR/linux-firmware-other-20240811-r0.apk"
 cp lib/firmware/iwlwifi-* "$ROOTFS_DIR/lib/firmware/" 2>/dev/null || true
 cd "$REPO_DIR"
 
+manifest=/tmp/p/iwl-manifest
+: > "$manifest"
+for f in "$ROOTFS_DIR"/lib/firmware/iwlwifi-*.ucode; do
+    [ -e "$f" ] || continue
+    b=${f##*/}; b=${b%.ucode}
+    case ${b##*-} in ''|*[!0-9]*) continue ;; esac
+    printf '%s %s %s\n' "${b%-*}" "${b##*-}" "$f" >> "$manifest"
+done
+LC_ALL=C sort -k1,1 -k2,2rn "$manifest" | awk 'c[$1]++ >= 2 {print $3}' > /tmp/p/iwl-drop
+if [ -s /tmp/p/iwl-drop ]; then
+    xargs rm -f < /tmp/p/iwl-drop
+    echo "Firmware diet: dropped $(wc -l < /tmp/p/iwl-drop) old iwlwifi revisions"
+fi
+rm -rf "$ROOTFS_DIR/lib/firmware/ath10k/WCN3990/hw1.0/qcm2290"
+
 step "Installing GUI apps and dependencies using apk.static"
 if [ ! -s "$CACHE_DIR/apk-tools-static.apk" ]; then
     wget -q "http://dl-cdn.alpinelinux.org/alpine/v3.20/main/x86_64/apk-tools-static-2.14.4-r1.apk" -O "$CACHE_DIR/apk-tools-static.apk" || true

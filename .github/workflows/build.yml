@@ -97,6 +97,7 @@ jobs:
           check bash-runs           'bash -c "exit 0"'
           check pkg-present         'test -x /usr/bin/pkg'
           check dropbear-running    'pidof dropbear'
+          check dropbear-hostkeys   'ls /etc/dropbear/*_host_key >/dev/null'
 
           # rezzusb against the second virtio drive (stick.img, whole-disk
           # ext4, no partition table) that the workflow attaches as /dev/vdb.

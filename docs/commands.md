@@ -43,6 +43,7 @@
 | `rezzdoctor` | System diagnostic & health check                                                              |
 | `rezzwifi` | Wi-Fi manager: status, scan, connect, saved networks                                          |
 | `rezzusb` | USB/removable disk manager: list, mount, umount, eject, format, fsck                          |
+| `rezztz` | Timezone viewer/setter: list zones in a region, set & persist a timezone                        |
 | `rezzrecovery` | RezzOS recovery utility. Allows you to check the system, enter the recovery shell, and reboot. |
 | `swap create [size]` | Create & activate swap file on persistent disk                                                |
 | `swap status` | Check swap memory status                                                                      |
