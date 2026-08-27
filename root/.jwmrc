@@ -11,7 +11,6 @@
         <Program icon="Rutils.png" label="Task Manager">st -e rtop</Program>
         <Separator/>
         <Program icon="Rutils.png" label="Control Center">st -e rezzconfig</Program>
-        <Program icon="Rutils.png" label="Keyboard Layout">st -e rezzkeymap</Program>
         <Program icon="Rutils.png" label="Install RezzOS to Disk">st -e rezzinstall</Program>
         <Separator/>
         <Menu icon="/usr/share/icons/RezzOS/info.png" label="Power">
