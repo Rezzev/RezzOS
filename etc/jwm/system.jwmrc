@@ -6,14 +6,14 @@
         <Program icon="terminal.png" label="Terminal">st</Program>
         <Program icon="browser.png" label="Links browser">links -g duckduckgo.com</Program>
         <Program icon="folder.png" label="File Manager">pcmanfm -n</Program>
-        <Program icon="Rutils.png" label="Notepad">rezzpad</Program>
-        <Program icon="Rutils.png" label="Image viewer">rezzview</Program>
-        <Program icon="Rutils.png" label="Task Manager">st -e rtop</Program>
+        <Program icon="notepad.png" label="Notepad">rezzpad</Program>
+        <Program icon="view.png" label="Image viewer">rezzview</Program>
+        <Program icon="manager.png" label="Task Manager">st -e rtop</Program>
         <Separator/>
-        <Program icon="Rutils.png" label="Control Center">st -e rezzconfig</Program>
-        <Program icon="Rutils.png" label="Install RezzOS to Disk">st -e rezzinstall</Program>
+        <Program icon="control.png" label="Control Center">st -e rezzconfig</Program>
+        <Program icon="install.png" label="Install RezzOS to Disk">st -e rezzinstall</Program>
         <Separator/>
-        <Menu icon="/usr/share/icons/RezzOS/info.png" label="Power">
+        <Menu icon="info.png" label="Power">
             <Program label="Suspend">sh -c 'zenity --info --title="RezzOS" --text="Suspending..." --timeout=2 &amp; suspend'</Program>
             <Program label="Hibernate">sh -c 'zenity --info --title="RezzOS" --text="Hibernating..." --timeout=3 &amp; hibernate'</Program>
             <Program label="Reboot">sh -c 'zenity --info --title="RezzOS" --text="Rebooting..." --timeout=5 &amp; reboot'</Program>
@@ -37,7 +37,7 @@
 
     <!-- Options for program interfaces. -->
     <Tray x="0" y="0" autohide="off">
-        <TrayButton icon="menu.png" label="Menu">root:1</TrayButton>
+        <TrayButton icon="menu.png">root:1</TrayButton>
         <Spacer width="2"/>
         <TrayButton label="_">showdesktop</TrayButton>
         <Spacer width="2"/>
