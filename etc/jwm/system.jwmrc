@@ -10,8 +10,8 @@
         <Program icon="view.png" label="Image viewer">rezzview</Program>
         <Program icon="manager.png" label="Task Manager">st -e rtop</Program>
         <Separator/>
-        <Program icon="control.png" label="Control Center">st -e rezzconfig</Program>
-        <Program icon="install.png" label="Install RezzOS to Disk">st -e rezzinstall</Program>
+        <Program label="Control Center">st -e rezzconfig</Program>
+        <Program label="Install RezzOS to Disk">st -e rezzinstall</Program>
         <Separator/>
         <Menu icon="info.png" label="Power">
             <Program label="Suspend">sh -c 'zenity --info --title="RezzOS" --text="Suspending..." --timeout=2 &amp; suspend'</Program>
