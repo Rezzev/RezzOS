@@ -19,7 +19,7 @@ header() {
     
     HN=$(hostname 2>/dev/null || echo "rezzos")
     IP=$(ip route get 1 2>/dev/null | awk '{print $7; exit}')
-    [ -z "$IP" ] && IP=$(ifconfig eth0 2>/dev/null | grep 'inet addr' | cut -d: -f2 | awk '{print $1}')
+    [ -z "$IP" ] && IP=$(ifconfig "$(detect_iface)" 2>/dev/null | grep 'inet addr' | cut -d: -f2 | awk '{print $1}')
     [ -z "$IP" ] && IP="No Network"
     
     CFONT="Default"
@@ -39,6 +39,19 @@ pause() {
     echo ""
     echo -e "${YELLOW}Press [ENTER] to return to menu...${NC}"
     read -r _
+}
+
+detect_iface() {
+    # First non-loopback interface that is up and has an address, so DHCP
+    # and static setup work on any naming (eth*, en*, wlan*, ...) not just eth0.
+    for iface in $(ip -o link show up 2>/dev/null | awk -F': ' '{print $2}'); do
+        [ "$iface" = "lo" ] && continue
+        if ip addr show "$iface" 2>/dev/null | grep -q 'inet '; then
+            echo "$iface"
+            return 0
+        fi
+    done
+    echo "eth0"
 }
 
 net_menu() {
@@ -66,20 +79,21 @@ net_menu() {
                 pause
                 ;;
             2)
-                echo -e "\n${YELLOW}Requesting IP via DHCP on eth0...${NC}"
-                ifconfig eth0 up 2>/dev/null
-                if udhcpc -b -i eth0 -s /usr/share/udhcpc/default.script 2>/dev/null; then
+                IFACE=$(detect_iface)
+                echo -e "\n${YELLOW}Requesting IP via DHCP on $IFACE...${NC}"
+                ifconfig "$IFACE" up 2>/dev/null
+                if udhcpc -b -i "$IFACE" -s /usr/share/udhcpc/default.script 2>/dev/null; then
                     echo -e "${GREEN}DHCP Configuration completed successfully!${NC}"
                 else
-                    echo -e "${RED}DHCP failed or eth0 not available.${NC}"
+                    echo -e "${RED}DHCP failed or $IFACE not available.${NC}"
                 fi
                 pause
                 ;;
             3)
                 echo -e "\n${CYAN}--- Static IP Setup ---${NC}"
-                echo -n "Enter Interface [eth0]: "
+                echo -n "Enter Interface [$(detect_iface)]: "
                 read -r IFACE
-                [ -z "$IFACE" ] && IFACE="eth0"
+                [ -z "$IFACE" ] && IFACE="$(detect_iface)"
 
                 echo -n "Enter IP Address (e.g. 192.168.1.100): "
                 read -r IPADDR
