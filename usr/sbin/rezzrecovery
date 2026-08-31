@@ -2,6 +2,7 @@
 
 RECOVERY_DIR="/var/lib/rezz"
 RECOVERY_FLAG="$RECOVERY_DIR/recovery"
+SVDIR="/etc/runit/runsvdir/default"
 
 die()
 {
@@ -45,8 +46,8 @@ status()
 
     echo
     echo "services:"
-    if [ -d /var/service ]; then
-        for service in /var/service/*; do
+    if [ -d "$SVDIR" ]; then
+        for service in "$SVDIR"/*; do
             [ -e "$service" ] || continue
             echo "  ${service##*/}"
         done
@@ -89,12 +90,12 @@ services()
 {
     echo "services:"
 
-    if [ ! -d /var/service ]; then
+    if [ ! -d "$SVDIR" ]; then
         echo "  no services"
         return
     fi
 
-    for service in /var/service/*; do
+    for service in "$SVDIR"/*; do
         [ -e "$service" ] || continue
 
         name="${service##*/}"
