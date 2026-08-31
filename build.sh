@@ -295,7 +295,6 @@ rm -f "$ROOTFS_DIR/usr/bin/runsv" "$ROOTFS_DIR/usr/bin/runsvdir" "$ROOTFS_DIR/us
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/bin/"* 2>/dev/null || true
-chmod +x "$ROOTFS_DIR/etc/runit/3" 2>/dev/null || true
 
 # Re-copy repository custom scripts to ensure they overwrite package defaults
 rm -f "$ROOTFS_DIR/usr/bin/font" "$ROOTFS_DIR/usr/bin/rezzfont" "$ROOTFS_DIR/bin/font" "$ROOTFS_DIR/bin/rezzfont" 2>/dev/null || true
