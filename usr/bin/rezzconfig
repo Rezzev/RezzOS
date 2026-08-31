@@ -54,6 +54,33 @@ detect_iface() {
     echo "eth0"
 }
 
+NET_CONF="/etc/network.conf"
+NET_DISK="/mnt/disk/etc/network.conf"
+
+disk_mounted_here() {
+    grep -q ' /mnt/disk ' /proc/mounts 2>/dev/null
+}
+
+write_net_conf() {
+    cat > "$NET_CONF" << EOF
+IFACE="$1"
+IP="$2"
+MASK="$3"
+GW="$4"
+DNS="$5"
+EOF
+    if disk_mounted_here; then
+        mkdir -p /mnt/disk/etc 2>/dev/null || true
+        cp -f "$NET_CONF" "$NET_DISK" 2>/dev/null || true
+    else
+        echo -e "${YELLOW}No persistent disk mounted - the static config will not survive a reboot.${NC}"
+    fi
+}
+
+clear_net_conf() {
+    rm -f "$NET_CONF" "$NET_DISK" 2>/dev/null || true
+}
+
 net_menu() {
     while true; do
         header
@@ -76,10 +103,24 @@ net_menu() {
                 route -n 2>/dev/null || ip route
                 echo -e "\n${CYAN}--- DNS Servers (/etc/resolv.conf) ---${NC}"
                 cat /etc/resolv.conf 2>/dev/null
+                echo -e "\n${CYAN}--- Persisted Network Config ---${NC}"
+                if [ -f "$NET_DISK" ]; then
+                    # shellcheck disable=SC1090
+                    . "$NET_DISK"
+                    echo -e "  Mode: ${GREEN}static${NC} (applied at every boot)"
+                    echo -e "  Interface: ${GREEN}${IFACE:-eth0}${NC}"
+                    echo -e "  IP: ${GREEN}${IP:-}${NC} / MASK: ${GREEN}${MASK:-255.255.255.0}${NC}"
+                    echo -e "  Gateway: ${GREEN}${GW:-none}${NC}"
+                    echo -e "  DNS: ${GREEN}${DNS:-none}${NC}"
+                else
+                    echo -e "  Mode: ${GREEN}DHCP${NC} (auto-configured at every boot)"
+                fi
                 pause
                 ;;
             2)
                 IFACE=$(detect_iface)
+                echo -e "\n${YELLOW}Switching to DHCP (clears any saved static config)...${NC}"
+                clear_net_conf
                 echo -e "\n${YELLOW}Requesting IP via DHCP on $IFACE...${NC}"
                 ifconfig "$IFACE" up 2>/dev/null
                 if udhcpc -b -i "$IFACE" -s /usr/share/udhcpc/default.script 2>/dev/null; then
@@ -90,7 +131,7 @@ net_menu() {
                 pause
                 ;;
             3)
-                echo -e "\n${CYAN}--- Static IP Setup ---${NC}"
+                echo -e "\n${CYAN}--- Static IP Setup (persisted across reboots) ---${NC}"
                 echo -n "Enter Interface [$(detect_iface)]: "
                 read -r IFACE
                 [ -z "$IFACE" ] && IFACE="$(detect_iface)"
@@ -105,9 +146,18 @@ net_menu() {
                 read -r GW
 
                 if [ -n "$IPADDR" ]; then
+                    echo -n "Enter DNS servers (space-separated, e.g. 8.8.8.8 1.1.1.1): "
+                    read -r DNSLIST
+                    [ -z "$DNSLIST" ] && DNSLIST="8.8.8.8"
+
                     ifconfig "$IFACE" "$IPADDR" netmask "$MASK" up
                     [ -n "$GW" ] && route add default gw "$GW" 2>/dev/null
-                    echo -e "${GREEN}Network interface $IFACE set to $IPADDR${NC}"
+                    : > /etc/resolv.conf
+                    for ns in $DNSLIST; do
+                        echo "nameserver $ns" >> /etc/resolv.conf
+                    done
+                    write_net_conf "$IFACE" "$IPADDR" "$MASK" "$GW" "$DNSLIST"
+                    echo -e "${GREEN}Network interface $IFACE set to $IPADDR (persisted).${NC}"
                 else
                     echo -e "${RED}Invalid IP address specified.${NC}"
                 fi
@@ -115,11 +165,22 @@ net_menu() {
                 ;;
             4)
                 echo -e "\n${CYAN}--- Set DNS Nameserver ---${NC}"
-                echo -n "Enter Primary DNS [8.8.8.8]: "
-                read -r DNS1
-                [ -z "$DNS1" ] && DNS1="8.8.8.8"
-                echo "nameserver $DNS1" > /etc/resolv.conf
-                echo -e "${GREEN}DNS updated to $DNS1${NC}"
+                echo -n "Enter DNS servers (space-separated, e.g. 8.8.8.8 1.1.1.1): "
+                read -r DNSLIST
+                [ -z "$DNSLIST" ] && DNSLIST="8.8.8.8"
+                : > /etc/resolv.conf
+                for ns in $DNSLIST; do
+                    echo "nameserver $ns" >> /etc/resolv.conf
+                done
+                if [ -f "$NET_DISK" ]; then
+                    # shellcheck disable=SC1090
+                    . "$NET_DISK"
+                    write_net_conf "${IFACE:-eth0}" "${IP:-}" "${MASK:-255.255.255.0}" "${GW:-}" "$DNSLIST"
+                    echo -e "${GREEN}DNS updated and saved with the static config to $DNSLIST${NC}"
+                else
+                    echo -e "${GREEN}DNS updated for this session to $DNSLIST${NC}"
+                    echo -e "${YELLOW}Set a static IP first to persist DNS across reboots (DHCP overrides it otherwise).${NC}"
+                fi
                 pause
                 ;;
             5)
