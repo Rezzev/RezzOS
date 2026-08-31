@@ -90,11 +90,25 @@ ifconfig lo 127.0.0.1 up
 ifconfig eth0 up
 sleep 0.2
 
-timeout 15 udhcpc -i eth0 -t 5 -s /usr/share/udhcpc/default.script 2>/dev/null
+# Start DHCP in the background (-b keeps the client alive to renew the lease
+# once it has one) and give it a bounded window to obtain an address. The old
+# `timeout 15 udhcpc` ran synchronously and then exited, so the lease was never
+# renewed and a long live session silently lost the network when it expired.
+udhcpc -b -i eth0 -t 5 -s /usr/share/udhcpc/default.script 2>/dev/null
 
+for i in 1 2 3 4 5 6 7 8 9 10; do
+    ifconfig eth0 | grep -q "inet " && break
+    sleep 1
+done
+
+# Static fallback only where it means anything: QEMU's user-net always hands
+# out 10.0.2.15/10.0.2.2. On real hardware the fixed address is just a
+# router-only subnet that goes nowhere, so do not apply it there.
 if ! ifconfig eth0 | grep -q "inet "; then
-    ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up
-    route add default gw 10.0.2.2 2>/dev/null || true
+    if [ -d /sys/bus/virtio/devices ]; then
+        ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up
+        route add default gw 10.0.2.2 2>/dev/null || true
+    fi
 fi
 
 # udhcpc's default.script already wrote the nameservers the DHCP server handed
