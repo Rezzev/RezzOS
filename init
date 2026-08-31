@@ -143,7 +143,7 @@ looks_like_rezz_disk() {
     test -d /mnt/disk/packages && return 0
     test -d /mnt/disk/services && return 0
     test -f /mnt/disk/swapfile && return 0
-    test -f /mnt/disk/font.conf && return 0
+    test -f /mnt/disk/etc/font.conf && return 0
     return 1
 }
 
@@ -177,8 +177,8 @@ if [ -f /mnt/disk/etc/hostname ]; then
 fi
 
 # Restore persistent font configuration
-if [ -f /mnt/disk/font.conf ]; then
-    cp /mnt/disk/font.conf /etc/font.conf 2>/dev/null || true
+if [ -f /mnt/disk/etc/font.conf ]; then
+    cp /mnt/disk/etc/font.conf /etc/font.conf 2>/dev/null || true
     FONT=$(grep -o 'FONT=[^ ]*' /etc/font.conf | cut -d= -f2)
     if [ -n "$FONT" ]; then
         if [ -w /sys/module/fbcon/parameters/font ]; then

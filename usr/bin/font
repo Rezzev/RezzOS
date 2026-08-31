@@ -83,7 +83,7 @@ set_font() {
             # Save configuration persistently inside OS and persistent disk
             echo "FONT=$TARGET_FONT" > "$CONF_FILE" 2>/dev/null || true
             if disk_is_mounted; then
-                echo "FONT=$TARGET_FONT" > /mnt/disk/font.conf 2>/dev/null || true
+                echo "FONT=$TARGET_FONT" > /mnt/disk/etc/font.conf 2>/dev/null || true
             else
                 echo -e "${FONT_YELLOW}No persistent disk at /mnt/disk, this font resets at reboot.${FONT_RESET}"
             fi
