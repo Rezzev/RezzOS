@@ -96,8 +96,8 @@ jobs:
           check disk-writable       'touch /mnt/disk/.citest && rm -f /mnt/disk/.citest'
           check bash-runs           'bash -c "exit 0"'
           check pkg-present         'test -x /usr/bin/pkg'
-          check dropbear-running    'pidof dropbear'
-          check dropbear-hostkeys   'ls /etc/dropbear/*_host_key >/dev/null'
+          check dropbear-running    'for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do pidof dropbear >/dev/null 2>&1 && break; sleep 1; done; pidof dropbear'
+          check dropbear-hostkeys   'for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do [ "$(ls /etc/dropbear/dropbear_*_host_key 2>/dev/null | wc -l)" -ge 3 ] && break; sleep 1; done; test "$(ls /etc/dropbear/dropbear_*_host_key 2>/dev/null | wc -l)" -ge 3'
 
           # rezzusb against the second virtio drive (stick.img, whole-disk
           # ext4, no partition table) that the workflow attaches as /dev/vdb.
