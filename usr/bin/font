@@ -36,6 +36,7 @@ list_fonts() {
     echo -e "  ${FONT_GREEN}VGA8x16${FONT_RESET}    - Standard VGA 8x16 Font"
     echo -e "  ${FONT_GREEN}VGA8x8${FONT_RESET}     - Standard VGA 8x8 Font"
     echo -e "  ${FONT_GREEN}6x11${FONT_RESET}       - Macintosh 6x11 Font"
+    echo -e "  ${FONT_GREEN}6x8${FONT_RESET}        - Tiny 6x8 Font"
     echo -e "  ${FONT_GREEN}PEARL8x8${FONT_RESET}   - Pearl 8x8 Font"
     echo -e "  ${FONT_GREEN}Acorn8x8${FONT_RESET}   - Acorn 8x8 Font"
     echo -e "  ${FONT_GREEN}MINI4x6${FONT_RESET}    - Mini 4x6 Micro Font"
