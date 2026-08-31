@@ -22,4 +22,7 @@ qemu-system-x86_64 \
     $EXTRA_DRIVE \
     -m 1024M -nographic \
     -enable-kvm \
-    -cpu host
+    -cpu host \
+    -usb \
+    -device usb-tablet \
+    -device usb-kbd 
