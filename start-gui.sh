@@ -23,4 +23,7 @@ qemu-system-x86_64 \
     $EXTRA_DRIVE \
     -m 2048M \
     -vga std \
-    -display gtk
+    -display gtk \
+    -usb \
+    -device usb-tablet \
+    -device usb-kbd
