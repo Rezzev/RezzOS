@@ -20,4 +20,6 @@ qemu-system-x86_64 \
     -object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 \
     -drive file=disk.img,format=raw,if=virtio \
     $EXTRA_DRIVE \
-    -m 1024M -nographic
+    -m 1024M -nographic \
+    -enable-kvm \
+    -cpu host
