@@ -1,0 +1,93 @@
+#!/bin/sh
+
+usage() {
+    echo "RezzOS audio control"
+    echo ""
+    echo "Usage:"
+    echo "  rezzaudio status               Show cards and master volume/mute"
+    echo "  rezzaudio list                 List sound cards"
+    echo "  rezzaudio set  <0-100>         Set master volume"
+    echo "  rezzaudio mute                 Mute master"
+    echo "  rezzaudio unmute               Unmute master"
+    echo "  rezzaudio toggle               Toggle master mute"
+    echo "  rezzaudio test                 Play a test tone"
+    echo ""
+    exit 1
+}
+
+die() {
+    echo "Error: $1" >&2
+    exit "${2:-1}"
+}
+
+need_root() {
+    [ "$(id -u)" -eq 0 ] || die "run as root"
+}
+
+disk_is_mounted() {
+    grep -q ' /mnt/disk ' /proc/mounts 2>/dev/null
+}
+
+save_state() {
+    alsactl store -f /etc/asound.state 2>/dev/null || true
+    if disk_is_mounted; then
+        mkdir -p /mnt/disk/etc
+        cp /etc/asound.state /mnt/disk/etc/asound.state 2>/dev/null || true
+    fi
+}
+
+master_info() {
+    amixer sget Master 2>/dev/null || amixer sget PCM 2>/dev/null
+}
+
+show_status() {
+    echo "== Sound cards =="
+    aplay -l 2>/dev/null || echo "no audio devices"
+    echo ""
+    echo "== Master =="
+    master_info | grep -E '^\s*(Front Left|Front Right|Mono|Mix)' 2>/dev/null | sed 's/^\s*//'
+}
+
+case "$1" in
+    status)   show_status ;;
+    list)     aplay -l ;;
+    set)
+        need_root
+        [ -n "$2" ] || usage
+        vol=$2
+        case "$vol" in
+            *[!0-9]*) die "volume must be 0-100" ;;
+        esac
+        [ "$vol" -ge 0 ] && [ "$vol" -le 100 ] 2>/dev/null || die "volume must be 0-100"
+        amixer sset Master "$vol%" >/dev/null 2>&1 || amixer sset PCM "$vol%" >/dev/null 2>&1 || die "no master volume control"
+        save_state
+        echo "Master volume set to $vol%"
+        ;;
+    mute)
+        need_root
+        amixer sset Master mute >/dev/null 2>&1 || die "no master volume control"
+        save_state
+        echo "Master muted"
+        ;;
+    unmute)
+        need_root
+        amixer sset Master unmute >/dev/null 2>&1 || die "no master volume control"
+        save_state
+        echo "Master unmuted"
+        ;;
+    toggle)
+        need_root
+        if master_info | grep -q '\[off\]'; then
+            amixer sset Master unmute >/dev/null 2>&1 || die "no master volume control"
+            echo "Master unmuted"
+        else
+            amixer sset Master mute >/dev/null 2>&1 || die "no master volume control"
+            echo "Master muted"
+        fi
+        save_state
+        ;;
+    test)
+        speaker-test -t sine -l 1 -s 1 2>/dev/null || die "playback failed"
+        ;;
+    *) usage ;;
+esac

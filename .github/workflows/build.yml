@@ -99,6 +99,14 @@ jobs:
           check dropbear-running    'for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do pidof dropbear >/dev/null 2>&1 && break; sleep 1; done; pidof dropbear'
           check dropbear-hostkeys   'for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do [ "$(ls /etc/dropbear/dropbear_*_host_key 2>/dev/null | wc -l)" -ge 3 ] && break; sleep 1; done; test "$(ls /etc/dropbear/dropbear_*_host_key 2>/dev/null | wc -l)" -ge 3'
 
+          # ALSA: audio service must be up, the HDA codec enumerated, and
+          # playback works end to end against the driver=none backend.
+          check audio-service-running 'for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do SVDIR=/etc/runit/runsvdir/default sv status audio 2>/dev/null | grep -q "^run:" && break; sleep 1; done; SVDIR=/etc/runit/runsvdir/default sv status audio 2>/dev/null | grep -q "^run:"'
+          check audio-card-present   'for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do [ -e /dev/snd/controlC0 ] && break; sleep 1; done; test -e /dev/snd/controlC0'
+          check audio-aplay-visible  'aplay -l 2>/dev/null | grep -q "card 0"'
+          check audio-speaker-test   'speaker-test -t sine -l 1 -s 1 2>&1 | grep -q "Rate set to"'
+          check audio-user-perms     'for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do [ "$(stat -c %a /dev/snd/controlC0 2>/dev/null)" = "660" ] && break; sleep 1; done; su user -c "aplay -l 2>/dev/null" | grep -q "card 0"'
+
           # rezzusb against the second virtio drive (stick.img, whole-disk
           # ext4, no partition table) that the workflow attaches as /dev/vdb.
           check rezzusb-list-sees-vdb       'rezzusb list | grep -q "^vdb"'
@@ -158,6 +166,8 @@ jobs:
             -drive file=disk.img,format=raw,if=virtio \
             -drive file=stick.img,format=raw,if=virtio \
             -netdev user,id=net0 -device virtio-net,netdev=net0 \
+            -audiodev id=snd0,driver=none \
+            -device intel-hda -device hda-duplex,audiodev=snd0 \
             -m 2048M -display none -no-reboot \
             -serial file:serial.log || true
 
