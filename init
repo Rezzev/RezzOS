@@ -80,45 +80,9 @@ if [ ! -d /home/user ]; then
 fi
 fi
 
-# Network - DHCP for real hardware, static fallback for QEMU
-for i in 1 2 3 4 5 6 7 8 9 10; do
-    [ -d /sys/class/net/eth0 ] && break
-    sleep 0.2
-done
-
-ifconfig lo 127.0.0.1 up
-ifconfig eth0 up
-sleep 0.2
-
-# Start DHCP in the background (-b keeps the client alive to renew the lease
-# once it has one) and give it a bounded window to obtain an address. The old
-# `timeout 15 udhcpc` ran synchronously and then exited, so the lease was never
-# renewed and a long live session silently lost the network when it expired.
-udhcpc -b -i eth0 -t 5 -s /usr/share/udhcpc/default.script 2>/dev/null
-
-for i in 1 2 3 4 5 6 7 8 9 10; do
-    ifconfig eth0 | grep -q "inet " && break
-    sleep 1
-done
-
-# Static fallback only where it means anything: QEMU's user-net always hands
-# out 10.0.2.15/10.0.2.2. On real hardware the fixed address is just a
-# router-only subnet that goes nowhere, so do not apply it there.
-if ! ifconfig eth0 | grep -q "inet "; then
-    if [ -d /sys/bus/virtio/devices ]; then
-        ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up
-        route add default gw 10.0.2.2 2>/dev/null || true
-    fi
-fi
-
-# udhcpc's default.script already wrote the nameservers the DHCP server handed
-# out. Only fall back to a public resolver when it wrote nothing, otherwise
-# the DHCP servers we just asked get overwritten one line later. Networks that
-# filter 8.8.8.8, or that resolve internal names through their own resolver,
-# were left with no working DNS even though DHCP had handed over a good one.
-if ! grep -q '^nameserver' /etc/resolv.conf 2>/dev/null; then
-    echo "nameserver 8.8.8.8" > /etc/resolv.conf
-fi
+# Everything from here to the GTK caches runs on live systems only: an
+# installed system already has all of this in its real /etc and /home.
+if [ "$MODE" = live ]; then
 
 # Mount disk safely.
 #
@@ -129,6 +93,11 @@ fi
 # and kernel.config sets CONFIG_EXT4_FS without CONFIG_EXT4_USE_FOR_EXT23, so
 # ext4 is the only on-disk filesystem this kernel can mount at all. NVMe is
 # absent from the list for the same reason, there is no NVMe driver built in.
+#
+# The mount runs before the network block on purpose: rezzconfig persists a
+# static address/DNS to /mnt/disk/etc/network.conf, and the network setup
+# below has to be able to read it off the live disk, the same way an installed
+# system reads it off fstab's /mnt/disk (mounted by mount -a further up).
 looks_like_rezz_disk() {
     # Bail out on anything that carries a root filesystem. Plenty of Linux
     # installs keep a /swapfile at the top level, and without this check one
@@ -147,10 +116,6 @@ looks_like_rezz_disk() {
     return 1
 }
 
-# Everything from here to the GTK caches runs on live systems only: an
-# installed system already has all of this in its real /etc and /home.
-if [ "$MODE" = live ]; then
-
 mkdir -p /mnt/disk
 for disk in /dev/vda /dev/vda1 /dev/sda /dev/sda1 /dev/sdb /dev/sdb1; do
     [ -b "$disk" ] || continue
@@ -158,6 +123,77 @@ for disk in /dev/vda /dev/vda1 /dev/sda /dev/sda1 /dev/sdb /dev/sdb1; do
     looks_like_rezz_disk && break
     umount /mnt/disk 2>/dev/null
 done
+
+fi
+
+# Network - DHCP for real hardware, static config for a persisted setting.
+for i in 1 2 3 4 5 6 7 8 9 10; do
+    [ -d /sys/class/net/eth0 ] && break
+    sleep 0.2
+done
+
+ifconfig lo 127.0.0.1 up
+
+# If rezzconfig persisted a static address to the data disk, use it verbatim
+# and skip DHCP. The config is shell-sourced, mirroring the keymap/timezone
+# convention, and only counts as static when it carries a non-empty $IP.
+STATIC_SRC=""
+if [ -f /mnt/disk/etc/network.conf ]; then
+    cp /mnt/disk/etc/network.conf /etc/network.conf 2>/dev/null || true
+    # shellcheck disable=SC1090,SC1091
+    . /etc/network.conf 2>/dev/null || true
+    [ -n "${IP:-}" ] && STATIC_SRC=1
+fi
+
+if [ -n "$STATIC_SRC" ]; then
+    ifconfig "${IFACE:-eth0}" up
+    sleep 0.2
+    ifconfig "${IFACE:-eth0}" "$IP" netmask "${MASK:-255.255.255.0}" up
+    [ -n "${GW:-}" ] && route add default gw "$GW" 2>/dev/null || true
+    : > /etc/resolv.conf
+    for ns in $DNS; do
+        echo "nameserver $ns" >> /etc/resolv.conf
+    done
+else
+    ifconfig eth0 up
+    sleep 0.2
+
+    # Start DHCP in the background (-b keeps the client alive to renew the
+    # lease once it has one) and give it a bounded window to obtain an address.
+    # The old `timeout 15 udhcpc` ran synchronously and then exited, so the
+    # lease was never renewed and a long live session silently lost the network
+    # when it expired.
+    udhcpc -b -i eth0 -t 5 -s /usr/share/udhcpc/default.script 2>/dev/null
+
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        ifconfig eth0 | grep -q "inet " && break
+        sleep 1
+    done
+
+    # Static fallback only where it means anything: QEMU's user-net always
+    # hands out 10.0.2.15/10.0.2.2. On real hardware the fixed address is just
+    # a router-only subnet that goes nowhere, so do not apply it there.
+    if ! ifconfig eth0 | grep -q "inet "; then
+        if [ -d /sys/bus/virtio/devices ]; then
+            ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up
+            route add default gw 10.0.2.2 2>/dev/null || true
+        fi
+    fi
+
+    # udhcpc's default.script already wrote the nameservers the DHCP server
+    # handed out. Only fall back to a public resolver when it wrote nothing,
+    # otherwise the DHCP servers we just asked get overwritten one line later.
+    # Networks that filter 8.8.8.8, or that resolve internal names through
+    # their own resolver, were left with no working DNS even though DHCP had
+    # handed over a good one.
+    if ! grep -q '^nameserver' /etc/resolv.conf 2>/dev/null; then
+        echo "nameserver 8.8.8.8" > /etc/resolv.conf
+    fi
+fi
+
+# Everything from here to the GTK caches runs on live systems only: an
+# installed system already has all of this in its real /etc and /home.
+if [ "$MODE" = live ]; then
 
 # Restore the hostname chosen in rezzconfig. The disk is not mounted yet when
 # "hostname rezzos" runs above, and the initramfs /etc comes back fresh from
