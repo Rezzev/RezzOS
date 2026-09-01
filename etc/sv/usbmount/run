@@ -1,0 +1,100 @@
+#!/bin/sh
+
+export PATH=/sbin:/bin:/usr/bin:/usr/sbin
+MOUNT_ROOT=/mnt/usb
+SUPPORTED="vfat exfat ext4 iso9660"
+LOG=/var/log/usbmount.log
+
+mkdir -p "$MOUNT_ROOT" /var/log
+
+is_skip_disk() {
+    case "$1" in
+        loop*|ram*|zram*|dm-*|md*|fd*|sr*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+parent_disk() {
+    name=$(basename "$1")
+    if [ -d "/sys/block/$name" ]; then
+        echo "$name"; return
+    fi
+    if [ -e "/sys/class/block/$name/partition" ]; then
+        basename "$(dirname "$(readlink -f "/sys/class/block/$name")")"
+        return
+    fi
+    echo "$name"
+}
+
+is_persist() {
+    src=$(awk '$2 == "/mnt/disk" { print $1; exit }' /proc/mounts)
+    [ -n "$src" ] || return 1
+    [ "$(parent_disk "$1")" = "$(parent_disk "$src")" ]
+}
+
+mounted_at() {
+    awk -v d="/dev/$1" '$1 == d { print $2; exit }' /proc/mounts
+}
+
+blk_type() {
+    busybox blkid "/dev/$1" 2>/dev/null \
+        | sed -n 's/.*TYPE="\([^"]*\)".*/\1/p'
+}
+
+fs_supported() {
+    [ -n "$1" ] || return 1
+    for s in $SUPPORTED; do
+        [ "$s" = "$1" ] && return 0
+    done
+    return 1
+}
+
+mount_dev() {
+    dev=$1
+    [ -b "/dev/$dev" ] || return 0
+    is_persist "$dev" && return 0
+    [ -z "$(mounted_at "$dev")" ] || return 0
+    fs=$(blk_type "$dev")
+    fs_supported "$fs" || return 0
+    dest="$MOUNT_ROOT/$dev"
+    mkdir -p "$dest" || return 0
+    opts="rw,nodev,nosuid"
+    case "$fs" in
+        vfat|msdos|fat) opts="rw,nodev,nosuid,utf8,umask=000,shortname=mixed" ;;
+        iso9660)        opts="ro,nodev,nosuid" ;;
+    esac
+    if mount -t "$fs" -o "$opts" "/dev/$dev" "$dest"; then
+        echo "$(date '+%b %d %H:%M:%S') mounted /dev/$dev -> $dest ($fs)" >>"$LOG"
+    else
+        rmdir "$dest" 2>/dev/null || true
+    fi
+}
+
+while true; do
+    for d in /sys/class/block/*; do
+        [ -e "$d" ] || continue
+        disk=$(basename "$d")
+        is_skip_disk "$disk" && continue
+        [ "$(cat "$d/removable" 2>/dev/null)" = "1" ] || continue
+        is_persist "$disk" && continue
+        found=
+        for p in /sys/block/"$disk"/"$disk"*; do
+            [ -e "$p" ] || continue
+            found=1
+            mount_dev "$(basename "$p")"
+        done
+        [ -n "$found" ] || mount_dev "$disk"
+    done
+
+    for m in "$MOUNT_ROOT"/*; do
+        [ -e "$m" ] || continue
+        dev=$(basename "$m")
+        [ -e "/dev/$dev" ] && continue
+        if umount "$m" 2>/dev/null; then
+            echo "$(date '+%b %d %H:%M:%S') unmounted $m (device gone)" >>"$LOG"
+            rmdir "$m" 2>/dev/null || true
+        fi
+    done
+
+    sleep 3
+done
