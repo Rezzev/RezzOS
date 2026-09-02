@@ -99,6 +99,9 @@ jobs:
           check dropbear-running    'for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do pidof dropbear >/dev/null 2>&1 && break; sleep 1; done; pidof dropbear'
           check dropbear-hostkeys   'for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do [ "$(ls /etc/dropbear/dropbear_*_host_key 2>/dev/null | wc -l)" -ge 3 ] && break; sleep 1; done; test "$(ls /etc/dropbear/dropbear_*_host_key 2>/dev/null | wc -l)" -ge 3'
 
+          check usb-automount-running 'SVDIR=/etc/runit/runsvdir/default sv status usbmount | grep -q "run:"'
+          check usb-automount-mounted 'for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do find /mnt/usb -name AUTOMOUNT_MARKER 2>/dev/null | grep -q . && break; sleep 1; done; find /mnt/usb -name AUTOMOUNT_MARKER 2>/dev/null | grep -q .'
+
           # rezzusb against the second virtio drive (stick.img, whole-disk
           # ext4, no partition table) that the workflow attaches as /dev/vdb.
           check rezzusb-list-sees-vdb       'rezzusb list | grep -q "^vdb"'
@@ -139,6 +142,14 @@ jobs:
           truncate -s 64M stick.img
           mke2fs -F -t ext4 -L CITEST stick.img
 
+          # Second stick, attached via USB mass-storage (usb.img) so the
+          # usbmount service auto-mounts it and the marker file is verifiable.
+          truncate -s 64M usb.img
+          mke2fs -F -t ext4 -L USBMOUNT usb.img
+          printf 'auto-mount-ok' > usb-marker
+          debugfs -w -R "write usb-marker AUTOMOUNT_MARKER" usb.img >/dev/null
+          rm -f usb-marker
+
       - name: Boot smoke test
         run: |
           # TCG only - hosted runners give no reliable /dev/kvm.
@@ -157,6 +168,9 @@ jobs:
             -append "console=ttyS0 random.trust_cpu=on" \
             -drive file=disk.img,format=raw,if=virtio \
             -drive file=stick.img,format=raw,if=virtio \
+            -drive file=usb.img,format=raw,if=none,id=usbdrive \
+            -device nec-usb-xhci \
+            -device usb-storage,drive=usbdrive,removable=on \
             -netdev user,id=net0 -device virtio-net,netdev=net0 \
             -m 2048M -display none -no-reboot \
             -serial file:serial.log || true
