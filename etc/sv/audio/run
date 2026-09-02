@@ -1,0 +1,14 @@
+#!/bin/sh
+
+export PATH=/sbin:/bin:/usr/bin:/usr/sbin
+
+if [ ! -e /dev/snd/controlC0 ]; then
+    sv down /etc/runit/runsvdir/default/audio 2>/dev/null || sv down audio 2>/dev/null || true
+    exit 0
+fi
+
+if [ -s /mnt/disk/etc/asound.state ]; then
+    alsactl restore -f /mnt/disk/etc/asound.state 2>/dev/null || true
+fi
+
+exec sleep 999999
