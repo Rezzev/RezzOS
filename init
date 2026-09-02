@@ -317,9 +317,28 @@ if [ ! -f /usr/share/glib-2.0/schemas/gschemas.compiled ]; then
         /usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/Adwaita 2>/dev/null || true
         /usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
     fi
+
+    # kernel/root scur ring
+    if [ -f /proc/sys/kernel/kptr_restrict ]; then
+    echo "2" > /proc/sys/kernel/kptr_restrict 2>/dev/null || true
+    fi
+
+    if [ -f /proc/sys/kernel/dmesg_restrict ]; then
+    echo "1" > /proc/sys/kernel/dmesg_restrict 2>/dev/null || true
+    fi
+
+    if [ -f /proc/sys/net/core/bpf_jit_harden ]; then
+    echo "2" > /proc/sys/net/core/bpf_jit_harden 2>/dev/null || true
+    fi
+
+    if [ -f /proc/sys/kernel/modules_disabled ]; then
+    echo "1" > /proc/sys/kernel/modules_disabled 2>/dev/null || true
+    fi
 fi
 
 clear
 echo ""
 
 exec runsvdir /etc/runit/runsvdir/default
+
+
