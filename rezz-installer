@@ -1,0 +1,506 @@
+#!/usr/bin/env bash
+#==================================================================
+# rezz-install.sh - Installer for RezzOS
+# Interactive, sleek, and easy installer - pure bash, no external libs
+#==================================================================
+
+set -o pipefail
+
+# ------------------------------
+# ANSI Color Settings
+# ------------------------------
+RESET='\033[0m'
+BOLD='\033[1m'
+DIM='\033[2m'
+UNDERLINE='\033[4m'
+BLINK='\033[5m'
+REVERSE='\033[7m'
+
+# Basic colors
+BLACK='\033[30m'
+RED='\033[31m'
+GREEN='\033[32m'
+YELLOW='\033[33m'
+BLUE='\033[34m'
+MAGENTA='\033[35m'
+CYAN='\033[36m'
+WHITE='\033[37m'
+
+# Backgrounds
+BG_RED='\033[41m'
+BG_GREEN='\033[42m'
+BG_YELLOW='\033[43m'
+BG_BLUE='\033[44m'
+BG_MAGENTA='\033[45m'
+BG_CYAN='\033[46m'
+BG_WHITE='\033[47m'
+
+# Predefined messages
+OK="${BOLD}${GREEN}[✓]${RESET}"
+FAIL="${BOLD}${RED}[✗]${RESET}"
+INFO="${BOLD}${CYAN}[i]${RESET}"
+WARN="${BOLD}${YELLOW}[!]${RESET}"
+ARROW="${BOLD}${WHITE}➜${RESET}"
+
+# ------------------------------
+# Helper Functions
+# ------------------------------
+clear_screen() {
+    clear
+}
+
+print_header() {
+    clear_screen
+    echo -e "${BOLD}${BG_BLUE}${WHITE}══════════════════════════════════════════════════════════════${RESET}"
+    echo -e "${BOLD}${BG_BLUE}${WHITE}                    REZZ INSTALLER v1.0                        ${RESET}"
+    echo -e "${BOLD}${BG_BLUE}${WHITE}              Easy installation of RezzOS                      ${RESET}"
+    echo -e "${BOLD}${BG_BLUE}${WHITE}══════════════════════════════════════════════════════════════${RESET}"
+    echo
+}
+
+print_step() {
+    echo -e "\n${BOLD}${CYAN}▸ ${1}${RESET}"
+    echo -e "${DIM}${CYAN}────────────────────────────────────────────────────────────${RESET}"
+}
+
+print_error() {
+    echo -e "${FAIL} ${BOLD}${RED}Error:${RESET} ${1}"
+}
+
+print_warning() {
+    echo -e "${WARN} ${BOLD}${YELLOW}Warning:${RESET} ${1}"
+}
+
+print_info() {
+    echo -e "${INFO} ${1}"
+}
+
+print_success() {
+    echo -e "${OK} ${BOLD}${GREEN}${1}${RESET}"
+}
+
+pause() {
+    echo
+    read -rp $'\033[1m\033[36mPress Enter to continue...\033[0m'
+}
+
+yes_no() {
+    local prompt="$1"
+    local default="${2:-n}"  # n or y
+    local answer
+    while true; do
+        if [[ "$default" == "y" ]]; then
+            read -rp "$(echo -e "${BOLD}${WHITE}${prompt} [Y/n]: ${RESET}")" answer
+            answer="${answer:-y}"
+        else
+            read -rp "$(echo -e "${BOLD}${WHITE}${prompt} [y/N]: ${RESET}")" answer
+            answer="${answer:-n}"
+        fi
+        case "$answer" in
+            [Yy]*) return 0 ;;
+            [Nn]*) return 1 ;;
+            *) print_warning "Please answer y or n" ;;
+        esac
+    done
+}
+
+# Display a menu and select an option (without dialog)
+select_option() {
+    local prompt="$1"
+    shift
+    local options=("$@")
+    local num_options=${#options[@]}
+    local selected=0
+    local key
+
+    # Save terminal state
+    stty -echo
+    tput civis  # Hide cursor
+
+    while true; do
+        clear_screen
+        print_header
+        echo -e "${BOLD}${CYAN}${prompt}${RESET}\n"
+
+        for i in $(seq 0 $((num_options - 1))); do
+            if [[ $i -eq $selected ]]; then
+                echo -e " ${BOLD}${BG_BLUE}${WHITE}  > ${options[$i]}  ${RESET}"
+            else
+                echo -e "   ${options[$i]}"
+            fi
+        done
+
+        echo -e "\n${DIM}Use ↑↓ arrows to navigate, Enter to select, q to quit${RESET}"
+
+        # Read a single key
+        read -rsn1 key
+        case "$key" in
+            $'\x1b') # Escape sequence
+                read -rsn2 -t 0.1 key
+                case "$key" in
+                    '[A') # Up arrow
+                        ((selected--))
+                        if [[ $selected -lt 0 ]]; then selected=$((num_options - 1)); fi
+                        ;;
+                    '[B') # Down arrow
+                        ((selected++))
+                        if [[ $selected -ge $num_options ]]; then selected=0; fi
+                        ;;
+                esac
+                ;;
+            '') # Enter
+                break
+                ;;
+            q|Q)
+                selected=-1
+                break
+                ;;
+        esac
+    done
+
+    # Restore terminal state
+    stty echo
+    tput cnorm
+
+    echo
+    if [[ $selected -ge 0 ]]; then
+        return $selected
+    else
+        return 255
+    fi
+}
+
+# ------------------------------
+# Global Variables
+# ------------------------------
+DISK=""
+PARTITIONS=()
+ROOT_PART=""
+BOOT_PART=""
+SWAP_PART=""
+HOME_PART=""
+FILESYSTEM="ext4"
+HOSTNAME="rezz"
+TIMEZONE="UTC"
+LOCALE="en_US.UTF-8"
+KEYMAP="us"
+USERNAME=""
+ROOT_PASSWORD=""
+USER_PASSWORD=""
+INSTALL_MIRROR="https://repo-default.voidlinux.org/current"
+GRUB_TARGET=""
+
+# ------------------------------
+# Installation Functions
+# ------------------------------
+detect_disks() {
+    print_step "Detecting available disks"
+    local disks=()
+    local disk_info
+    for disk in /dev/sd? /dev/nvme?n? /dev/vd?; do
+        [[ -b "$disk" ]] || continue
+        local size=$(lsblk -dno SIZE "$disk" 2>/dev/null)
+        local model=$(lsblk -dno MODEL "$disk" 2>/dev/null)
+        disks+=("$disk" "$size" "$model")
+    done
+
+    if [[ ${#disks[@]} -eq 0 ]]; then
+        print_error "No disks found!"
+        exit 1
+    fi
+
+    echo -e "${BOLD}${WHITE}Available disks:${RESET}"
+    local i=1
+    local disk_names=()
+    for ((j=0; j<${#disks[@]}; j+=3)); do
+        local d=${disks[$j]}
+        local sz=${disks[$j+1]}
+        local mdl=${disks[$j+2]}
+        echo -e "  ${BOLD}${i})${RESET} ${CYAN}${d}${RESET} - ${sz} - ${mdl}"
+        disk_names+=("$d")
+        ((i++))
+    done
+
+    echo
+    while true; do
+        read -rp "$(echo -e "${BOLD}${WHITE}Select disk number for installation: ${RESET}")" choice
+        if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#disk_names[@]} )); then
+            DISK="${disk_names[$choice-1]}"
+            break
+        else
+            print_warning "Invalid selection, try again"
+        fi
+    done
+
+    if ! yes_no "The entire disk ${DISK} will be erased. Are you sure?" "n"; then
+        print_info "Operation cancelled."
+        exit 0
+    fi
+    print_success "Selected disk: $DISK"
+}
+
+partition_disk() {
+    print_step "Partitioning disk"
+    print_info "A GPT partition table will be created with the following partitions:"
+    echo -e "  ${CYAN}1.${RESET} Boot partition (BIOS/UEFI) - 512MB"
+    echo -e "  ${CYAN}2.${RESET} Swap partition - 2GB"
+    echo -e "  ${CYAN}3.${RESET} Root partition (/) - remaining space"
+    echo
+
+    # Use parted or fdisk
+    if command -v parted >/dev/null; then
+        print_info "Using parted to partition the disk..."
+        parted -s "$DISK" mklabel gpt
+        parted -s "$DISK" mkpart primary fat32 1MiB 513MiB
+        parted -s "$DISK" set 1 esp on
+        parted -s "$DISK" mkpart primary linux-swap 513MiB 2.5GiB
+        parted -s "$DISK" mkpart primary ext4 2.5GiB 100%
+        # Refresh partitions
+        partprobe "$DISK" 2>/dev/null || true
+    else
+        print_warning "parted not found, using fdisk (requires automatic commands)"
+        # Here we could use sfdisk or fdisk with a here document
+        # For simplicity, we will just warn
+        print_error "Please install parted or partition manually, then continue"
+        exit 1
+    fi
+
+    # Determine partition names
+    if [[ "$DISK" == *"nvme"* ]]; then
+        BOOT_PART="${DISK}p1"
+        SWAP_PART="${DISK}p2"
+        ROOT_PART="${DISK}p3"
+    else
+        BOOT_PART="${DISK}1"
+        SWAP_PART="${DISK}2"
+        ROOT_PART="${DISK}3"
+    fi
+
+    print_success "Partitioning complete:"
+    echo -e "  ${CYAN}BOOT:${RESET} $BOOT_PART (fat32)"
+    echo -e "  ${CYAN}SWAP:${RESET} $SWAP_PART (swap)"
+    echo -e "  ${CYAN}ROOT:${RESET} $ROOT_PART (ext4)"
+}
+
+format_partitions() {
+    print_step "Formatting partitions"
+    print_info "Formatting boot partition as FAT32..."
+    mkfs.fat -F32 "$BOOT_PART" || { print_error "Failed to format $BOOT_PART"; exit 1; }
+    print_info "Formatting root partition as ext4..."
+    mkfs.ext4 -F "$ROOT_PART" || { print_error "Failed to format $ROOT_PART"; exit 1; }
+    print_info "Setting up swap..."
+    mkswap "$SWAP_PART" || { print_error "Failed to format swap"; exit 1; }
+    swapon "$SWAP_PART"
+    print_success "Formatting complete."
+}
+
+mount_partitions() {
+    print_step "Mounting partitions"
+    print_info "Mounting root to /mnt..."
+    mount "$ROOT_PART" /mnt || { print_error "Failed to mount root"; exit 1; }
+    mkdir -p /mnt/boot
+    print_info "Mounting boot to /mnt/boot..."
+    mount "$BOOT_PART" /mnt/boot || { print_error "Failed to mount boot"; exit 1; }
+    print_success "Mounted successfully."
+}
+
+install_base_system() {
+    print_step "Installing base system"
+    print_info "Selecting mirror..."
+    # Here we could use xbps-install with a specific mirror
+    # We assume xbps is available
+    if command -v xbps-install >/dev/null; then
+        print_info "Installing core packages (base-system, kernel, grub)..."
+        XBPS_ARCH=$(uname -m) xbps-install -Sy -R "$INSTALL_MIRROR" -r /mnt base-system linux grub bash nano networkmanager dhcpcd || {
+            print_error "Failed to install base packages"
+            exit 1
+        }
+        print_success "Base system installed."
+    else
+        print_error "xbps-install not found! Are you in a Rezz installation environment?"
+        exit 1
+    fi
+}
+
+generate_fstab() {
+    print_step "Generating fstab"
+    print_info "Generating fstab automatically..."
+    genfstab -U /mnt > /mnt/etc/fstab || {
+        print_warning "genfstab not found, creating a simple fstab manually"
+        cat > /mnt/etc/fstab <<EOF
+# <file system> <mount point> <type> <options> <dump> <pass>
+UUID=$(blkid -s UUID -o value "$ROOT_PART") / ext4 defaults 0 1
+UUID=$(blkid -s UUID -o value "$BOOT_PART") /boot vfat defaults 0 2
+UUID=$(blkid -s UUID -o value "$SWAP_PART") none swap sw 0 0
+proc /proc proc defaults 0 0
+sysfs /sys sysfs defaults 0 0
+devpts /dev/pts devpts defaults 0 0
+tmpfs /tmp tmpfs defaults 0 0
+EOF
+    }
+    print_success "fstab generated."
+}
+
+configure_system() {
+    print_step "Configuring system inside chroot"
+    print_info "Copying DNS file..."
+    cp /etc/resolv.conf /mnt/etc/resolv.conf
+
+    print_info "Entering chroot to configure system..."
+    # Use chroot to run commands
+    CHROOT="chroot /mnt"
+
+    # Set timezone
+    print_info "Setting timezone to $TIMEZONE"
+    $CHROOT ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
+
+    # Set locale
+    print_info "Setting locale $LOCALE"
+    echo "LANG=$LOCALE" > /mnt/etc/locale.conf
+    echo "$LOCALE UTF-8" >> /mnt/etc/default/libc-locales
+    $CHROOT xbps-reconfigure -f glibc-locales
+
+    # Set hostname
+    print_info "Setting hostname: $HOSTNAME"
+    echo "$HOSTNAME" > /mnt/etc/hostname
+
+    # Set users and passwords
+    print_info "Setting root password"
+    if [[ -n "$ROOT_PASSWORD" ]]; then
+        echo "root:$ROOT_PASSWORD" | $CHROOT chpasswd
+    else
+        print_warning "Root password will be empty (must be changed later)"
+        echo "root:" | $CHROOT chpasswd
+    fi
+
+    if [[ -n "$USERNAME" ]]; then
+        print_info "Creating user: $USERNAME"
+        $CHROOT useradd -m -G wheel,audio,video,network,storage -s /bin/bash "$USERNAME"
+        if [[ -n "$USER_PASSWORD" ]]; then
+            echo "$USERNAME:$USER_PASSWORD" | $CHROOT chpasswd
+        else
+            print_warning "User password is empty"
+        fi
+    fi
+
+    # Enable services
+    print_info "Enabling system services..."
+    $CHROOT ln -s /etc/sv/dhcpcd /etc/runit/runsvdir/default/
+    $CHROOT ln -s /etc/sv/NetworkManager /etc/runit/runsvdir/default/
+
+    print_success "System configuration complete."
+}
+
+install_bootloader() {
+    print_step "Installing GRUB bootloader"
+    print_info "Installing GRUB on disk $DISK"
+    $CHROOT grub-install "$DISK" || {
+        print_error "GRUB installation failed"
+        exit 1
+    }
+    print_info "Generating GRUB configuration..."
+    $CHROOT grub-mkconfig -o /boot/grub/grub.cfg
+    print_success "GRUB installed."
+}
+
+finalize() {
+    print_step "Finalizing installation"
+    print_info "Unmounting partitions..."
+    umount -R /mnt
+    swapoff "$SWAP_PART"
+    print_success "Installation completed! You can reboot now."
+    echo
+    echo -e "${BOLD}${GREEN}  Rezz Linux has been installed successfully!${RESET}"
+    echo -e "${DIM}  Remember to remove installation media and reboot.${RESET}"
+    echo
+}
+
+# ------------------------------
+# Main settings menu
+# ------------------------------
+configure_settings() {
+    # Here we can show a menu to modify settings (hostname, timezone, users, etc)
+    # For demonstration we keep it simple
+    print_step "Basic Settings"
+    read -rp "$(echo -e "${BOLD}${WHITE}Hostname [rezz]: ${RESET}")" HOSTNAME
+    HOSTNAME="${HOSTNAME:-rezz}"
+    read -rp "$(echo -e "${BOLD}${WHITE}Timezone [UTC]: ${RESET}")" TIMEZONE
+    TIMEZONE="${TIMEZONE:-UTC}"
+    read -rp "$(echo -e "${BOLD}${WHITE}Locale [en_US.UTF-8]: ${RESET}")" LOCALE
+    LOCALE="${LOCALE:-en_US.UTF-8}"
+    read -rp "$(echo -e "${BOLD}${WHITE}Keyboard layout [us]: ${RESET}")" KEYMAP
+    KEYMAP="${KEYMAP:-us}"
+
+    if yes_no "Do you want to create a regular user?" "y"; then
+        read -rp "$(echo -e "${BOLD}${WHITE}Username: ${RESET}")" USERNAME
+        read -rsp "$(echo -e "${BOLD}${WHITE}User password: ${RESET}")" USER_PASSWORD
+        echo
+    fi
+
+    read -rsp "$(echo -e "${BOLD}${WHITE}Root password: ${RESET}")" ROOT_PASSWORD
+    echo
+}
+
+# ------------------------------
+# Program start
+# ------------------------------
+main() {
+    # Check for root privileges
+    if [[ $EUID -ne 0 ]]; then
+        print_error "You must run the installer as root"
+        exit 1
+    fi
+
+    print_header
+    echo -e "${BOLD}${GREEN}Welcome to the Rezz Linux installer${RESET}"
+    echo -e "${DIM}This installer will guide you through the installation step by step${RESET}\n"
+
+    # Check for required tools
+    local required_commands=("parted" "mkfs.fat" "mkfs.ext4" "mkswap" "mount" "chroot" "xbps-install" "grub-install")
+    local missing=()
+    for cmd in "${required_commands[@]}"; do
+        if ! command -v "$cmd" >/dev/null; then
+            missing+=("$cmd")
+        fi
+    done
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        print_warning "Some tools are missing: ${missing[*]}"
+        print_warning "You may need to install them first or verify the installation environment."
+        if ! yes_no "Continue anyway?" "n"; then
+            exit 1
+        fi
+    fi
+
+    # Step 1: Settings
+    configure_settings
+
+    # Step 2: Disk selection
+    detect_disks
+
+    # Step 3: Partitioning
+    partition_disk
+
+    # Step 4: Formatting
+    format_partitions
+
+    # Step 5: Mounting
+    mount_partitions
+
+    # Step 6: Base system installation
+    install_base_system
+
+    # Step 7: fstab
+    generate_fstab
+
+    # Step 8: System configuration
+    configure_system
+
+    # Step 9: Install GRUB
+    install_bootloader
+
+    # Step 10: Finalize
+    finalize
+}
+
+# Run the program
+main "$@"
