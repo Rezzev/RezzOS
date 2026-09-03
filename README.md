@@ -61,6 +61,7 @@ Built-in utilities for convenient work:
 - rezzpad — a simple text notepad
 - rezztop — a system resource monitor
 - rezzview — an image viewer
+- rezz-installer — the install tool for rezzos
 
 Sources and package list: [Rezz-utils source](https://github.com/stars/neko-qt/lists/rezz-utils)
 
@@ -74,7 +75,7 @@ For loading from disk:
 - Follow the steps outlined above.
 - After starting the system, enter these command:
 ```bash
-rezzinstall
+sudo bash rezz-install
 ```
 
 ## Building from source
