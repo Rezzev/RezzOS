@@ -4,7 +4,7 @@
     <IconPath>/usr/share/icons/RezzOS</IconPath>
     <RootMenu onroot="1">
         <Program icon="terminal.png" label="Terminal">st</Program>
-        <Program icon="browser.png" label="Links browser">links -g duckduckgo.com</Program>
+        <Program icon="browser.png" label="Browser">rezzbrowser</Program>
         <Program icon="folder.png" label="File Manager">pcmanfm -n</Program>
         <Program icon="notepad.png" label="Notepad">rezzpad</Program>
         <Program icon="view.png" label="Image viewer">rezzview</Program>
