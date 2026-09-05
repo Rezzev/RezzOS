@@ -178,20 +178,6 @@ cp -r lib/* "$ROOTFS_DIR/lib/"
 step "Downloading Alpine packages (parallel, cached)"
 MAIN_GUI="libsm-1.2.4-r4.apk xz-libs-5.8.3-r0.apk dbus-x11-1.14.10-r1.apk dbus-libs-1.14.10-r1.apk libpng-1.6.57-r0.apk libffi-3.4.6-r0.apk mesa-24.0.9-r1.apk harfbuzz-8.5.0-r0.apk wayland-libs-client-1.22.0-r4.apk libgcc-13.2.1_git20240309-r1.apk pcre2-10.43-r0.apk libuuid-2.40.1-r1.apk libice-1.1.1-r6.apk libxdmcp-1.1.5-r1.apk libxt-1.3.0-r5.apk libxxf86vm-1.1.5-r6.apk libxau-1.0.11-r4.apk pango-1.52.2-r0.apk mcookie-2.40.1-r1.apk libxft-2.3.8-r3.apk libeconf-0.6.3-r0.apk libxinerama-1.1.5-r4.apk libpciaccess-0.18.1-r0.apk libxshmfence-1.3.2-r6.apk cairo-1.18.4-r0.apk font-alias-1.0.5-r0.apk brotli-libs-1.1.0-r2.apk font-terminus-4.49.1-r4.apk libmd-1.1.0-r0.apk encodings-1.0.7-r1.apk pixman-0.43.2-r0.apk libblkid-2.40.1-r1.apk font-liberation-2.1.5-r2.apk musl-1.2.5-r3.apk wayland-libs-server-1.22.0-r4.apk libxcb-1.16.1-r0.apk font-dejavu-2.37-r5.apk mkfontscale-1.2.2-r6.apk font-misc-misc-1.1.3-r1.apk libcrypto3-3.3.7-r0.apk udev-init-scripts-35-r1.apk graphite2-1.3.14-r6.apk libstdc++-13.2.1_git20240309-r1.apk libmount-2.40.1-r1.apk libdrm-2.4.120-r0.apk xkeyboard-config-2.41-r0.apk fribidi-1.0.15-r0.apk mesa-gbm-24.0.9-r1.apk mesa-gl-24.0.9-r1.apk hwdata-pci-0.382-r0.apk fontconfig-2.15.0-r1.apk kmod-libs-32-r0.apk freetype-2.13.2-r0.apk nettle-3.10.2-r0.apk libxmu-1.1.4-r2.apk util-macros-1.20.0-r0.apk libbsd-0.12.2-r0.apk libx11-1.8.9-r1.apk libepoxy-1.5.10-r1.apk mesa-glapi-24.0.9-r1.apk zlib-1.3.2-r0.apk tiff-4.6.0t-r0.apk dbus-1.14.10-r1.apk eudev-3.2.14-r2.apk xkbcomp-1.5.0-r0.apk libsharpyuv-1.3.2-r0.apk libxrender-0.9.11-r5.apk libfontenc-1.1.8-r0.apk mesa-egl-24.0.9-r1.apk libjpeg-turbo-3.0.3-r0.apk libxext-1.3.6-r2.apk gdk-pixbuf-2.42.12-r0.apk libbz2-1.0.8-r6.apk libxfixes-6.0.1-r4.apk libintl-0.22.5-r0.apk ncurses-terminfo-base-6.4_p20240420-r2.apk libexpat-2.8.1-r0.apk eudev-libs-3.2.14-r2.apk gmp-6.3.0-r1.apk glib-2.80.5-r0.apk libwebp-1.3.2-r0.apk libxpm-3.5.19-r0.apk libxrandr-1.5.4-r1.apk libxml2-2.12.10-r0.apk zstd-libs-1.5.6-r0.apk cairo-gobject-1.18.4-r0.apk shared-mime-info-2.4-r0.apk libxkbfile-1.1.3-r0.apk font-cursor-misc-1.0.4-r1.apk"
 MAIN_PACKAGES="libeconf-0.6.3-r0.apk zstd-libs-1.5.6-r0.apk xz-libs-5.8.3-r0.apk ncurses-terminfo-base-6.4_p20240420-r2.apk dhcpcd-10.0.6-r1.apk libncursesw-6.4_p20240420-r2.apk libevent-2.1.12-r7.apk tmux-3.4-r1.apk readline-8.2.10-r0.apk bash-5.2.26-r0.apk nano-8.0-r0.apk dropbear-2024.85-r0.apk dropbear-ssh-2024.85-r0.apk zlib-1.3.2-r0.apk musl-dev-1.2.5-r3.apk musl-1.2.5-r3.apk make-4.4.1-r2.apk lua5.3-5.3.6-r6.apk lua5.3-libs-5.3.6-r6.apk linenoise-1.0-r5.apk syslinux-6.04_pre1-r15.apk e2fsprogs-1.47.0-r5.apk e2fsprogs-libs-1.47.0-r5.apk libcom_err-1.47.0-r5.apk dosfstools-4.2-r2.apk sfdisk-2.40.1-r1.apk libfdisk-2.40.1-r1.apk libsmartcols-2.40.1-r1.apk device-mapper-libs-2.03.23-r3.apk grub-2.12-r5.apk grub-bios-2.12-r5.apk grub-efi-2.12-r5.apk alsa-lib-1.2.11-r0.apk alsa-utils-1.2.11-r1.apk alsa-ucm-conf-1.2.11-r1.apk libformw-6.4_p20240420-r2.apk libmenuw-6.4_p20240420-r2.apk libpanelw-6.4_p20240420-r2.apk fftw-single-libs-3.3.10-r5.apk"
-for pkg in $MAIN_PACKAGES $MAIN_GUI; do
-    [ -s "$CACHE_DIR/$pkg" ] || { echo "Missing $pkg in dl_cache" >&2; exit 1; }
-    mkdir -p /tmp/p
-    cd /tmp/p
-    rm -rf ./*
-    tar -xzf "$CACHE_DIR/$pkg" 2>/dev/null
-    [ -d usr ] && cp -r usr/* "$ROOTFS_DIR/usr/" 2>/dev/null || true
-    [ -d bin ] && cp -r bin/* "$ROOTFS_DIR/bin/" 2>/dev/null || true
-    [ -d sbin ] && cp -r sbin/* "$ROOTFS_DIR/sbin/" 2>/dev/null || true
-    [ -d lib ] && cp -r lib/* "$ROOTFS_DIR/lib/" 2>/dev/null || true
-    [ -d etc ] && cp -r etc/* "$ROOTFS_DIR/etc/" 2>/dev/null || true
-    [ -d var ] && cp -r var/* "$ROOTFS_DIR/var/" 2>/dev/null || true
-    [ -d share ] && cp -r share/* "$ROOTFS_DIR/usr/share/" 2>/dev/null || true
-done
 COMM_GUI="mtdev-1.1.6-r3.apk libinput-libs-1.25.0-r0.apk xorg-server-common-21.1.14-r0.apk xrdb-1.2.2-r0.apk jwm-2.4.3-r0.apk libevdev-1.13.1-r0.apk setxkbmap-1.3.4-r0.apk st-0.9.2-r0.apk xinit-1.4.2-r1.apk libxcvt-0.1.2-r0.apk xmodmap-1.0.11-r1.apk xorg-server-21.1.14-r0.apk xf86-video-fbdev-0.5.0-r6.apk xf86-video-vesa-2.6.0-r4.apk librsvg-2.58.5-r0.apk xauth-1.1.3-r0.apk xf86-input-libinput-1.4.0-r1.apk libxfont2-2.0.6-r4.apk"
 COMMUNITY_PACKAGES="runit-2.1.2-r7.apk neatvi-15-r0.apk sudo-1.9.15_p5-r0.apk iwd-2.17-r0.apk exfatprogs-1.2.2-r0.apk "
 EDGE_COMMUNITY_PACKAGES="links-graphics-2.30-r1.apk tcc-0.9.27_git20260714-r0.apk tcc-libs-0.9.27_git20260714-r0.apk tcc-libs-static-0.9.27_git20260714-r0.apk"
@@ -306,7 +292,7 @@ if [ -f sbin/apk.static ]; then
     mkdir -p "$ROOTFS_DIR/etc/apk" "$ROOTFS_DIR/lib/apk/db" "$ROOTFS_DIR/var/cache/apk"
     touch "$ROOTFS_DIR/etc/apk/world"
     fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" --initdb -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted update
-    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm zenity neofetch adwaita-icon-theme menu-cache gvfs mesa-dri-gallium
+    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm zenity neofetch adwaita-icon-theme menu-cache gvfs mesa-dri-gallium webkit2gtk gtk+3.0
 fi
 
 # Restore custom busybox and remove conflicting Alpine busybox symlinks for runit
@@ -342,6 +328,29 @@ if [ -f "$REPO_DIR/usr/bin/setconsolefont.c" ]; then
     gcc -O2 -static "$REPO_DIR/usr/bin/setconsolefont.c" \
         -o "$ROOTFS_DIR/usr/bin/setconsolefont"
     chmod +x "$ROOTFS_DIR/usr/bin/setconsolefont"
+fi
+
+# Compile rezzbrowser (minimal GTK3 + WebKitGTK browser).
+#
+# Unlike setconsolefont, this links dynamically against gtk+3.0 and
+# webkit2gtk-4.0 — GTK does not support meaningful static linking. That
+# means the binary's dynamic dependencies have to match what apk.static just
+# installed into ROOTFS_DIR (the "webkit2gtk gtk+3.0" packages added above).
+# Building on this host works because the host and rootfs are pulled from
+# the same Alpine branch, so the .so versions line up.
+#
+# Needs webkit2gtk-dev and gtk+3.0-dev on the build host:
+#   apk add gtk+3.0-dev webkit2gtk-dev pkgconfig
+if [ -f "$REPO_DIR/usr/bin/rezzbrowser.c" ]; then
+    if pkg-config --exists gtk+-3.0 webkit2gtk-4.0 2>/dev/null; then
+        log "Compiling rezzbrowser"
+        gcc -O2 "$REPO_DIR/usr/bin/rezzbrowser.c" \
+            $(pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.0) \
+            -o "$ROOTFS_DIR/usr/bin/rezzbrowser"
+        chmod +x "$ROOTFS_DIR/usr/bin/rezzbrowser"
+    else
+        echo "Skipping rezzbrowser: install gtk+3.0-dev webkit2gtk-dev pkgconfig to build it" >&2
+    fi
 fi
 
 step "Downloading rezz-utils"
