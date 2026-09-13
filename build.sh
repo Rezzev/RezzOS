@@ -353,6 +353,46 @@ if [ -f "$REPO_DIR/usr/bin/rezzbrowser.c" ]; then
     fi
 fi
 
+# Compile rezzconfig (GTK3 control-center — replaces the old shell text
+# menu entirely: network, hostname, font, keyboard, swap, services,
+# users, packages, install, power, all in one binary). Same linking
+# situation as rezzbrowser/rezzinstall: dynamic against gtk+3.0, so it
+# needs the "gtk+3.0" package already installed into ROOTFS_DIR above.
+#
+# Needs gtk+3.0-dev and pkgconfig on the build host:
+#   apk add gtk+3.0-dev pkgconfig
+if [ -f "$REPO_DIR/usr/bin/rezzconfig.c" ]; then
+    if pkg-config --exists gtk+-3.0 2>/dev/null; then
+        log "Compiling rezzconfig"
+        gcc -O2 -Wall -Wextra "$REPO_DIR/usr/bin/rezzconfig.c" \
+            $(pkg-config --cflags --libs gtk+-3.0) \
+            -o "$ROOTFS_DIR/usr/bin/rezzconfig"
+        chmod +x "$ROOTFS_DIR/usr/bin/rezzconfig"
+    else
+        echo "Skipping rezzconfig: install gtk+3.0-dev pkgconfig to build it" >&2
+    fi
+fi
+
+# Compile rezzinstall (GTK3 installer wizard).
+#
+# The binary itself demands root at *runtime* (it partitions/formats disks),
+# but building it does not need root — only a GTK3 dev environment on the
+# build host, same as rezzconfig/rezzbrowser above.
+#
+# Needs gtk+3.0-dev and pkgconfig on the build host:
+#   apk add gtk+3.0-dev pkgconfig
+if [ -f "$REPO_DIR/usr/bin/rezzinstall.c" ]; then
+    if pkg-config --exists gtk+-3.0 2>/dev/null; then
+        log "Compiling rezzinstall"
+        gcc -O2 -Wall -Wextra "$REPO_DIR/usr/bin/rezzinstall.c" \
+            $(pkg-config --cflags --libs gtk+-3.0) \
+            -o "$ROOTFS_DIR/usr/bin/rezzinstall"
+        chmod +x "$ROOTFS_DIR/usr/bin/rezzinstall"
+    else
+        echo "Skipping rezzinstall: install gtk+3.0-dev pkgconfig to build it" >&2
+    fi
+fi
+
 step "Downloading rezz-utils"
 REZZPAD_URL="https://github.com/neko-qt/rezzpad/releases/download/1.1.0/rezzpad-musl"
 if [ ! -f "$CACHE_DIR/rezzpad-musl" ]; then
