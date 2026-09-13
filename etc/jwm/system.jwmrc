@@ -10,8 +10,8 @@
         <Program icon="view.png" label="Image viewer">rezzview</Program>
         <Program icon="manager.png" label="Task Manager">st -e rtop</Program>
         <Separator/>
-        <Program label="Control Center">st -e rezzconfig</Program>
-        <Program label="Install RezzOS to Disk">st -e rezzinstall</Program>
+        <Program icon="settings.png" label="settings">rezzconfig</Program>
+        <Program icon="install.png" label="Install RezzOS to Disk">rezzinstall</Program>
         <Separator/>
         <Menu icon="info.png" label="Power">
             <Program label="Suspend">sh -c 'zenity --info --title="RezzOS" --text="Suspending..." --timeout=2 &amp; suspend'</Program>
@@ -64,7 +64,7 @@
             <Opacity>1</Opacity>
         </Active>
     </WindowStyle>
-    
+
     <TrayStyle group="true" list="all">
         <Font>NotoSans-11</Font>
         <Background>#232629</Background>
@@ -72,7 +72,7 @@
         <Outline>#1a1c1f</Outline>
         <Opacity>0.95</Opacity>
     </TrayStyle>
-    
+
     <TaskListStyle>
       <Font>NotoSans-11</Font>
       <Active>
@@ -82,7 +82,7 @@
       <Foreground>#BDC3C7</Foreground>
       <Background>#232629</Background>
     </TaskListStyle>
-    
+
     <PagerStyle>
         <Outline>#1a1c1f</Outline>
         <Foreground>#31363B</Foreground>
@@ -93,7 +93,7 @@
             <Background>#3DAEE9</Background>
         </Active>
     </PagerStyle>
-    
+
     <MenuStyle>
         <Font>NotoSans-11</Font>
         <Foreground>#FCFCFC</Foreground>
@@ -105,7 +105,7 @@
         </Active>
         <Opacity>0.95</Opacity>
     </MenuStyle>
-    
+
     <PopupStyle>
         <Font>NotoSans-11</Font>
         <Foreground>#FCFCFC</Foreground>
@@ -140,4 +140,3 @@
     <Key mask="A" key="Down">ddesktop</Key>
     <Key mask="CA" key="t">exec:st</Key>
 </JWM>
-
