@@ -12,7 +12,8 @@
 [![BusyBox](https://img.shields.io/badge/BusyBox-000000?style=for-the-badge&logo=busybox&logoColor=white)](https://busybox.net)
 [![Shell](https://img.shields.io/badge/Shell-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)](https://www.gnu.org/software/bash/)
 
-<img width="640" height="320" alt="image" src="https://github.com/user-attachments/assets/49f8b972-04a9-4133-acf9-8a16d2d92cbd" />
+<img width="640" height="360" alt="image" src="https://github.com/user-attachments/assets/2d46ea38-c100-47a7-8604-6c5848e375a1" />
+
 
 <p><em>Additional documentation is in the <code>/docs</code> directory.</em></p>
 
