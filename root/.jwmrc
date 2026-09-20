@@ -8,7 +8,7 @@
         <Program icon="folder.png" label="File Manager">pcmanfm -n</Program>
         <Program icon="notepad.png" label="Notepad">rezzpad</Program>
         <Program icon="view.png" label="Image viewer">rezzview</Program>
-        <Program icon="manager.png" label="Task Manager">st -e rtop</Program>
+        <Program icon="manager.png" label="Service Manager">rsv-gui</Program>
         <Separator/>
         <Program icon="settings.png" label="settings">rezzconfig</Program>
         <Program icon="install.png" label="Install RezzOS to Disk">rezzinstall</Program>
@@ -36,7 +36,7 @@
     </RootMenu>
 
     <!-- Options for program interfaces. -->
-    <Tray x="0" y="0" autohide="off">
+    <Tray x="0" y="-1" autohide="off">
         <TrayButton icon="menu.png">root:1</TrayButton>
         <Spacer width="2"/>
         <TrayButton label="_">showdesktop</TrayButton>
@@ -49,68 +49,58 @@
 
     <!-- Visual Styles (Breeze Dark) -->
     <WindowStyle>
-        <Font>Noto NotoSans-11:bold</Font>
-        <Width>4</Width>
-        <Height>21</Height>
-        <Corner>3</Corner>
-        <Foreground>#BDC3C7</Foreground>
-        <Background>#232629</Background>
-        <Outline>#1a1c1f</Outline>
-        <Opacity>1</Opacity>
+        <Font>Sans-10:Bold</Font>
+        <Width>7</Width>
+        <Height>34</Height>
+        <Corner>5</Corner>
+        <Opacity>1.0</Opacity>
+        <Foreground>#FFFFFF</Foreground>
+        <Background>#000000:#343434</Background>
+        <Outline>#5B5B5D</Outline>
         <Active>
-            <Foreground>#FCFCFC</Foreground>
-            <Background>#31363B</Background>
-            <Outline>#3DAEE9</Outline>
-            <Opacity>1</Opacity>
+            <Foreground>#FFFFFF</Foreground>
+            <Background>#000000:#343434</Background>
+            <Outline>#5B5B5D</Outline>
         </Active>
     </WindowStyle>
-
-    <TrayStyle group="true" list="all">
-        <Font>NotoSans-11</Font>
-        <Background>#232629</Background>
-        <Foreground>#FCFCFC</Foreground>
-        <Outline>#1a1c1f</Outline>
-        <Opacity>0.95</Opacity>
+    <TrayStyle group="false" list="desktop">
+        <Opacity>0.8</Opacity>
+        <Font>Sans-10</Font>
+        <Outline>#5B5B5D</Outline>
+        <Foreground>#FFFFFF</Foreground>
+        <Background>#000000:#343434</Background>
+        <Active>       
+            <Outline>#5B5B5D</Outline>
+            <Foreground>#FFFFFF</Foreground>
+            <Background>#343434:#000000</Background>
+        </Active>
     </TrayStyle>
-
-    <TaskListStyle>
-      <Font>NotoSans-11</Font>
-      <Active>
-        <Foreground>#FCFCFC</Foreground>
-        <Background>#31363B</Background>
-      </Active>
-      <Foreground>#BDC3C7</Foreground>
-      <Background>#232629</Background>
-    </TaskListStyle>
-
     <PagerStyle>
-        <Outline>#1a1c1f</Outline>
-        <Foreground>#31363B</Foreground>
-        <Background>#232629</Background>
-        <Text>#BDC3C7</Text>
+        <Outline>#000000</Outline>
+        <Foreground>#FFFFFF</Foreground>
+        <Background>#000000</Background>
+        <Text>#ACABAB</Text>
         <Active>
-            <Foreground>#FCFCFC</Foreground>
-            <Background>#3DAEE9</Background>
+            <Foreground>#FFFFFF</Foreground>
+            <Background>#5B5B5D</Background>
         </Active>
     </PagerStyle>
-
     <MenuStyle>
-        <Font>NotoSans-11</Font>
-        <Foreground>#FCFCFC</Foreground>
-        <Background>#31363B</Background>
-        <Outline>#1a1c1f</Outline>
+        <Font>Sans-13</Font>
+            <Foreground>#323232</Foreground>
+            <Background>#FCFCFC</Background>
+        <Outline>#CDC7C2</Outline>
         <Active>
             <Foreground>#FCFCFC</Foreground>
-            <Background>#3DAEE9</Background>
+            <Background>#3584E4</Background>
         </Active>
-        <Opacity>0.95</Opacity>
     </MenuStyle>
-
     <PopupStyle>
-        <Font>NotoSans-11</Font>
-        <Foreground>#FCFCFC</Foreground>
-        <Background>#232629</Background>
+        <Font>Sans-12</Font>
+            <Foreground>#ACAFC6</Foreground>
+            <Background>#343434</Background>
     </PopupStyle>
+</JWM>
 
     <!-- Virtual Desktops -->
     <Desktops width="4" height="1">
