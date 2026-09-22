@@ -122,7 +122,7 @@ on_url_activate(GtkEntry *entry, gpointer data)
 int
 main(int argc, char *argv[])
 {
-    const char *start_url = "https://www.google.com";
+    const char *start_url = "https://duckduckgo.com";
 
     if (argc > 1) {
         start_url = argv[1];
