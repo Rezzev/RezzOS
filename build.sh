@@ -408,14 +408,21 @@ if [ -f "$REPO_DIR/usr/bin/rsv-gui.c" ]; then
     fi
 fi
 
-step "Downloading rezz-utils"
-REZZPAD_URL="https://github.com/neko-qt/rezzpad/releases/download/1.1.0/rezzpad-musl"
-if [ ! -f "$CACHE_DIR/rezzpad-musl" ]; then
-    wget -q "$REZZPAD_URL" -O "$CACHE_DIR/rezzpad-musl" || { echo "Failed to download rezzpad"; exit 1; }
+# Compile editor
+if [ -f "$REPO_DIR/usr/bin/edit.c" ]; then
+    if pkg-config --exists gtk+-3.0 gtksourceview-3.0 2>/dev/null; then
+        log "Compiling edit"
+        gcc -O2 -Wall -Wextra "$REPO_DIR/usr/bin/edit.c" \
+            $(pkg-config --cflags --libs gtk+-3.0 gtksourceview-3.0) \
+            -o "$ROOTFS_DIR/usr/bin/edit"
+        chmod +x "$ROOTFS_DIR/usr/bin/edit"
+    else
+        echo "Skipping rezzeditor: install gtk+3.0-dev, gtksourceview-dev, and pkgconfig to build it" >&2
+    fi
 fi
-cp -f "$CACHE_DIR/rezzpad-musl" "$ROOTFS_DIR/usr/bin/rezzpad"
-chmod +x "$ROOTFS_DIR/usr/bin/rezzpad"
 
+
+step "Downloading rezz-utils"
 REZZVIEW_URL="https://github.com/neko-qt/rezzview/releases/download/1.1.0/rezzview-musl"
 if [ ! -f "$CACHE_DIR/rezzview-musl" ]; then
     wget -q "$REZZVIEW_URL" -O "$CACHE_DIR/rezzview-musl" || { echo "Failed to download rezzview"; exit 1; }
