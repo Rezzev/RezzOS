@@ -6,7 +6,7 @@
         <Program icon="terminal.png" label="Terminal">st</Program>
         <Program icon="browser.png" label="Browser">rezzbrowser</Program>
         <Program icon="folder.png" label="File Manager">pcmanfm -n</Program>
-        <Program icon="notepad.png" label="Notepad">rezzpad</Program>
+        <Program icon="notepad.png" label="Editor">edit</Program>
         <Program icon="view.png" label="Image viewer">rezzview</Program>
         <Program icon="manager.png" label="Service Manager">rsv-gui</Program>
         <Separator/>
