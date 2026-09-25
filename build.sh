@@ -421,6 +421,17 @@ if [ -f "$REPO_DIR/usr/bin/edit.c" ]; then
     fi
 fi
 
+if [ -f "$REPO_DIR/usr/bin/rtop-gui.c" ]; then
+    if pkg-config --exists gtk+-3.0 2>/dev/null; then
+        log "Compiling rtop"
+        gcc -O2 -Wall -Wextra "$REPO_DIR/usr/bin/rtop-gui.c" \
+            $(pkg-config --cflags --libs gtk+-3.0 gtksourceview-3.0) \
+            -o "$ROOTFS_DIR/usr/bin/rtopg"
+        chmod +x "$ROOTFS_DIR/usr/bin/rtopg"
+    else
+        echo "Skipping rtop and pkgconfig to build it" >&2
+    fi
+fi
 
 step "Downloading rezz-utils"
 REZZVIEW_URL="https://github.com/neko-qt/rezzview/releases/download/1.1.0/rezzview-musl"
