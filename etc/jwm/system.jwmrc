@@ -7,6 +7,7 @@
         <Program icon="browser.png" label="Browser">rezzbrowser</Program>
         <Program icon="folder.png" label="File Manager">pcmanfm -n</Program>
         <Program icon="notepad.png" label="Editor">edit</Program>
+        <Program icon="monitor.png" label="System Monitor">rtop-gui</Program>
         <Program icon="view.png" label="Image viewer">rezzview</Program>
         <Program icon="manager.png" label="Service Manager">rsv-gui</Program>
         <Separator/>
@@ -69,7 +70,7 @@
         <Outline>#5B5B5D</Outline>
         <Foreground>#FFFFFF</Foreground>
         <Background>#000000:#343434</Background>
-        <Active>       
+        <Active>
             <Outline>#5B5B5D</Outline>
             <Foreground>#FFFFFF</Foreground>
             <Background>#343434:#000000</Background>
