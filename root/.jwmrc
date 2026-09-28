@@ -42,8 +42,8 @@
         <Spacer width="2"/>
         <TrayButton label="_">showdesktop</TrayButton>
         <Spacer width="2"/>
-        <Pager labeled="true"/>
-        <TaskList maxwidth="256"/>
+        <Pager labeled="false"/>
+        <TaskList maxwidth="40"/>
         <Dock/>
         <Clock format="%d.%m.%Y %H:%M"></Clock>
     </Tray>
