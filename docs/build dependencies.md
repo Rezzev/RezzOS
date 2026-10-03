@@ -11,7 +11,7 @@ apk add build-base flex bison linux-headers elfutils-dev openssl-dev perl bc cpi
 # Ubuntu/Debian:
 --------------
 ```bash
-apt install build-essential flex bison libncurses-dev libssl-dev libelf-dev bc cpio gzip wget tar grub-pc-bin xorriso qemu-system-x86 qemu-utils fakeroot
+apt install build-essential flex bison libncurses-dev libgtk-3-dev libgtksourceview-3.0-dev libssl-dev libelf-dev bc cpio gzip wget tar grub-pc-bin xorriso qemu-system-x86 qemu-utils fakeroot
 ```
 # Arch Linux:
 -----------
