@@ -433,6 +433,18 @@ if [ -f "$REPO_DIR/usr/bin/rtop-gui.c" ]; then
     fi
 fi
 
+if [ -f "$REPO_DIR/usr/bin/rezzabout.c" ]; then
+    if pkg-config --exists gtk+-3.0 2>/dev/null; then
+        log "Compiling rezzabout"
+        gcc -O2 -Wall -Wextra "$REPO_DIR/usr/bin/rezzabout" \
+            $(pkg-config --cflags --libs gtk+-3.0) \
+            -o "$ROOTFS_DIR/usr/bin/rezzabout"
+        chmod +x "$ROOTFS_DIR/usr/bin/rezzabout.c"
+    else
+        echo "Skipping about system: install gtk+3.0-dev pkgconfig to build it" >&2
+    fi
+fi
+
 step "Downloading rezz-utils"
 REZZVIEW_URL="https://github.com/neko-qt/rezzview/releases/download/1.1.0/rezzview-musl"
 if [ ! -f "$CACHE_DIR/rezzview-musl" ]; then
