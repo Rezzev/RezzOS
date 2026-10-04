@@ -59,9 +59,11 @@
 ## RezzUtils
 Built-in utilities for convenient work:
 
-- rezzpad — a simple text notepad
-- rezztop — a system resource monitor
+- rezzedit — a simple editor
+- rezztop(-gui) — a system resource monitor
+- rezzbrowser - A lightweight browser powered by WebKit
 - rezzview — an image viewer
+*You can view all the unique programs in the repository yourself.*
 
 Sources and package list: [Rezz-utils source](https://github.com/stars/neko-qt/lists/rezz-utils)
 
@@ -82,7 +84,7 @@ rezzinstall
 The simplest way is to use the included build script:
 
 ```bash
-./build.sh
+(sudo)./build.sh
 ```
 
 For NixOS use:
@@ -97,24 +99,16 @@ The script will automatically download sources, compile the kernel and BusyBox, 
 ---
 
 ## Network
-If you are using QEMU (virtual machine), you can configure the network manually:
-
+If your internet isn't working and your IP address is 10.0.2.15 or similar...
 ```bash
-ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up
-route add default gw 10.0.2.2
-echo "nameserver 8.8.8.8" > /etc/resolv.conf
+Open the settings, go to the internet configuration section, and manually enter your IP address, netmask, and other details.
 ```
 
-On real hardware DHCP is used. If the network does not come up:
+## Before using the package manager run:
 
 ```bash
-dhcpcd eth0
-```
-
-Before using the package manager run:
-
-```bash
-pkg update
+apk update - download from alpine linux repository 
+pkg update - download from RezzOS linux repository 
 ```
 
 ---
@@ -130,7 +124,7 @@ Run from the repository root:
 ---
 
 ## links
-- Main repository: [open](https://github.com/semen88pochuev-eng/RezzOS)
+- Main repository: [open](https://github.com/Rezzev/RezzOS)
 - Pkg repository: [open](https://github.com/Rezzev/RezzOS-Packages)
 
 ---
@@ -149,6 +143,8 @@ Thanks to everyone who helps develop the project!
 
 Author contact:
 - Telegram: @Loexez
+Tg channel:
+- @Losk149
 
 ---
 
