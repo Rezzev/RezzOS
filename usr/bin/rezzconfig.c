@@ -3,16 +3,20 @@
  *
  * Merges the original shell "rezzconfig" text menu (network, hostname,
  * font, keyboard, swap, services, users, packages, install, power) with
- * the GTK3 front-end that used to sit on top of it. This is now the only
- * copy of that logic — the standalone shell menu is gone.
+ * the GTK3 front-end that used to sit on top of it.
  *
- * All shell work goes through capture_shell()/run_cmd(), both of which
- * spawn a real "sh -c <script>", so every pipeline, awk, sed -i and
- * heredoc from the original menu works unmodified. Because that means
- * user-entered text now reaches a real shell (unlike the previous
- * g_spawn_command_line_sync-based run_cmd, which could not interpret
- * shell syntax at all), every field taken from an entry widget is passed
- * through is_safe_token() before it is spliced into a script string.
+ * Execution model:
+ *   - Fixed multi-step scripts (network, hostname) run through run_cmd(),
+ *     i.e. "sh -c <script>". Every value spliced into such a script has
+ *     already passed a strict per-field validator (is_ip, is_iface,
+ *     is_hostname, ...), not just a character whitelist.
+ *   - Everything that takes a free-form name (package, service, user,
+ *     font) runs through run_argv(): no shell at all, the value is a
+ *     single argv element, so it can neither inject shell syntax nor
+ *     extra options (validators also reject a leading '-').
+ *   - Commands run asynchronously and stream their output into the log,
+ *     so the window never freezes during `pkg install`, `ping`, etc.
+ *     While a command runs the tab area is disabled.
  *
  * Build (on the Alpine build host, same as rezzbrowser/rezzinstall):
  *   gcc -O2 -Wall -Wextra rezzconfig.c $(pkg-config --cflags --libs gtk+-3.0) \
@@ -20,15 +24,18 @@
  */
 
 #include <gtk/gtk.h>
+#include <arpa/inet.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 
 static GtkWidget *log_view;
 static GtkWidget *status_bar_label;
 static GtkWidget *notebook;
+static gboolean   cmd_busy = FALSE;
 
 /* ====================================================================== */
-/* Shared plumbing: log panel, shell execution, input validation          */
+/* Log panel                                                              */
 /* ====================================================================== */
 
 static void
@@ -45,6 +52,19 @@ log_append(const char *text)
     gtk_text_view_scroll_mark_onscreen(GTK_TEXT_VIEW(log_view), mark);
 }
 
+static void log_appendf(const char *fmt, ...) G_GNUC_PRINTF(1, 2);
+
+static void
+log_appendf(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    gchar *s = g_strdup_vprintf(fmt, ap);
+    va_end(ap);
+    log_append(s);
+    g_free(s);
+}
+
 static void
 log_clear(void)
 {
@@ -52,50 +72,131 @@ log_clear(void)
     gtk_text_buffer_set_text(buf, "", -1);
 }
 
-/* Runs `script` as a real shell script (sh -c), combining stdout+stderr
- * into the log, exactly like watching the original menu run in a
- * terminal. Unlike g_spawn_command_line_sync, this understands pipes,
- * awk, sed -i, $(...), heredocs, loops — everything the original
- * rezzconfig used. */
+/* ====================================================================== */
+/* Asynchronous command execution                                         */
+/* ====================================================================== */
+
+typedef struct {
+    GSubprocess      *proc;
+    GDataInputStream *in;
+    void            (*done)(void);
+} RunCtx;
+
+static void read_next_line(RunCtx *ctx);
+
 static void
-run_cmd(const char *script)
+run_ctx_finish(RunCtx *ctx)
 {
-    GSubprocess *proc;
+    cmd_busy = FALSE;
+    gtk_widget_set_sensitive(notebook, TRUE);
+    if (ctx->done) ctx->done();
+    g_object_unref(ctx->in);
+    g_object_unref(ctx->proc);
+    g_free(ctx);
+}
+
+static void
+on_proc_waited(GObject *src, GAsyncResult *res, gpointer data)
+{
+    RunCtx *ctx = data;
     GError *error = NULL;
-    gchar *out = NULL;
 
-    log_append(g_strdup_printf("$ %s", script));
+    if (!g_subprocess_wait_finish(G_SUBPROCESS(src), res, &error)) {
+        log_appendf("(wait failed: %s)", error->message);
+        g_error_free(error);
+    } else if (g_subprocess_get_if_exited(ctx->proc)) {
+        gint code = g_subprocess_get_exit_status(ctx->proc);
+        if (code != 0) log_appendf("(exited with status %d)", code);
+    } else if (g_subprocess_get_if_signaled(ctx->proc)) {
+        log_appendf("(killed by signal %d)", g_subprocess_get_term_sig(ctx->proc));
+    }
+    run_ctx_finish(ctx);
+}
 
-    proc = g_subprocess_new(
-        G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_MERGE,
-        &error, "sh", "-c", script, NULL);
+static void
+on_line_read(GObject *src, GAsyncResult *res, gpointer data)
+{
+    RunCtx *ctx = data;
+    GError *error = NULL;
+    gsize len = 0;
+    gchar *line = g_data_input_stream_read_line_finish(
+        G_DATA_INPUT_STREAM(src), res, &len, &error);
+
+    if (error) {
+        log_appendf("(read error: %s)", error->message);
+        g_error_free(error);
+        g_subprocess_wait_async(ctx->proc, NULL, on_proc_waited, ctx);
+        return;
+    }
+    if (!line) {                       /* EOF: process closed its output */
+        g_subprocess_wait_async(ctx->proc, NULL, on_proc_waited, ctx);
+        return;
+    }
+
+    gchar *valid = g_utf8_make_valid(line, (gssize)len);
+    log_append(valid);
+    g_free(valid);
+    g_free(line);
+    read_next_line(ctx);
+}
+
+static void
+read_next_line(RunCtx *ctx)
+{
+    g_data_input_stream_read_line_async(ctx->in, G_PRIORITY_DEFAULT, NULL,
+                                        on_line_read, ctx);
+}
+
+/* Core: start argv, merge stdout+stderr, stream into the log. */
+static void
+run_async(const char * const *argv, const char *shown, void (*done)(void))
+{
+    if (cmd_busy) {
+        log_append("Another command is still running.");
+        return;
+    }
+
+    log_appendf("$ %s", shown);
+
+    GError *error = NULL;
+    GSubprocess *proc = g_subprocess_newv(
+        argv, G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_MERGE,
+        &error);
     if (!proc) {
-        log_append(g_strdup_printf("(failed to start: %s)", error->message));
+        log_appendf("(failed to start: %s)", error->message);
         g_error_free(error);
         return;
     }
 
-    if (!g_subprocess_communicate_utf8(proc, NULL, NULL, &out, NULL, &error)) {
-        log_append(g_strdup_printf("(failed to run: %s)",
-                                    error ? error->message : "unknown error"));
-        if (error) g_error_free(error);
-        g_object_unref(proc);
-        return;
-    }
+    RunCtx *ctx = g_new0(RunCtx, 1);
+    ctx->proc = proc;
+    ctx->in   = g_data_input_stream_new(g_subprocess_get_stdout_pipe(proc));
+    ctx->done = done;
 
-    if (out && *out) log_append(out);
-
-    gint code = g_subprocess_get_exit_status(proc);
-    if (code != 0 && (!out || !*out))
-        log_append(g_strdup_printf("(exited with status %d, no output)", code));
-
-    g_free(out);
-    g_object_unref(proc);
+    cmd_busy = TRUE;
+    gtk_widget_set_sensitive(notebook, FALSE);
+    read_next_line(ctx);
 }
 
-/* Same as run_cmd but silent (no log lines) and returns stdout, for
- * reading status information (hostname, IP, font, swap) rather than
- * showing a command execution. */
+/* Runs `script` through sh -c (pipes, heredocs, $(...) all work). Only
+ * ever pass scripts whose variable parts were validated. */
+static void
+run_cmd(const char *script, void (*done)(void))
+{
+    const char *argv[] = { "sh", "-c", script, NULL };
+    run_async(argv, script, done);
+}
+
+/* Runs a program directly, no shell. */
+static void
+run_argv(const char * const *argv, void (*done)(void))
+{
+    gchar *shown = g_strjoinv(" ", (gchar **)argv);
+    run_async(argv, shown, done);
+    g_free(shown);
+}
+
+/* Silent synchronous capture for short status queries. */
 static gchar *
 capture_shell(const char *script)
 {
@@ -111,98 +212,164 @@ capture_shell(const char *script)
     return out;
 }
 
-/* Whitelist check for anything that gets spliced into a shell script:
- * letters, digits, and the handful of punctuation marks that legitimate
- * hostnames/IPs/interface names/usernames/DNS lists actually use. Blocks
- * ;, |, `, $, (, ), <, >, quotes, backslash, newline — the characters
- * that would otherwise let a form field escape into arbitrary shell. */
+/* ====================================================================== */
+/* Input validation                                                       */
+/* ====================================================================== */
+
+/* Names (user, service, package, font): starts with a letter/digit, so it
+ * can never be mistaken for an option; then letters, digits, . _ - and
+ * optionally '+' (Alpine package names such as "g++"). */
 static gboolean
-is_safe_token(const char *s)
+is_name_token(const char *s, gboolean allow_plus)
 {
-    if (!s || !*s) return FALSE;
+    if (!s || !*s || strlen(s) > 64) return FALSE;
+    if (!g_ascii_isalnum((guchar)*s)) return FALSE;
     for (const char *p = s; *p; p++) {
         if (g_ascii_isalnum((guchar)*p)) continue;
-        switch (*p) {
-            case '.': case '-': case '_': case ':': case '/': case ' ':
-                continue;
-            default:
-                return FALSE;
-        }
+        if (*p == '.' || *p == '_' || *p == '-') continue;
+        if (allow_plus && *p == '+') continue;
+        return FALSE;
     }
     return TRUE;
 }
 
-/* Sets a user's password without it ever appearing as a command-line
- * argument (which `ps` on another terminal could otherwise see) — feeds
- * "user:password" to chpasswd's stdin instead. This replaces the shell
- * menu's interactive `passwd` call, which needed a real terminal attached
- * to prompt twice; a GUI has no terminal to hand it, so this is the
- * equivalent for a GUI context rather than a straight port. */
+static gboolean
+is_hostname(const char *s)
+{
+    if (!s || !*s || strlen(s) > 63) return FALSE;
+    if (!g_ascii_isalnum((guchar)*s)) return FALSE;
+    for (const char *p = s; *p; p++)
+        if (!g_ascii_isalnum((guchar)*p) && *p != '.' && *p != '-')
+            return FALSE;
+    return TRUE;
+}
+
+static gboolean
+is_iface(const char *s)
+{
+    if (!s || !*s || strlen(s) > 15) return FALSE;
+    if (!g_ascii_isalnum((guchar)*s)) return FALSE;
+    for (const char *p = s; *p; p++)
+        if (!g_ascii_isalnum((guchar)*p) && *p != '.' && *p != '-' && *p != '_')
+            return FALSE;
+    return TRUE;
+}
+
+static gboolean
+is_ipv4(const char *s)
+{
+    struct in_addr a;
+    return s && *s && inet_pton(AF_INET, s, &a) == 1;
+}
+
+static gboolean
+is_ip(const char *s)
+{
+    struct in_addr a4;
+    struct in6_addr a6;
+    return s && *s &&
+           (inet_pton(AF_INET, s, &a4) == 1 || inet_pton(AF_INET6, s, &a6) == 1);
+}
+
+/* "8.8.8.8, 1.1.1.1" -> "8.8.8.8 1.1.1.1"; NULL if any item is not an IP. */
+static gchar *
+normalize_dns(const char *in)
+{
+    gchar **parts = g_strsplit_set(in, " ,\t", -1);
+    GString *res = g_string_new(NULL);
+    gboolean ok = TRUE;
+
+    for (gchar **p = parts; *p; p++) {
+        if (!**p) continue;
+        if (!is_ip(*p)) { ok = FALSE; break; }
+        if (res->len) g_string_append_c(res, ' ');
+        g_string_append(res, *p);
+    }
+    g_strfreev(parts);
+
+    if (!ok || !res->len) { g_string_free(res, TRUE); return NULL; }
+    return g_string_free(res, FALSE);
+}
+
+/* ====================================================================== */
+/* Passwords                                                              */
+/* ====================================================================== */
+
+/* Feeds "user:password" to chpasswd's stdin so the password never shows
+ * up in argv / `ps`. `user` must already be validated (no ':'). */
 static gboolean
 set_password(const char *user, const char *password)
 {
-    GSubprocess *proc;
     GError *error = NULL;
-    gchar *input;
-    gboolean ok;
+    const char *argv[] = { "chpasswd", NULL };
 
-    proc = g_subprocess_new(
-        G_SUBPROCESS_FLAGS_STDIN_PIPE | G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_MERGE,
-        &error, "chpasswd", NULL);
+    GSubprocess *proc = g_subprocess_newv(
+        argv,
+        G_SUBPROCESS_FLAGS_STDIN_PIPE | G_SUBPROCESS_FLAGS_STDOUT_PIPE |
+        G_SUBPROCESS_FLAGS_STDERR_MERGE,
+        &error);
     if (!proc) {
-        log_append(g_strdup_printf("chpasswd failed to start: %s", error->message));
+        log_appendf("chpasswd failed to start: %s", error->message);
         g_error_free(error);
         return FALSE;
     }
 
-    input = g_strdup_printf("%s:%s\n", user, password);
-    ok = g_subprocess_communicate_utf8(proc, input, NULL, NULL, NULL, &error);
+    gchar *input = g_strdup_printf("%s:%s\n", user, password);
+    gchar *out = NULL;
+    gboolean ok = g_subprocess_communicate_utf8(proc, input, NULL, &out, NULL, &error);
+    memset(input, 0, strlen(input));
     g_free(input);
 
     if (!ok) {
-        log_append(g_strdup_printf("chpasswd error: %s", error ? error->message : "unknown"));
+        log_appendf("chpasswd error: %s", error ? error->message : "unknown");
         if (error) g_error_free(error);
+        g_free(out);
         g_object_unref(proc);
         return FALSE;
     }
 
-    gint code = g_subprocess_get_exit_status(proc);
+    if (out && *out) log_append(out);
+    g_free(out);
+
+    gboolean success = g_subprocess_get_successful(proc);
     g_object_unref(proc);
 
-    if (code == 0) {
-        log_append(g_strdup_printf("Password updated for %s.", user));
-        return TRUE;
-    }
-    log_append(g_strdup_printf("chpasswd exited with status %d.", code));
-    return FALSE;
+    if (success) log_appendf("Password updated for %s.", user);
+    else         log_appendf("chpasswd failed for %s.", user);
+    return success;
 }
 
-/* Port of the shell menu's detect_iface(): first non-loopback interface
- * that is up and already has an address, so DHCP/static setup works on
- * any naming (eth*, en*, wlan*), not just eth0. */
+/* ====================================================================== */
+/* Status bar                                                             */
+/* ====================================================================== */
+
+/* First non-loopback interface that is up and already has an address;
+ * failing that, the first one that is merely up; failing that, eth0. */
 static gchar *
 detect_iface(void)
 {
     gchar *out = capture_shell(
-        "for i in $(ip -o link show up 2>/dev/null | awk -F': ' '{print $2}'); do "
+        "first=''; "
+        "for i in $(ip -o link show up 2>/dev/null | awk -F': ' '{print $2}' | sed 's/@.*//'); do "
         "  [ \"$i\" = lo ] && continue; "
+        "  [ -z \"$first\" ] && first=$i; "
         "  if ip addr show \"$i\" 2>/dev/null | grep -q 'inet '; then echo \"$i\"; exit 0; fi; "
-        "done; echo eth0");
-    if (!out || !*out) { g_free(out); return g_strdup("eth0"); }
+        "done; echo \"${first:-eth0}\"");
+    if (!out || !*out || !is_iface(out)) { g_free(out); return g_strdup("eth0"); }
     return out;
 }
 
-/* Port of the shell menu's header(): hostname / IP / font / swap
- * summary, shown above the tabs and refreshed on every tab switch and
- * after any action that could change one of these values. */
 static void
 refresh_status_bar(void)
 {
     gchar *hn = capture_shell("hostname 2>/dev/null || echo rezzos");
+    /* Pick the word after "src" instead of a fixed column: the column
+     * moves when the route has no "via" (directly connected network). */
     gchar *ip = capture_shell(
-        "IP=$(ip route get 1 2>/dev/null | awk '{print $7; exit}'); "
+        "IP=$(ip route get 1 2>/dev/null | "
+        "awk '{for(i=1;i<=NF;i++) if($i==\"src\"){print $(i+1); exit}}'); "
         "if [ -z \"$IP\" ]; then "
-        "  IFACE=$(ip -o link show up 2>/dev/null | awk -F': ' '$2!=\"lo\"{print $2; exit}'); "
+        "  IFACE=$(ip -o link show up 2>/dev/null | awk -F': ' '$2!=\"lo\"{print $2; exit}' | sed 's/@.*//'); "
         "  IP=$(ifconfig \"$IFACE\" 2>/dev/null | grep 'inet addr' | cut -d: -f2 | awk '{print $1}'); "
         "fi; "
         "[ -z \"$IP\" ] && IP='No Network'; echo \"$IP\"");
@@ -221,6 +388,12 @@ refresh_status_bar(void)
     gtk_label_set_text(GTK_LABEL(status_bar_label), text);
 
     g_free(hn); g_free(ip); g_free(font); g_free(swap); g_free(text);
+}
+
+static void
+after_status(void)
+{
+    refresh_status_bar();
 }
 
 /* ---------- helpers to build simple form rows ---------- */
@@ -249,8 +422,6 @@ tab_box(void)
 }
 
 /* ================= Network tab ================= */
-/* Ports net_menu() from the shell script: view status (1), DHCP (2),
- * static IP (3), DNS-only update (4), ping test (5). */
 
 static GtkWidget *net_iface, *net_ip, *net_mask, *net_gw, *net_dns;
 
@@ -271,90 +442,120 @@ on_net_status(GtkButton *b, gpointer d)
         "  echo \"IP: ${IP:-} / MASK: ${MASK:-255.255.255.0}\"; "
         "  echo \"Gateway: ${GW:-none}\"; "
         "  echo \"DNS: ${DNS:-none}\"; "
-        "else echo 'Mode: DHCP (auto-configured at every boot)'; fi");
+        "else echo 'Mode: DHCP (auto-configured at every boot)'; fi",
+        NULL);
 }
 
 static void
 on_net_dhcp(GtkButton *b, gpointer d)
 {
     (void)b; (void)d;
+    const char *typed = gtk_entry_get_text(GTK_ENTRY(net_iface));
     log_clear();
-    run_cmd(
-        "IFACE=$(ip -o link show up 2>/dev/null | awk -F': ' '$2!=\"lo\"{print $2; exit}'); "
-        "[ -z \"$IFACE\" ] && IFACE=eth0; "
-        "echo \"Switching to DHCP on $IFACE (clears any saved static config)...\"; "
-        "rm -f /etc/network.conf /mnt/disk/etc/network.conf; "
+
+    gchar *iface = *typed ? g_strdup(typed) : detect_iface();
+    if (!is_iface(iface)) {
+        log_append("Interface name is not valid.");
+        g_free(iface);
+        return;
+    }
+
+    /* The saved static config is only removed once DHCP actually worked,
+     * so a failed attempt does not destroy a working setup. -n makes
+     * udhcpc exit non-zero when there is no lease (the old -b returned 0
+     * after forking, so "completed" was printed even on failure); on
+     * success it daemonises itself for renewals. Output is redirected so
+     * the daemon does not keep our log pipe open. */
+    gchar *script = g_strdup_printf(
+        "IFACE=%s; "
+        "echo \"Switching to DHCP on $IFACE...\"; "
         "ifconfig \"$IFACE\" up 2>/dev/null; "
-        "if udhcpc -b -i \"$IFACE\" -s /usr/share/udhcpc/default.script 2>/dev/null; then "
-        "  echo \"DHCP configuration completed on $IFACE\"; "
-        "else echo \"DHCP failed or $IFACE not available.\"; fi");
-    refresh_status_bar();
+        "if udhcpc -n -i \"$IFACE\" -s /usr/share/udhcpc/default.script "
+        "   >/dev/null 2>&1 </dev/null; then "
+        "  rm -f /etc/network.conf /mnt/disk/etc/network.conf; "
+        "  echo \"DHCP configuration completed on $IFACE (saved static config removed).\"; "
+        "else "
+        "  echo \"DHCP failed on $IFACE - existing configuration left untouched.\"; "
+        "fi",
+        iface);
+
+    run_cmd(script, after_status);
+    g_free(script);
+    g_free(iface);
 }
 
 static void
 on_net_static_apply(GtkButton *b, gpointer d)
 {
     (void)b; (void)d;
-    const char *iface = gtk_entry_get_text(GTK_ENTRY(net_iface));
-    const char *ip    = gtk_entry_get_text(GTK_ENTRY(net_ip));
-    const char *mask  = gtk_entry_get_text(GTK_ENTRY(net_mask));
-    const char *gw    = gtk_entry_get_text(GTK_ENTRY(net_gw));
-    const char *dns   = gtk_entry_get_text(GTK_ENTRY(net_dns));
+    const char *iface_in = gtk_entry_get_text(GTK_ENTRY(net_iface));
+    const char *ip       = gtk_entry_get_text(GTK_ENTRY(net_ip));
+    const char *mask_in  = gtk_entry_get_text(GTK_ENTRY(net_mask));
+    const char *gw       = gtk_entry_get_text(GTK_ENTRY(net_gw));
+    const char *dns_in   = gtk_entry_get_text(GTK_ENTRY(net_dns));
 
     log_clear();
 
     if (!*ip) { log_append("Enter an IP address first."); return; }
-    if (!*iface) iface = "eth0";
-    if (!*mask)  mask  = "255.255.255.0";
-    if (!*dns)   dns   = "8.8.8.8";
 
-    if (!is_safe_token(iface) || !is_safe_token(ip) || !is_safe_token(mask) ||
-        (*gw && !is_safe_token(gw)) || !is_safe_token(dns)) {
-        log_append("One of the network fields contains characters that aren't allowed.");
-        return;
+    gchar *iface = *iface_in ? g_strdup(iface_in) : detect_iface();
+    const char *mask = *mask_in ? mask_in : "255.255.255.0";
+    gchar *dns = normalize_dns(*dns_in ? dns_in : "8.8.8.8");
+
+    if (!is_iface(iface)) { log_append("Interface name is not valid."); goto out; }
+    if (!is_ipv4(ip))     { log_append("IP address is not a valid IPv4 address."); goto out; }
+    if (!is_ipv4(mask))   { log_append("Subnet mask is not a valid IPv4 mask."); goto out; }
+    if (*gw && !is_ipv4(gw)) { log_append("Gateway is not a valid IPv4 address."); goto out; }
+    if (!dns)             { log_append("DNS servers must be IP addresses separated by spaces or commas."); goto out; }
+
+    {
+        gchar *route_part = *gw
+            ? g_strdup_printf("route add default gw %s 2>/dev/null; ", gw)
+            : g_strdup("");
+
+        gchar *script = g_strdup_printf(
+            "ifconfig %s %s netmask %s up; "
+            "%s"
+            ": > /etc/resolv.conf; for ns in %s; do echo nameserver $ns >> /etc/resolv.conf; done; "
+            "cat > /etc/network.conf << NETCONF\n"
+            "IFACE=\"%s\"\nIP=\"%s\"\nMASK=\"%s\"\nGW=\"%s\"\nDNS=\"%s\"\n"
+            "NETCONF\n"
+            "if grep -q ' /mnt/disk ' /proc/mounts; then "
+            "  mkdir -p /mnt/disk/etc; cp -f /etc/network.conf /mnt/disk/etc/network.conf; "
+            "  echo 'Static config applied and saved (persists across reboots).'; "
+            "else "
+            "  echo 'No persistent disk mounted - the static config will not survive a reboot.'; "
+            "fi",
+            iface, ip, mask, route_part, dns, iface, ip, mask, gw, dns);
+
+        run_cmd(script, after_status);
+        g_free(route_part);
+        g_free(script);
     }
 
-    gchar *route_part = *gw
-        ? g_strdup_printf("route add default gw %s 2>/dev/null; ", gw)
-        : g_strdup("");
-
-    gchar *script = g_strdup_printf(
-        "ifconfig %s %s netmask %s up; "
-        "%s"
-        ": > /etc/resolv.conf; for ns in %s; do echo nameserver $ns >> /etc/resolv.conf; done; "
-        "cat > /etc/network.conf << NETCONF\n"
-        "IFACE=\"%s\"\nIP=\"%s\"\nMASK=\"%s\"\nGW=\"%s\"\nDNS=\"%s\"\n"
-        "NETCONF\n"
-        "if grep -q ' /mnt/disk ' /proc/mounts; then "
-        "  mkdir -p /mnt/disk/etc; cp -f /etc/network.conf /mnt/disk/etc/network.conf; "
-        "  echo 'Static config applied and saved (persists across reboots).'; "
-        "else "
-        "  echo 'No persistent disk mounted - the static config will not survive a reboot.'; "
-        "fi",
-        iface, ip, mask, route_part, dns, iface, ip, mask, gw, dns);
-
-    run_cmd(script);
-    g_free(route_part);
-    g_free(script);
-    refresh_status_bar();
+out:
+    g_free(iface);
+    g_free(dns);
 }
 
 static void
 on_net_dns_only(GtkButton *b, gpointer d)
 {
     (void)b; (void)d;
-    const char *dns = gtk_entry_get_text(GTK_ENTRY(net_dns));
+    const char *dns_in = gtk_entry_get_text(GTK_ENTRY(net_dns));
     log_clear();
 
-    if (!*dns) dns = "8.8.8.8";
-    if (!is_safe_token(dns)) {
-        log_append("DNS field contains characters that aren't allowed.");
+    gchar *dns = normalize_dns(*dns_in ? dns_in : "8.8.8.8");
+    if (!dns) {
+        log_append("DNS servers must be IP addresses separated by spaces or commas.");
         return;
     }
 
+    /* Same persistence rule as the static-IP path: a mounted /mnt/disk
+     * that already holds a static config. */
     gchar *script = g_strdup_printf(
         ": > /etc/resolv.conf; for ns in %s; do echo nameserver $ns >> /etc/resolv.conf; done; "
-        "if [ -f /mnt/disk/etc/network.conf ]; then "
+        "if grep -q ' /mnt/disk ' /proc/mounts && [ -f /mnt/disk/etc/network.conf ]; then "
         "  . /mnt/disk/etc/network.conf; "
         "  cat > /etc/network.conf << NETCONF\n"
         "IFACE=\"${IFACE:-eth0}\"\nIP=\"${IP:-}\"\nMASK=\"${MASK:-255.255.255.0}\"\nGW=\"${GW:-}\"\nDNS=\"%s\"\n"
@@ -367,8 +568,9 @@ on_net_dns_only(GtkButton *b, gpointer d)
         "fi",
         dns, dns, dns, dns);
 
-    run_cmd(script);
+    run_cmd(script, NULL);
     g_free(script);
+    g_free(dns);
 }
 
 static void
@@ -376,7 +578,8 @@ on_net_ping(GtkButton *b, gpointer d)
 {
     (void)b; (void)d;
     log_clear();
-    run_cmd("ping -c 4 8.8.8.8");
+    const char *argv[] = { "ping", "-c", "4", "8.8.8.8", NULL };
+    run_argv(argv, NULL);
 }
 
 static GtkWidget *
@@ -403,7 +606,7 @@ build_network_tab(void)
     gtk_box_pack_start(GTK_BOX(box), static_label, FALSE, FALSE, 0);
 
     gchar *detected = detect_iface();
-    gchar *iface_hint = g_strdup_printf("detected: %s", detected);
+    gchar *iface_hint = g_strdup_printf("detected: %s (used if left empty)", detected);
     net_iface = labeled_entry(box, "Interface", iface_hint);
     g_free(iface_hint);
     g_free(detected);
@@ -446,6 +649,13 @@ refresh_hostname_label(void)
 }
 
 static void
+after_hostname(void)
+{
+    refresh_hostname_label();
+    refresh_status_bar();
+}
+
+static void
 on_hostname_apply(GtkButton *b, gpointer d)
 {
     (void)b; (void)d;
@@ -453,27 +663,26 @@ on_hostname_apply(GtkButton *b, gpointer d)
     log_clear();
 
     if (!*hn) { log_append("Enter a hostname first."); return; }
-    for (const char *p = hn; *p; p++) {
-        if (!g_ascii_isalnum((guchar)*p) && *p != '.' && *p != '-') {
-            log_append("A hostname may only contain letters, digits, dots and hyphens.");
-            return;
-        }
+    if (!is_hostname(hn)) {
+        log_append("A hostname must start with a letter or digit, contain only "
+                   "letters, digits, dots and hyphens, and be at most 63 characters.");
+        return;
     }
 
     gchar *script = g_strdup_printf(
         "hostname %s; echo %s > /etc/hostname; "
-        /* Keep 127.0.0.1 pointing at the machine's own name. Leaving the
-         * old one there makes anything that looks itself up wait for a
-         * lookup that cannot succeed. */
-        "sed -i 's/^127\\.0\\.0\\.1 .*/127.0.0.1 %s localhost/' /etc/hosts 2>/dev/null; "
-        "if [ -d /mnt/disk ]; then mkdir -p /mnt/disk/etc; echo %s > /mnt/disk/etc/hostname; fi; "
+        /* Keep 127.0.0.1 pointing at the machine's own name; add the
+         * line if /etc/hosts has none. */
+        "if grep -q '^127\\.0\\.0\\.1' /etc/hosts 2>/dev/null; then "
+        "  sed -i 's/^127\\.0\\.0\\.1 .*/127.0.0.1 %s localhost/' /etc/hosts; "
+        "else echo '127.0.0.1 %s localhost' >> /etc/hosts; fi; "
+        "if grep -q ' /mnt/disk ' /proc/mounts; then "
+        "  mkdir -p /mnt/disk/etc; echo %s > /mnt/disk/etc/hostname; fi; "
         "echo 'Hostname changed to %s successfully!'",
-        hn, hn, hn, hn, hn);
+        hn, hn, hn, hn, hn, hn);
 
-    run_cmd(script);
+    run_cmd(script, after_hostname);
     g_free(script);
-    refresh_hostname_label();
-    refresh_status_bar();
 }
 
 static GtkWidget *
@@ -503,7 +712,7 @@ on_font_list(GtkButton *b, gpointer d)
     (void)b; (void)d;
     log_clear();
     run_cmd("if command -v font >/dev/null 2>&1; then font list; "
-            "else echo 'font tool not found'; fi");
+            "else echo 'font tool not found'; fi", NULL);
 }
 
 static void
@@ -513,12 +722,13 @@ on_font_apply(GtkButton *b, gpointer d)
     const char *name = gtk_entry_get_text(GTK_ENTRY(font_entry));
     log_clear();
     if (!*name) { log_append("Enter a font name first."); return; }
-    if (!is_safe_token(name)) { log_append("Font name contains characters that aren't allowed."); return; }
+    if (!is_name_token(name, FALSE)) {
+        log_append("Font name contains characters that aren't allowed.");
+        return;
+    }
 
-    gchar *script = g_strdup_printf("font set %s", name);
-    run_cmd(script);
-    g_free(script);
-    refresh_status_bar();
+    const char *argv[] = { "font", "set", name, NULL };
+    run_argv(argv, after_status);
 }
 
 static GtkWidget *
@@ -537,15 +747,12 @@ build_font_tab(void)
 }
 
 /* ================= Keyboard tab ================= */
-/* Ports keyboard_menu(): prefer the standalone rezzkeymap tool if it's
- * installed (checked at click time, same pattern as the Install tab's
- * check for rezzinstall), otherwise fall back to the four quick layouts. */
 
 static void
 on_kb_layout(GtkButton *b, gpointer data)
 {
     (void)b;
-    run_cmd((const char *)data);
+    run_cmd((const char *)data, NULL);
 }
 
 static void
@@ -556,7 +763,7 @@ on_kb_launch_external(GtkButton *b, gpointer d)
     if (g_file_test("/usr/bin/rezzkeymap", G_FILE_TEST_IS_EXECUTABLE)) {
         GError *error = NULL;
         if (!g_spawn_command_line_async("st -e /usr/bin/rezzkeymap", &error)) {
-            log_append(g_strdup_printf("Failed to launch rezzkeymap: %s", error->message));
+            log_appendf("Failed to launch rezzkeymap: %s", error->message);
             g_error_free(error);
         }
     } else {
@@ -579,11 +786,13 @@ build_keyboard_tab(void)
     gtk_label_set_xalign(GTK_LABEL(lbl), 0.0);
     gtk_box_pack_start(GTK_BOX(box), lbl, FALSE, FALSE, 0);
 
-    struct { const char *label; const char *cmd; } opts[] = {
-        {"US / RU (Alt + Shift)",  "setxkbmap -layout us,ru -option grp:alt_shift_toggle,grp_led:scroll"},
-        {"US / RU (Caps Lock)",    "setxkbmap -layout us,ru -option grp:caps_toggle,grp_led:scroll"},
-        {"US / RU (Ctrl + Shift)", "setxkbmap -layout us,ru -option grp:ctrl_shift_toggle,grp_led:scroll"},
-        {"US English only",       "setxkbmap -layout us -option ''"},
+    /* `-option ''` first clears previously set options: setxkbmap appends
+     * otherwise, so switching Alt+Shift -> Caps would leave both active. */
+    static const struct { const char *label; const char *cmd; } opts[] = {
+        {"US / RU (Alt + Shift)",  "setxkbmap -layout us,ru -option '' -option grp:alt_shift_toggle,grp_led:scroll"},
+        {"US / RU (Caps Lock)",    "setxkbmap -layout us,ru -option '' -option grp:caps_toggle,grp_led:scroll"},
+        {"US / RU (Ctrl + Shift)", "setxkbmap -layout us,ru -option '' -option grp:ctrl_shift_toggle,grp_led:scroll"},
+        {"US English only",        "setxkbmap -layout us -option ''"},
     };
 
     for (size_t i = 0; i < G_N_ELEMENTS(opts); i++) {
@@ -601,7 +810,7 @@ on_swap_status(GtkButton *b, gpointer d)
 {
     (void)b; (void)d;
     log_clear();
-    run_cmd("if command -v swap >/dev/null 2>&1; then swap status; else free -m; fi");
+    run_cmd("if command -v swap >/dev/null 2>&1; then swap status; else free -m; fi", NULL);
 }
 
 static void
@@ -610,10 +819,8 @@ on_swap_create(GtkButton *b, gpointer data)
     (void)b;
     const char *size = (const char *)data;
     log_clear();
-    gchar *script = g_strdup_printf("swap create %s", size);
-    run_cmd(script);
-    g_free(script);
-    refresh_status_bar();
+    const char *argv[] = { "swap", "create", size, NULL };
+    run_argv(argv, after_status);
 }
 
 static void
@@ -621,8 +828,8 @@ on_swap_off(GtkButton *b, gpointer d)
 {
     (void)b; (void)d;
     log_clear();
-    run_cmd("swap off 2>/dev/null || swapoff -a 2>/dev/null; echo 'Swap disabled.'");
-    refresh_status_bar();
+    run_cmd("swap off 2>/dev/null || swapoff -a 2>/dev/null; echo 'Swap disabled.'",
+            after_status);
 }
 
 static GtkWidget *
@@ -633,7 +840,7 @@ build_swap_tab(void)
     g_signal_connect(status, "clicked", G_CALLBACK(on_swap_status), NULL);
     gtk_box_pack_start(GTK_BOX(box), status, FALSE, FALSE, 0);
 
-    const char *sizes[] = {"256M", "512M", "1024M"};
+    static const char *sizes[] = {"256M", "512M", "1024M"};
     for (size_t i = 0; i < G_N_ELEMENTS(sizes); i++) {
         gchar *label = g_strdup_printf("Create & Enable Swap (%s)", sizes[i]);
         GtkWidget *btn = gtk_button_new_with_label(label);
@@ -657,7 +864,8 @@ on_svc_list(GtkButton *b, gpointer d)
 {
     (void)b; (void)d;
     log_clear();
-    run_cmd("rsv list");
+    const char *argv[] = { "rsv", "list", NULL };
+    run_argv(argv, NULL);
 }
 
 static void
@@ -668,11 +876,13 @@ on_svc_action(GtkButton *b, gpointer data)
     const char *name = gtk_entry_get_text(GTK_ENTRY(service_entry));
     log_clear();
     if (!*name) { log_append("Enter a service name first."); return; }
-    if (!is_safe_token(name)) { log_append("Service name contains characters that aren't allowed."); return; }
+    if (!is_name_token(name, FALSE)) {
+        log_append("Service name contains characters that aren't allowed.");
+        return;
+    }
 
-    gchar *script = g_strdup_printf("rsv %s %s", action, name);
-    run_cmd(script);
-    g_free(script);
+    const char *argv[] = { "rsv", action, name, NULL };
+    run_argv(argv, NULL);
 }
 
 static GtkWidget *
@@ -700,10 +910,6 @@ build_services_tab(void)
 }
 
 /* ================= Users tab ================= */
-/* Password changes use chpasswd via GSubprocess (stdin, not argv) rather
- * than the shell menu's interactive `passwd` — a GUI has no terminal to
- * hand an interactive prompt to, so this is the GUI-appropriate
- * equivalent rather than a literal port. */
 
 static GtkWidget *root_pw1, *root_pw2;
 static GtkWidget *user_name_pw, *user_pw1, *user_pw2;
@@ -720,9 +926,10 @@ on_root_pw_apply(GtkButton *b, gpointer d)
         log_append("Passwords are empty or do not match.");
         return;
     }
-    set_password("root", p1);
-    gtk_entry_set_text(GTK_ENTRY(root_pw1), "");
-    gtk_entry_set_text(GTK_ENTRY(root_pw2), "");
+    if (set_password("root", p1)) {
+        gtk_entry_set_text(GTK_ENTRY(root_pw1), "");
+        gtk_entry_set_text(GTK_ENTRY(root_pw2), "");
+    }
 }
 
 static void
@@ -734,14 +941,18 @@ on_user_pw_apply(GtkButton *b, gpointer d)
     const char *p2 = gtk_entry_get_text(GTK_ENTRY(user_pw2));
     log_clear();
     if (!*user) { log_append("Enter a username first."); return; }
-    if (!is_safe_token(user)) { log_append("Username contains characters that aren't allowed."); return; }
+    if (!is_name_token(user, FALSE)) {
+        log_append("Username contains characters that aren't allowed.");
+        return;
+    }
     if (!*p1 || strcmp(p1, p2) != 0) {
         log_append("Passwords are empty or do not match.");
         return;
     }
-    set_password(user, p1);
-    gtk_entry_set_text(GTK_ENTRY(user_pw1), "");
-    gtk_entry_set_text(GTK_ENTRY(user_pw2), "");
+    if (set_password(user, p1)) {
+        gtk_entry_set_text(GTK_ENTRY(user_pw1), "");
+        gtk_entry_set_text(GTK_ENTRY(user_pw2), "");
+    }
 }
 
 static void
@@ -751,13 +962,15 @@ on_add_user(GtkButton *b, gpointer d)
     const char *name = gtk_entry_get_text(GTK_ENTRY(new_user_entry));
     log_clear();
     if (!*name) { log_append("Enter a username first."); return; }
-    if (!is_safe_token(name)) { log_append("Username contains characters that aren't allowed."); return; }
+    if (!is_name_token(name, FALSE)) {
+        log_append("Username contains characters that aren't allowed.");
+        return;
+    }
 
-    /* -D: create without prompting for a password; set one afterwards via
-     * the password fields above. */
-    gchar *script = g_strdup_printf("adduser -D %s", name);
-    run_cmd(script);
-    g_free(script);
+    /* -D: create without a password; set one via the fields above.
+     * Run without a shell, so the name is exactly one argument. */
+    const char *argv[] = { "adduser", "-D", name, NULL };
+    run_argv(argv, NULL);
 }
 
 static GtkWidget *
@@ -812,7 +1025,8 @@ on_pkg_update(GtkButton *b, gpointer d)
 {
     (void)b; (void)d;
     log_clear();
-    run_cmd("pkg update");
+    const char *argv[] = { "pkg", "update", NULL };
+    run_argv(argv, NULL);
 }
 
 static void
@@ -822,11 +1036,13 @@ on_pkg_search(GtkButton *b, gpointer d)
     const char *q = gtk_entry_get_text(GTK_ENTRY(pkg_search_entry));
     log_clear();
     if (!*q) { log_append("Enter a search query first."); return; }
-    if (!is_safe_token(q)) { log_append("Search query contains characters that aren't allowed."); return; }
+    if (!is_name_token(q, TRUE)) {
+        log_append("Search query contains characters that aren't allowed.");
+        return;
+    }
 
-    gchar *script = g_strdup_printf("pkg search %s", q);
-    run_cmd(script);
-    g_free(script);
+    const char *argv[] = { "pkg", "search", q, NULL };
+    run_argv(argv, NULL);
 }
 
 static void
@@ -836,11 +1052,13 @@ on_pkg_install(GtkButton *b, gpointer d)
     const char *p = gtk_entry_get_text(GTK_ENTRY(pkg_install_entry));
     log_clear();
     if (!*p) { log_append("Enter a package name first."); return; }
-    if (!is_safe_token(p)) { log_append("Package name contains characters that aren't allowed."); return; }
+    if (!is_name_token(p, TRUE)) {
+        log_append("Package name contains characters that aren't allowed.");
+        return;
+    }
 
-    gchar *script = g_strdup_printf("pkg install %s", p);
-    run_cmd(script);
-    g_free(script);
+    const char *argv[] = { "pkg", "install", p, NULL };
+    run_argv(argv, NULL);
 }
 
 static void
@@ -848,7 +1066,8 @@ on_pkg_list(GtkButton *b, gpointer d)
 {
     (void)b; (void)d;
     log_clear();
-    run_cmd("pkg list");
+    const char *argv[] = { "pkg", "list", NULL };
+    run_argv(argv, NULL);
 }
 
 static GtkWidget *
@@ -888,12 +1107,11 @@ on_launch_installer(GtkButton *b, gpointer d)
         log_append("rezzinstall not found in /usr/bin!");
         return;
     }
-    /* rezzinstall is its own GTK3 window, not a console tool, so it is
-     * launched directly and asynchronously - no terminal wrapper, and no
-     * blocking the control center's event loop while it runs. */
+    /* rezzinstall is its own GTK3 window, so it is launched directly and
+     * asynchronously. */
     GError *error = NULL;
     if (!g_spawn_command_line_async("/usr/bin/rezzinstall", &error)) {
-        log_append(g_strdup_printf("Failed to launch rezzinstall: %s", error->message));
+        log_appendf("Failed to launch rezzinstall: %s", error->message);
         g_error_free(error);
     }
 }
@@ -917,7 +1135,7 @@ build_install_tab(void)
 /* ================= Power tab ================= */
 
 static void
-confirm_and_run(GtkWindow *parent, const char *question, const char *cmd)
+confirm_and_run(GtkWindow *parent, const char *question, const char *prog)
 {
     GtkWidget *dialog = gtk_message_dialog_new(parent,
         GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_YES_NO,
@@ -925,7 +1143,8 @@ confirm_and_run(GtkWindow *parent, const char *question, const char *cmd)
     gint response = gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
     if (response == GTK_RESPONSE_YES) {
-        run_cmd(cmd);
+        const char *argv[] = { prog, NULL };
+        run_argv(argv, NULL);
     }
 }
 
@@ -985,44 +1204,43 @@ main(int argc, char *argv[])
     GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_container_add(GTK_CONTAINER(window), vbox);
 
-    /* Status bar: hostname / IP / font / swap, mirrors the shell menu's
-     * header() banner that used to redraw on every screen. */
     status_bar_label = gtk_label_new("");
     gtk_widget_set_halign(status_bar_label, GTK_ALIGN_START);
-    gtk_container_set_border_width(GTK_CONTAINER(status_bar_label), 0);
     gtk_widget_set_margin_start(status_bar_label, 10);
     gtk_widget_set_margin_top(status_bar_label, 8);
     gtk_widget_set_margin_bottom(status_bar_label, 4);
     gtk_box_pack_start(GTK_BOX(vbox), status_bar_label, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), FALSE, FALSE, 0);
 
+    /* The log is created before the tabs: building a tab may already log. */
+    log_view = gtk_text_view_new();
+    gtk_text_view_set_editable(GTK_TEXT_VIEW(log_view), FALSE);
+    gtk_text_view_set_monospace(GTK_TEXT_VIEW(log_view), TRUE);
+
     notebook = gtk_notebook_new();
+    gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook), GTK_POS_RIGHT);  /* tabs on the right */
+    gtk_notebook_set_scrollable(GTK_NOTEBOOK(notebook), TRUE);
     gtk_box_pack_start(GTK_BOX(vbox), notebook, TRUE, TRUE, 0);
 
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_network_tab(),  gtk_label_new("Network"));
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_hostname_tab(), gtk_label_new("Hostname"));
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_font_tab(),     gtk_label_new("Font"));
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_keyboard_tab(), gtk_label_new("Keyboard"));
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_swap_tab(),     gtk_label_new("Swap"));
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_services_tab(),gtk_label_new("Services"));
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_users_tab(),    gtk_label_new("Users"));
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_packages_tab(),gtk_label_new("Packages"));
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_install_tab(), gtk_label_new("Install"));
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_network_tab(),   gtk_label_new("Network"));
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_hostname_tab(),  gtk_label_new("Hostname"));
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_font_tab(),      gtk_label_new("Font"));
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_keyboard_tab(),  gtk_label_new("Keyboard"));
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_swap_tab(),      gtk_label_new("Swap"));
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_services_tab(),  gtk_label_new("Services"));
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_users_tab(),     gtk_label_new("Users"));
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_packages_tab(),  gtk_label_new("Packages"));
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_install_tab(),   gtk_label_new("Install"));
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook), build_power_tab(window), gtk_label_new("Power"));
 
     g_signal_connect(notebook, "switch-page", G_CALLBACK(on_switch_page), NULL);
 
-    /* Shared output log, visible under every tab. */
     GtkWidget *log_frame = gtk_frame_new("Output");
     gtk_box_pack_start(GTK_BOX(vbox), log_frame, FALSE, FALSE, 0);
 
     GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
     gtk_widget_set_size_request(scroll, -1, 180);
     gtk_container_add(GTK_CONTAINER(log_frame), scroll);
-
-    log_view = gtk_text_view_new();
-    gtk_text_view_set_editable(GTK_TEXT_VIEW(log_view), FALSE);
-    gtk_text_view_set_monospace(GTK_TEXT_VIEW(log_view), TRUE);
     gtk_container_add(GTK_CONTAINER(scroll), log_view);
 
     refresh_status_bar();
