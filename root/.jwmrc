@@ -14,7 +14,6 @@
         <Program icon="settings.png" label="settings">rezzconfig</Program>
         <Program icon="install.png" label="Install RezzOS to Disk">rezzinstall</Program>
         <Separator/>
-        <Program icon="about.png" label="About system">rezzabout>/Program>
         <Menu icon="info.png" label="Power">
             <Program label="Suspend">sh -c 'zenity --info --title="RezzOS" --text="Suspending..." --timeout=2 &amp; suspend'</Program>
             <Program label="Hibernate">sh -c 'zenity --info --title="RezzOS" --text="Hibernating..." --timeout=3 &amp; hibernate'</Program>
