@@ -10,6 +10,7 @@
         <Program icon="monitor.png" label="System Monitor">rtopg</Program>
         <Program icon="view.png" label="Image viewer">rezzview</Program>
         <Program icon="manager.png" label="Service Manager">rsv-gui</Program>
+        <Program icon="about.png" label="About System">rezzabout</Program>
         <Separator/>
         <Program icon="settings.png" label="settings">rezzconfig</Program>
         <Program icon="install.png" label="Install RezzOS to Disk">rezzinstall</Program>
