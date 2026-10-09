@@ -22,5 +22,5 @@ if command -v setxkbmap >/dev/null 2>&1; then
         setxkbmap -layout "$LAYOUT" -option "" 2>/dev/null || true
     fi
 fi
-
+rcomp &
 exec jwm -f /etc/jwm/system.jwmrc
