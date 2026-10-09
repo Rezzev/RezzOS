@@ -33,5 +33,5 @@ fi
 
 # Enable desktop icons and wallpaper
 pcmanfm --desktop &
-
+rcomp &
 exec jwm -f /root/.jwmrc
