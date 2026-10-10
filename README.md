@@ -140,6 +140,7 @@ Thanks to everyone who helps develop the project!
 - [@wqreloxz](https://github.com/wqreloxz) — service scripts, package manager, init improvements.
 - [@TOPDATOP](https://github.com/topdatop01) — wireless support (iwd, dhcpcd).
 - [@thebiggestlarp](https://github.com/thebiggestlarp) - developer rezzfetch
+- [@superuserdo-sudo](https://github.com/superuserdo-sudo) - init security layer devloper
 
 Author contact:
 - Telegram: @Loexez
