@@ -32,11 +32,11 @@ apk update - from alpine repository
 pkg update - from our repository
 ```
 ### Key system utilities
-Rcomp - composer(x11)
-Redit - code editor
-Rbrowser - simple built-in browser on webkit2gtk
-Rconfig - settings menu
-Rinstall - minimal graphical installer
+- Rcomp - composer(x11)
+- Redit - code editor
+- Rbrowser - simple built-in browser on webkit2gtk
+- Rconfig - settings menu
+- Rinstall - minimal graphical installer
 *These aren't all the utilities.*
 ### Other
 - Persistent storage (ext4)
