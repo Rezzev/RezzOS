@@ -2,9 +2,8 @@
   README.md — RezzOS
   Improved and formatted version of the README in English
 -->
-<img src="docs/assets/baner.jpg" alt="RezzOS Banner" width="100%" />
 
-# <img width="40" height="40" src="https://github.com/user-attachments/assets/2ea53faa-fcd1-4380-b317-6dc3e521ccd4" alt="RezzOS logo" /> RezzOS
+# <img width="40" height="40" src="https://github.com/user-attachments/assets/2ea53faa-fcd1-4380-b317-6dc3e521ccd4" alt="RezzOS logo" /> RezzOS - simple distribution
 
 **A minimalist Linux build based on the Linux 6.6.40 kernel and BusyBox**
 
@@ -12,29 +11,6 @@
 [![BusyBox](https://img.shields.io/badge/BusyBox-000000?style=for-the-badge&logo=busybox&logoColor=white)](https://busybox.net)
 [![Shell](https://img.shields.io/badge/Shell-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)](https://www.gnu.org/software/bash/)
 
-<img width="640" height="360" alt="image" src="https://github.com/user-attachments/assets/2d46ea38-c100-47a7-8604-6c5848e375a1" />
-
-
-<p><em>Additional documentation is in the <code>/docs</code> directory.</em></p>
-
-
-
----
-
-## Contents
-- [About the system](#about-the-system)
-- [How install](#Installation-on-hardware)
-- [Features](#features)
-- [RezzUtils](#rezzutils)
-- [Development](#development)
-- [Building from source](#building-from-source)
-- [Network](#network)
-- [Quick start (QEMU)](#quick-start-qemu)
-- [Links](#links)
-- [Contacts and contributors](#contacts-and-contributors)
-- [License](#license)
-
----
 
 ## About the system
 
@@ -50,59 +26,43 @@
 > Change versions in <code>build.sh</code> if you need to build different versions.
 
 ## Features
-- Package manager (Alpine repositories)
+### Package manager (Alpine repositories and its own repository)
+```bash
+apk update - from alpine repository
+pkg update - from our repository
+```
+### Key system utilities
+Rcomp - composer(x11)
+Redit - code editor
+Rbrowser - simple built-in browser on webkit2gtk
+Rconfig - settings menu
+Rinstall - minimal graphical installer
+*These aren't all the utilities.*
+### Other
 - Persistent storage (ext4)
-- Network with DHCP and DNS
-- Built-in diagnostics: `rezzdoctor` checks storage, services, network and memory, and reports what is wrong
 - Lightweight and fast development environment: TCC and Lua in the root filesystem
 
-## RezzUtils
-Built-in utilities for convenient work:
 
-- rezzedit — a simple editor
-- rezztop(-gui) — a system resource monitor
-- rezzbrowser - A lightweight browser powered by WebKit
-- rezzview — an image viewer
-*You can view all the unique programs in the repository yourself.*
-
-Sources and package list: [Rezz-utils source](https://github.com/stars/neko-qt/lists/rezz-utils)
 
 ## Installation on hardware
-For execution in RAM(default):
-- Download the ISO image.
-- Save it to a flash drive.
-- And boot from it.
-
-For loading from disk:
-- Follow the steps outlined above.
-- After starting the system, enter these command:
 ```bash
-rezzinstall
+startx # Start GUI
 ```
+Open installer
+Fill in the input fields and install the system.
 
 ## Building from source
-The simplest way is to use the included build script:
+If you are NOT using Alpine Linux:
+Install alpine in Docker
 
+Then, install the build dependencies:
 ```bash
-(sudo)./build.sh
+apk add build-base flex bison linux-headers elfutils-dev openssl-dev perl bc cpio gzip wget tar grub-bios xorriso qemu-system-x86_64 qemu-img fakeroot gtk+3.0 gtksourceview webkit2gtk libxcomposite-dev libxrender-dev libxfixes-dev libxdamage-dev libx11-dev e2fsprogs gtk+3.0-dev gtksourceview-dev 
 ```
-
-For NixOS use:
-
-```bash
-./nixshell-run.sh
-```
-
-Before building, install dependencies (list in <code>/docs/build dependencies.md</code>).
-The script will automatically download sources, compile the kernel and BusyBox, assemble the rootfs, and create a disk image.
 
 ---
 
-## Network
-If your internet isn't working and your IP address is 10.0.2.15 or similar...
-```bash
-Open the settings, go to the internet configuration section, and manually enter your IP address, netmask, and other details.
-```
+
 
 ## Before using the package manager run:
 
