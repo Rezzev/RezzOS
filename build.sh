@@ -342,7 +342,7 @@ fi
 # Needs webkit2gtk-dev and gtk+3.0-dev on the build host:
 #   apk add gtk+3.0-dev webkit2gtk-dev pkgconfig
 if [ -f "$REPO_DIR/usr/bin/rezzbrowser.c" ]; then
-    if pkg-config --exists gtk+-3.0 webkit2gtk-4.0 2>/dev/null; then
+    if pkg-config --exists gtk+-3.0 webkit2gtk-4.1 2>/dev/null; then
         log "Compiling rezzbrowser"
         gcc -O2 "$REPO_DIR/usr/bin/rezzbrowser.c" \
             $(pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.0) \
