@@ -1,14 +1,4 @@
 /*
- * rezzedit — minimal GTK3 code editor for RezzOS.
- *
- * Sidebar file tree (lazy-loaded directories) + tabbed GtkSourceView
- * editors with automatic syntax highlighting by file extension.
- *
- * Hotkeys: Ctrl+N new, Ctrl+O open, Ctrl+Shift+O open folder,
- *          Ctrl+S save, Ctrl+Shift+S save as, Ctrl+W close tab,
- *          Ctrl+Q quit, Ctrl+Z undo, Ctrl+Y redo.
- * (Ctrl+C/V/X/A work out of the box — GtkTextView's own default bindings.)
- *
  * Build:
  *   gcc -O2 rezzedit.c $(pkg-config --cflags --libs gtk+-3.0 gtksourceview-3.0) \
  *       -o rezzedit
@@ -29,6 +19,95 @@ static GtkTreeStore *tree_store;
 static GtkAccelGroup *accel_group;
 static gchar *current_root = NULL;
 
+/* ---------- settings state ---------- */
+
+typedef struct {
+    gchar *style_scheme;   /* GtkSourceView style scheme id */
+    gint font_size;        /* editor font size, pt */
+    gboolean dark_ui;      /* prefer-dark-theme */
+    gboolean search_wrap;  /* wrap search around buffer */
+    gboolean search_case;  /* case sensitive search */
+    gchar *font_family;    /* editor font family, NULL means Monospace */
+} Settings;
+
+static Settings settings = { NULL, 11, FALSE, TRUE, FALSE, NULL };
+
+/* ---------- configuration file ---------- */
+
+#define CONFIG_FILE "settings.ini"
+#define CFG_GROUP   "settings"
+
+static gchar *config_path(void)
+{
+    return g_build_filename(g_get_user_config_dir(), "rezzedit", CONFIG_FILE, NULL);
+}
+
+/* Loads persisted settings; missing keys keep their defaults. */
+static void
+load_config(void)
+{
+    gchar *path = config_path();
+    GKeyFile *kf = g_key_file_new();
+    if (g_key_file_load_from_file(kf, path, G_KEY_FILE_NONE, NULL)) {
+        GError *err = NULL;
+        gchar *scheme = g_key_file_get_string(kf, CFG_GROUP, "style-scheme", &err);
+        if (err) g_clear_error(&err);
+        else { g_free(settings.style_scheme); settings.style_scheme = scheme; }
+
+        gint size = g_key_file_get_integer(kf, CFG_GROUP, "font-size", &err);
+        if (err) g_clear_error(&err);
+        else if (size >= 6 && size <= 48) settings.font_size = size;
+
+        gboolean b = g_key_file_get_boolean(kf, CFG_GROUP, "dark-ui", &err);
+        if (err) g_clear_error(&err); else settings.dark_ui = b;
+
+        b = g_key_file_get_boolean(kf, CFG_GROUP, "search-wrap", &err);
+        if (err) g_clear_error(&err); else settings.search_wrap = b;
+
+        b = g_key_file_get_boolean(kf, CFG_GROUP, "search-case", &err);
+        if (err) g_clear_error(&err); else settings.search_case = b;
+
+        gchar *family = g_key_file_get_string(kf, CFG_GROUP, "font-family", &err);
+        if (err) g_clear_error(&err);
+        else if (family && *family) { g_free(settings.font_family); settings.font_family = family; }
+        else g_free(family);
+
+        if (settings.dark_ui) {
+            GtkSettings *gtks = gtk_settings_get_default();
+            if (gtks)
+                g_object_set(gtks, "gtk-application-prefer-dark-theme", TRUE, NULL);
+        }
+    }
+    g_key_file_free(kf);
+    g_free(path);
+}
+
+static void
+save_config(void)
+{
+    gchar *path = config_path();
+    gchar *dir = g_path_get_dirname(path);
+    g_mkdir_with_parents(dir, 0755);
+    g_free(dir);
+
+    GKeyFile *kf = g_key_file_new();
+    g_key_file_set_string(kf, CFG_GROUP, "style-scheme",
+        settings.style_scheme ? settings.style_scheme : "classic");
+    g_key_file_set_integer(kf, CFG_GROUP, "font-size", settings.font_size);
+    g_key_file_set_boolean(kf, CFG_GROUP, "dark-ui", settings.dark_ui);
+    g_key_file_set_boolean(kf, CFG_GROUP, "search-wrap", settings.search_wrap);
+    g_key_file_set_boolean(kf, CFG_GROUP, "search-case", settings.search_case);
+    g_key_file_set_string(kf, CFG_GROUP, "font-family",
+        settings.font_family ? settings.font_family : "Monospace");
+
+    gsize len = 0;
+    gchar *data = g_key_file_to_data(kf, &len, NULL);
+    g_file_set_contents(path, data, len, NULL);
+    g_free(data);
+    g_key_file_free(kf);
+    g_free(path);
+}
+
 /* ---------- per-tab state ---------- */
 
 typedef struct {
@@ -47,18 +126,811 @@ current_tab(void)
     return g_object_get_data(G_OBJECT(scroll), "tab");
 }
 
-/* ---------- language / highlighting ---------- */
+/* ---------- language / appearance ---------- */
+
+/*
+ * Extra syntax definitions installed on first run into
+ * ~/.local/share/gtksourceview-3.0/language-specs, so highlighting covers
+ * languages that the distro package does not ship (Zig, Nix, TypeScript,
+ * Dockerfile, ...). They are deliberately plain: keywords, numbers, strings,
+ * comments. Anything already provided by the system wins, since the manager
+ * picks the first definition per id from its search path order.
+ */
+typedef struct {
+    const gchar *id;
+    const gchar *file;     /* file name inside the language-specs dir */
+    const gchar *spec;     /* full XML definition */
+} ExtraLang;
+
+static const ExtraLang extra_langs[] = {
+    { "zig", "zig.lang",
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<language id=\"zig\" name=\"Zig\" version=\"2.0\" _section=\"Source\">\n"
+      "  <metadata>\n"
+      "    <property name=\"globs\">*.zig;*.zon</property>\n"
+      "    <property name=\"mimetypes\">text/x-zig</property>\n"
+      "    <property name=\"line-comment-start\">//</property>\n"
+      "  </metadata>\n"
+      "  <definitions>\n"
+      "    <context id=\"comment\" style-ref=\"def:comment\" end-at-line-end=\"true\">\n"
+      "      <start>//</start>\n"
+      "      <end>\\n</end>\n"
+      "    </context>\n"
+      "    <context id=\"string\" style-ref=\"def:string\" end-at-line-end=\"true\">\n"
+      "      <start>\"</start>\n"
+      "      <end>\"</end>\n"
+      "      <include>\n"
+      "        <context id=\"escape\" style-ref=\"def:special-char\">\n"
+      "          <match>\\\\[\\\\\"'nrt0x]</match>\n"
+      "        </context>\n"
+      "      </include>\n"
+      "    </context>\n"
+      "    <context id=\"keyword\" style-ref=\"def:keyword\">\n"
+      "      <keyword>align</keyword>\n"
+      "      <keyword>allowzero</keyword>\n"
+      "      <keyword>and</keyword>\n"
+      "      <keyword>anyframe</keyword>\n"
+      "      <keyword>anytype</keyword>\n"
+      "      <keyword>asm</keyword>\n"
+      "      <keyword>async</keyword>\n"
+      "      <keyword>await</keyword>\n"
+      "      <keyword>break</keyword>\n"
+      "      <keyword>catch</keyword>\n"
+      "      <keyword>comptime</keyword>\n"
+      "      <keyword>const</keyword>\n"
+      "      <keyword>continue</keyword>\n"
+      "      <keyword>defer</keyword>\n"
+      "      <keyword>else</keyword>\n"
+      "      <keyword>enum</keyword>\n"
+      "      <keyword>errdefer</keyword>\n"
+      "      <keyword>error</keyword>\n"
+      "      <keyword>export</keyword>\n"
+      "      <keyword>extern</keyword>\n"
+      "      <keyword>fn</keyword>\n"
+      "      <keyword>for</keyword>\n"
+      "      <keyword>if</keyword>\n"
+      "      <keyword>inline</keyword>\n"
+      "      <keyword>linksection</keyword>\n"
+      "      <keyword>noalias</keyword>\n"
+      "      <keyword>noinline</keyword>\n"
+      "      <keyword>nosuspend</keyword>\n"
+      "      <keyword>opaque</keyword>\n"
+      "      <keyword>or</keyword>\n"
+      "      <keyword>orelse</keyword>\n"
+      "      <keyword>packed</keyword>\n"
+      "      <keyword>pub</keyword>\n"
+      "      <keyword>resume</keyword>\n"
+      "      <keyword>return</keyword>\n"
+      "      <keyword>struct</keyword>\n"
+      "      <keyword>suspend</keyword>\n"
+      "      <keyword>switch</keyword>\n"
+      "      <keyword>test</keyword>\n"
+      "      <keyword>threadlocal</keyword>\n"
+      "      <keyword>try</keyword>\n"
+      "      <keyword>union</keyword>\n"
+      "      <keyword>unreachable</keyword>\n"
+      "      <keyword>usingnamespace</keyword>\n"
+      "      <keyword>var</keyword>\n"
+      "      <keyword>volatile</keyword>\n"
+      "      <keyword>while</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"type\" style-ref=\"def:type\">\n"
+      "      <keyword>bool</keyword>\n"
+      "      <keyword>void</keyword>\n"
+      "      <keyword>noreturn</keyword>\n"
+      "      <keyword>type</keyword>\n"
+      "      <keyword>anyerror</keyword>\n"
+      "      <keyword>comptime_int</keyword>\n"
+      "      <keyword>comptime_float</keyword>\n"
+      "      <keyword>isize</keyword>\n"
+      "      <keyword>usize</keyword>\n"
+      "      <keyword>u8</keyword>\n"
+      "      <keyword>u16</keyword>\n"
+      "      <keyword>u32</keyword>\n"
+      "      <keyword>u64</keyword>\n"
+      "      <keyword>u128</keyword>\n"
+      "      <keyword>i8</keyword>\n"
+      "      <keyword>i16</keyword>\n"
+      "      <keyword>i32</keyword>\n"
+      "      <keyword>i64</keyword>\n"
+      "      <keyword>i128</keyword>\n"
+      "      <keyword>f16</keyword>\n"
+      "      <keyword>f32</keyword>\n"
+      "      <keyword>f64</keyword>\n"
+      "      <keyword>f80</keyword>\n"
+      "      <keyword>f128</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"constant\" style-ref=\"def:constant\">\n"
+      "      <keyword>true</keyword>\n"
+      "      <keyword>false</keyword>\n"
+      "      <keyword>null</keyword>\n"
+      "      <keyword>undefined</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"number\" style-ref=\"def:number\">\n"
+      "      <match>\\b0[xX][0-9a-fA-F_]+\\b</match>\n"
+      "      <match>\\b0[bB][01_]+\\b</match>\n"
+      "      <match>\\b0[oO][0-7_]+\\b</match>\n"
+      "      <match>\\b[0-9][0-9_]*(\\.[0-9_]+)?([eE][+-]?[0-9]+)?\\b</match>\n"
+      "    </context>\n"
+      "    <context id=\"preprocessor\" style-ref=\"def:preprocessor\">\n"
+      "      <match>@[a-zA-Z_][a-zA-Z0-9_]*</match>\n"
+      "    </context>\n"
+      "    <context id=\"operator\" style-ref=\"def:operator\">\n"
+      "      <match>[+\\-*/%=!&lt;&gt;&amp;|^~?:;,.(){}\\[\\]]</match>\n"
+      "    </context>\n"
+      "  </definitions>\n"
+      "</language>\n" },
+
+    { "nix", "nix.lang",
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<language id=\"nix\" name=\"Nix\" version=\"2.0\" _section=\"Source\">\n"
+      "  <metadata>\n"
+      "    <property name=\"globs\">*.nix</property>\n"
+      "    <property name=\"mimetypes\">text/x-nix</property>\n"
+      "    <property name=\"line-comment-start\">#</property>\n"
+      "  </metadata>\n"
+      "  <definitions>\n"
+      "    <context id=\"comment\" style-ref=\"def:comment\" end-at-line-end=\"true\">\n"
+      "      <start>#</start>\n"
+      "      <end>\\n</end>\n"
+      "    </context>\n"
+      "    <context id=\"string\" style-ref=\"def:string\">\n"
+      "      <start>''</start>\n"
+      "      <end>''</end>\n"
+      "    </context>\n"
+      "    <context id=\"string-double\" style-ref=\"def:string\" end-at-line-end=\"true\">\n"
+      "      <start>\"</start>\n"
+      "      <end>\"</end>\n"
+      "      <include>\n"
+      "        <context id=\"interpolation\" style-ref=\"def:special-char\">\n"
+      "          <start>\\$\\{</start>\n"
+      "          <end>\\}</end>\n"
+      "        </context>\n"
+      "        <context id=\"escape\" style-ref=\"def:special-char\">\n"
+      "          <match>\\\\[nrt\"\\\\$]</match>\n"
+      "        </context>\n"
+      "      </include>\n"
+      "    </context>\n"
+      "    <context id=\"keyword\" style-ref=\"def:keyword\">\n"
+      "      <keyword>assert</keyword>\n"
+      "      <keyword>else</keyword>\n"
+      "      <keyword>if</keyword>\n"
+      "      <keyword>in</keyword>\n"
+      "      <keyword>inherit</keyword>\n"
+      "      <keyword>let</keyword>\n"
+      "      <keyword>or</keyword>\n"
+      "      <keyword>rec</keyword>\n"
+      "      <keyword>then</keyword>\n"
+      "      <keyword>with</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"constant\" style-ref=\"def:constant\">\n"
+      "      <keyword>true</keyword>\n"
+      "      <keyword>false</keyword>\n"
+      "      <keyword>null</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"number\" style-ref=\"def:number\">\n"
+      "      <match>\\b[0-9]+(\\.[0-9]+)?\\b</match>\n"
+      "    </context>\n"
+      "    <context id=\"path\" style-ref=\"def:string\">\n"
+      "      <match>(\\.\\.?|~)?/[a-zA-Z0-9._+\\-/]*</match>\n"
+      "    </context>\n"
+      "    <context id=\"operator\" style-ref=\"def:operator\">\n"
+      "      <match>[@+\\-*/&lt;&gt;=!&amp;|?:;.,(){}\\[\\]]</match>\n"
+      "    </context>\n"
+      "  </definitions>\n"
+      "</language>\n" },
+
+    { "typescript", "typescript.lang",
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<language id=\"typescript\" name=\"TypeScript\" version=\"2.0\" _section=\"Source\">\n"
+      "  <metadata>\n"
+      "    <property name=\"globs\">*.ts;*.tsx;*.mts;*.cts</property>\n"
+      "    <property name=\"mimetypes\">text/typescript;application/x-typescript</property>\n"
+      "    <property name=\"line-comment-start\">//</property>\n"
+      "    <property name=\"block-comment-start\">/*</property>\n"
+      "    <property name=\"block-comment-end\">*/</property>\n"
+      "  </metadata>\n"
+      "  <definitions>\n"
+      "    <context id=\"comment\" style-ref=\"def:comment\" end-at-line-end=\"true\">\n"
+      "      <start>//</start>\n"
+      "      <end>\\n</end>\n"
+      "    </context>\n"
+      "    <context id=\"block-comment\" style-ref=\"def:comment\">\n"
+      "      <start>/\\*</start>\n"
+      "      <end>\\*/</end>\n"
+      "    </context>\n"
+      "    <context id=\"template-string\" style-ref=\"def:string\">\n"
+      "      <start>`</start>\n"
+      "      <end>`</end>\n"
+      "      <include>\n"
+      "        <context id=\"template-interpolation\" style-ref=\"def:special-char\">\n"
+      "          <start>\\$\\{</start>\n"
+      "          <end>\\}</end>\n"
+      "        </context>\n"
+      "      </include>\n"
+      "    </context>\n"
+      "    <context id=\"string\" style-ref=\"def:string\" end-at-line-end=\"true\">\n"
+      "      <start>\"</start>\n"
+      "      <end>\"</end>\n"
+      "      <include>\n"
+      "        <context id=\"escape\" style-ref=\"def:special-char\">\n"
+      "          <match>\\\\[\\\\\"'nrtbfv0xu]</match>\n"
+      "        </context>\n"
+      "      </include>\n"
+      "    </context>\n"
+      "    <context id=\"string-single\" style-ref=\"def:string\" end-at-line-end=\"true\">\n"
+      "      <start>'</start>\n"
+      "      <end>'</end>\n"
+      "      <include>\n"
+      "        <context id=\"escape-single\" style-ref=\"def:special-char\">\n"
+      "          <match>\\\\[\\\\'nrtbfv0xu]</match>\n"
+      "        </context>\n"
+      "      </include>\n"
+      "    </context>\n"
+      "    <context id=\"keyword\" style-ref=\"def:keyword\">\n"
+      "      <keyword>as</keyword>\n"
+      "      <keyword>async</keyword>\n"
+      "      <keyword>await</keyword>\n"
+      "      <keyword>break</keyword>\n"
+      "      <keyword>case</keyword>\n"
+      "      <keyword>catch</keyword>\n"
+      "      <keyword>class</keyword>\n"
+      "      <keyword>const</keyword>\n"
+      "      <keyword>continue</keyword>\n"
+      "      <keyword>debugger</keyword>\n"
+      "      <keyword>declare</keyword>\n"
+      "      <keyword>default</keyword>\n"
+      "      <keyword>delete</keyword>\n"
+      "      <keyword>do</keyword>\n"
+      "      <keyword>else</keyword>\n"
+      "      <keyword>enum</keyword>\n"
+      "      <keyword>export</keyword>\n"
+      "      <keyword>extends</keyword>\n"
+      "      <keyword>false</keyword>\n"
+      "      <keyword>finally</keyword>\n"
+      "      <keyword>for</keyword>\n"
+      "      <keyword>from</keyword>\n"
+      "      <keyword>function</keyword>\n"
+      "      <keyword>get</keyword>\n"
+      "      <keyword>if</keyword>\n"
+      "      <keyword>implements</keyword>\n"
+      "      <keyword>import</keyword>\n"
+      "      <keyword>in</keyword>\n"
+      "      <keyword>instanceof</keyword>\n"
+      "      <keyword>interface</keyword>\n"
+      "      <keyword>keyof</keyword>\n"
+      "      <keyword>let</keyword>\n"
+      "      <keyword>namespace</keyword>\n"
+      "      <keyword>new</keyword>\n"
+      "      <keyword>null</keyword>\n"
+      "      <keyword>of</keyword>\n"
+      "      <keyword>private</keyword>\n"
+      "      <keyword>protected</keyword>\n"
+      "      <keyword>public</keyword>\n"
+      "      <keyword>readonly</keyword>\n"
+      "      <keyword>return</keyword>\n"
+      "      <keyword>satisfies</keyword>\n"
+      "      <keyword>set</keyword>\n"
+      "      <keyword>static</keyword>\n"
+      "      <keyword>super</keyword>\n"
+      "      <keyword>switch</keyword>\n"
+      "      <keyword>this</keyword>\n"
+      "      <keyword>throw</keyword>\n"
+      "      <keyword>true</keyword>\n"
+      "      <keyword>try</keyword>\n"
+      "      <keyword>type</keyword>\n"
+      "      <keyword>typeof</keyword>\n"
+      "      <keyword>undefined</keyword>\n"
+      "      <keyword>var</keyword>\n"
+      "      <keyword>void</keyword>\n"
+      "      <keyword>while</keyword>\n"
+      "      <keyword>with</keyword>\n"
+      "      <keyword>yield</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"type\" style-ref=\"def:type\">\n"
+      "      <keyword>any</keyword>\n"
+      "      <keyword>bigint</keyword>\n"
+      "      <keyword>boolean</keyword>\n"
+      "      <keyword>never</keyword>\n"
+      "      <keyword>number</keyword>\n"
+      "      <keyword>object</keyword>\n"
+      "      <keyword>string</keyword>\n"
+      "      <keyword>symbol</keyword>\n"
+      "      <keyword>unknown</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"number\" style-ref=\"def:number\">\n"
+      "      <match>\\b0[xX][0-9a-fA-F_]+n?\\b</match>\n"
+      "      <match>\\b0[bB][01_]+n?\\b</match>\n"
+      "      <match>\\b0[oO][0-7_]+n?\\b</match>\n"
+      "      <match>\\b[0-9][0-9_]*(\\.[0-9_]+)?([eE][+-]?[0-9]+)?n?\\b</match>\n"
+      "    </context>\n"
+      "    <context id=\"regex\" style-ref=\"def:string\">\n"
+      "      <match>/(?:[^/\\\\\\n]|\\\\.)+/[gimsuy]*</match>\n"
+      "    </context>\n"
+      "    <context id=\"operator\" style-ref=\"def:operator\">\n"
+      "      <match>[+\\-*/%=!&lt;&gt;&amp;|^~?:;,.(){}\\[\\]]</match>\n"
+      "    </context>\n"
+      "  </definitions>\n"
+      "</language>\n" },
+
+    { "dockerfile", "dockerfile.lang",
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<language id=\"dockerfile\" name=\"Dockerfile\" version=\"2.0\" _section=\"Source\">\n"
+      "  <metadata>\n"
+      "    <property name=\"globs\">Dockerfile;*.dockerfile;Containerfile</property>\n"
+      "    <property name=\"mimetypes\">text/x-dockerfile</property>\n"
+      "    <property name=\"line-comment-start\">#</property>\n"
+      "  </metadata>\n"
+      "  <styles>\n"
+      "    <style id=\"variable\" name=\"Variable\" map-to=\"def:identifier\"/>\n"
+      "  </styles>\n"
+      "  <definitions>\n"
+      "    <context id=\"comment\" style-ref=\"def:comment\" end-at-line-end=\"true\">\n"
+      "      <start>#</start>\n"
+      "      <end>\\n</end>\n"
+      "    </context>\n"
+      "    <context id=\"string\" style-ref=\"def:string\" end-at-line-end=\"true\">\n"
+      "      <start>\"</start>\n"
+      "      <end>\"</end>\n"
+      "      <include>\n"
+      "        <context id=\"escape\" style-ref=\"def:special-char\">\n"
+      "          <match>\\\\[\\\\\"'nrt$]</match>\n"
+      "        </context>\n"
+      "      </include>\n"
+      "    </context>\n"
+      "    <context id=\"string-single\" style-ref=\"def:string\" end-at-line-end=\"true\">\n"
+      "      <start>'</start>\n"
+      "      <end>'</end>\n"
+      "    </context>\n"
+      "    <context id=\"keyword\" style-ref=\"def:keyword\">\n"
+      "      <keyword>FROM</keyword>\n"
+      "      <keyword>RUN</keyword>\n"
+      "      <keyword>CMD</keyword>\n"
+      "      <keyword>LABEL</keyword>\n"
+      "      <keyword>MAINTAINER</keyword>\n"
+      "      <keyword>EXPOSE</keyword>\n"
+      "      <keyword>ENV</keyword>\n"
+      "      <keyword>ADD</keyword>\n"
+      "      <keyword>COPY</keyword>\n"
+      "      <keyword>ENTRYPOINT</keyword>\n"
+      "      <keyword>VOLUME</keyword>\n"
+      "      <keyword>USER</keyword>\n"
+      "      <keyword>WORKDIR</keyword>\n"
+      "      <keyword>ARG</keyword>\n"
+      "      <keyword>ONBUILD</keyword>\n"
+      "      <keyword>STOPSIGNAL</keyword>\n"
+      "      <keyword>HEALTHCHECK</keyword>\n"
+      "      <keyword>SHELL</keyword>\n"
+      "      <keyword>AS</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"variable\" style-ref=\"def:variable\">\n"
+      "      <match>\\$\\{[a-zA-Z_][a-zA-Z0-9_]*\\}</match>\n"
+      "      <match>\\$[a-zA-Z_][a-zA-Z0-9_]*</match>\n"
+      "    </context>\n"
+      "    <context id=\"number\" style-ref=\"def:number\">\n"
+      "      <match>\\b[0-9]+\\b</match>\n"
+      "    </context>\n"
+      "  </definitions>\n"
+      "</language>\n" },
+
+    { "dart", "dart.lang",
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<language id=\"dart\" name=\"Dart\" version=\"2.0\" _section=\"Source\">\n"
+      "  <metadata>\n"
+      "    <property name=\"globs\">*.dart</property>\n"
+      "    <property name=\"mimetypes\">text/x-dart;application/dart</property>\n"
+      "    <property name=\"line-comment-start\">//</property>\n"
+      "    <property name=\"block-comment-start\">/*</property>\n"
+      "    <property name=\"block-comment-end\">*/</property>\n"
+      "  </metadata>\n"
+      "  <definitions>\n"
+      "    <context id=\"comment\" style-ref=\"def:comment\" end-at-line-end=\"true\">\n"
+      "      <start>//</start>\n"
+      "      <end>\\n</end>\n"
+      "    </context>\n"
+      "    <context id=\"block-comment\" style-ref=\"def:comment\">\n"
+      "      <start>/\\*</start>\n"
+      "      <end>\\*/</end>\n"
+      "    </context>\n"
+      "    <context id=\"annotation\" style-ref=\"def:preprocessor\" end-at-line-end=\"true\">\n"
+      "      <start>@</start>\n"
+      "      <end>\\s</end>\n"
+      "    </context>\n"
+      "    <context id=\"triple-string\" style-ref=\"def:string\">\n"
+      "      <start>\"\"\"</start>\n"
+      "      <end>\"\"\"</end>\n"
+      "    </context>\n"
+      "    <context id=\"triple-string-single\" style-ref=\"def:string\">\n"
+      "      <start>'''</start>\n"
+      "      <end>'''</end>\n"
+      "    </context>\n"
+      "    <context id=\"string\" style-ref=\"def:string\" end-at-line-end=\"true\">\n"
+      "      <start>\"</start>\n"
+      "      <end>\"</end>\n"
+      "      <include>\n"
+      "        <context id=\"interpolation\" style-ref=\"def:special-char\">\n"
+      "          <start>\\$\\{</start>\n"
+      "          <end>\\}</end>\n"
+      "        </context>\n"
+      "        <context id=\"escape\" style-ref=\"def:special-char\">\n"
+      "          <match>\\\\[\\\\\"'nrtbfv0xu$]</match>\n"
+      "        </context>\n"
+      "      </include>\n"
+      "    </context>\n"
+      "    <context id=\"string-single\" style-ref=\"def:string\" end-at-line-end=\"true\">\n"
+      "      <start>'</start>\n"
+      "      <end>'</end>\n"
+      "      <include>\n"
+      "        <context id=\"escape-single\" style-ref=\"def:special-char\">\n"
+      "          <match>\\\\[\\\\'nrtbfv0xu$]</match>\n"
+      "        </context>\n"
+      "      </include>\n"
+      "    </context>\n"
+      "    <context id=\"keyword\" style-ref=\"def:keyword\">\n"
+      "      <keyword>abstract</keyword>\n"
+      "      <keyword>as</keyword>\n"
+      "      <keyword>assert</keyword>\n"
+      "      <keyword>async</keyword>\n"
+      "      <keyword>await</keyword>\n"
+      "      <keyword>break</keyword>\n"
+      "      <keyword>case</keyword>\n"
+      "      <keyword>catch</keyword>\n"
+      "      <keyword>class</keyword>\n"
+      "      <keyword>const</keyword>\n"
+      "      <keyword>continue</keyword>\n"
+      "      <keyword>covariant</keyword>\n"
+      "      <keyword>default</keyword>\n"
+      "      <keyword>deferred</keyword>\n"
+      "      <keyword>do</keyword>\n"
+      "      <keyword>dynamic</keyword>\n"
+      "      <keyword>else</keyword>\n"
+      "      <keyword>enum</keyword>\n"
+      "      <keyword>export</keyword>\n"
+      "      <keyword>extends</keyword>\n"
+      "      <keyword>extension</keyword>\n"
+      "      <keyword>external</keyword>\n"
+      "      <keyword>factory</keyword>\n"
+      "      <keyword>final</keyword>\n"
+      "      <keyword>finally</keyword>\n"
+      "      <keyword>for</keyword>\n"
+      "      <keyword>get</keyword>\n"
+      "      <keyword>hide</keyword>\n"
+      "      <keyword>if</keyword>\n"
+      "      <keyword>implements</keyword>\n"
+      "      <keyword>import</keyword>\n"
+      "      <keyword>in</keyword>\n"
+      "      <keyword>interface</keyword>\n"
+      "      <keyword>is</keyword>\n"
+      "      <keyword>late</keyword>\n"
+      "      <keyword>library</keyword>\n"
+      "      <keyword>mixin</keyword>\n"
+      "      <keyword>new</keyword>\n"
+      "      <keyword>on</keyword>\n"
+      "      <keyword>operator</keyword>\n"
+      "      <keyword>part</keyword>\n"
+      "      <keyword>required</keyword>\n"
+      "      <keyword>rethrow</keyword>\n"
+      "      <keyword>return</keyword>\n"
+      "      <keyword>set</keyword>\n"
+      "      <keyword>show</keyword>\n"
+      "      <keyword>static</keyword>\n"
+      "      <keyword>super</keyword>\n"
+      "      <keyword>switch</keyword>\n"
+      "      <keyword>sync</keyword>\n"
+      "      <keyword>this</keyword>\n"
+      "      <keyword>throw</keyword>\n"
+      "      <keyword>try</keyword>\n"
+      "      <keyword>typedef</keyword>\n"
+      "      <keyword>var</keyword>\n"
+      "      <keyword>void</keyword>\n"
+      "      <keyword>while</keyword>\n"
+      "      <keyword>with</keyword>\n"
+      "      <keyword>yield</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"type\" style-ref=\"def:type\">\n"
+      "      <keyword>bool</keyword>\n"
+      "      <keyword>double</keyword>\n"
+      "      <keyword>int</keyword>\n"
+      "      <keyword>num</keyword>\n"
+      "      <keyword>Object</keyword>\n"
+      "      <keyword>String</keyword>\n"
+      "      <keyword>Future</keyword>\n"
+      "      <keyword>Stream</keyword>\n"
+      "      <keyword>List</keyword>\n"
+      "      <keyword>Map</keyword>\n"
+      "      <keyword>Set</keyword>\n"
+      "      <keyword>Iterable</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"constant\" style-ref=\"def:constant\">\n"
+      "      <keyword>true</keyword>\n"
+      "      <keyword>false</keyword>\n"
+      "      <keyword>null</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"number\" style-ref=\"def:number\">\n"
+      "      <match>\\b0[xX][0-9a-fA-F]+\\b</match>\n"
+      "      <match>\\b[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?\\b</match>\n"
+      "    </context>\n"
+      "    <context id=\"operator\" style-ref=\"def:operator\">\n"
+      "      <match>[+\\-*/%=!&lt;&gt;&amp;|^~?:;,.(){}\\[\\]]</match>\n"
+      "    </context>\n"
+      "  </definitions>\n"
+      "</language>\n" },
+
+    { "terraform", "terraform.lang",
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<language id=\"terraform\" name=\"Terraform\" version=\"2.0\" _section=\"Source\">\n"
+      "  <metadata>\n"
+      "    <property name=\"globs\">*.tf;*.tfvars;*.hcl;*.nomad</property>\n"
+      "    <property name=\"mimetypes\">text/x-terraform;text/x-hcl</property>\n"
+      "    <property name=\"line-comment-start\">#</property>\n"
+      "    <property name=\"block-comment-start\">/*</property>\n"
+      "    <property name=\"block-comment-end\">*/</property>\n"
+      "  </metadata>\n"
+      "  <definitions>\n"
+      "    <context id=\"comment\" style-ref=\"def:comment\" end-at-line-end=\"true\">\n"
+      "      <start>#</start>\n"
+      "      <end>\\n</end>\n"
+      "    </context>\n"
+      "    <context id=\"comment-slash\" style-ref=\"def:comment\" end-at-line-end=\"true\">\n"
+      "      <start>//</start>\n"
+      "      <end>\\n</end>\n"
+      "    </context>\n"
+      "    <context id=\"block-comment\" style-ref=\"def:comment\">\n"
+      "      <start>/\\*</start>\n"
+      "      <end>\\*/</end>\n"
+      "    </context>\n"
+      "    <context id=\"heredoc\" style-ref=\"def:string\">\n"
+      "      <start>&lt;&lt;-?[A-Za-z_][A-Za-z0-9_]*</start>\n"
+      "      <end>^\\s*[A-Za-z_][A-Za-z0-9_]*\\s*$</end>\n"
+      "    </context>\n"
+      "    <context id=\"string\" style-ref=\"def:string\" end-at-line-end=\"true\">\n"
+      "      <start>\"</start>\n"
+      "      <end>\"</end>\n"
+      "      <include>\n"
+      "        <context id=\"interpolation\" style-ref=\"def:special-char\">\n"
+      "          <start>\\$\\{</start>\n"
+      "          <end>\\}</end>\n"
+      "        </context>\n"
+      "        <context id=\"escape\" style-ref=\"def:special-char\">\n"
+      "          <match>\\\\[\\\\\"nrt$%]</match>\n"
+      "        </context>\n"
+      "      </include>\n"
+      "    </context>\n"
+      "    <context id=\"keyword\" style-ref=\"def:keyword\">\n"
+      "      <keyword>resource</keyword>\n"
+      "      <keyword>data</keyword>\n"
+      "      <keyword>variable</keyword>\n"
+      "      <keyword>output</keyword>\n"
+      "      <keyword>module</keyword>\n"
+      "      <keyword>provider</keyword>\n"
+      "      <keyword>terraform</keyword>\n"
+      "      <keyword>locals</keyword>\n"
+      "      <keyword>dynamic</keyword>\n"
+      "      <keyword>for_each</keyword>\n"
+      "      <keyword>count</keyword>\n"
+      "      <keyword>depends_on</keyword>\n"
+      "      <keyword>lifecycle</keyword>\n"
+      "      <keyword>provisioner</keyword>\n"
+      "      <keyword>connection</keyword>\n"
+      "      <keyword>backend</keyword>\n"
+      "      <keyword>required_providers</keyword>\n"
+      "      <keyword>if</keyword>\n"
+      "      <keyword>else</keyword>\n"
+      "      <keyword>for</keyword>\n"
+      "      <keyword>in</keyword>\n"
+      "      <keyword>endfor</keyword>\n"
+      "      <keyword>endif</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"constant\" style-ref=\"def:constant\">\n"
+      "      <keyword>true</keyword>\n"
+      "      <keyword>false</keyword>\n"
+      "      <keyword>null</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"number\" style-ref=\"def:number\">\n"
+      "      <match>\\b[0-9]+(\\.[0-9]+)?\\b</match>\n"
+      "    </context>\n"
+      "    <context id=\"operator\" style-ref=\"def:operator\">\n"
+      "      <match>[-+=!&lt;&gt;&amp;|?:.,(){}\\[\\]]</match>\n"
+      "    </context>\n"
+      "  </definitions>\n"
+      "</language>\n" },
+
+    { "graphql", "graphql.lang",
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<language id=\"graphql\" name=\"GraphQL\" version=\"2.0\" _section=\"Source\">\n"
+      "  <metadata>\n"
+      "    <property name=\"globs\">*.graphql;*.gql;*.graphqls</property>\n"
+      "    <property name=\"mimetypes\">application/graphql</property>\n"
+      "    <property name=\"line-comment-start\">#</property>\n"
+      "  </metadata>\n"
+      "  <definitions>\n"
+      "    <context id=\"comment\" style-ref=\"def:comment\" end-at-line-end=\"true\">\n"
+      "      <start>#</start>\n"
+      "      <end>\\n</end>\n"
+      "    </context>\n"
+      "    <context id=\"block-string\" style-ref=\"def:string\">\n"
+      "      <start>\"\"\"</start>\n"
+      "      <end>\"\"\"</end>\n"
+      "    </context>\n"
+      "    <context id=\"string\" style-ref=\"def:string\" end-at-line-end=\"true\">\n"
+      "      <start>\"</start>\n"
+      "      <end>\"</end>\n"
+      "      <include>\n"
+      "        <context id=\"escape\" style-ref=\"def:special-char\">\n"
+      "          <match>\\\\[\"\\\\/bfnrtu]</match>\n"
+      "        </context>\n"
+      "      </include>\n"
+      "    </context>\n"
+      "    <context id=\"keyword\" style-ref=\"def:keyword\">\n"
+      "      <keyword>query</keyword>\n"
+      "      <keyword>mutation</keyword>\n"
+      "      <keyword>subscription</keyword>\n"
+      "      <keyword>fragment</keyword>\n"
+      "      <keyword>on</keyword>\n"
+      "      <keyword>schema</keyword>\n"
+      "      <keyword>type</keyword>\n"
+      "      <keyword>interface</keyword>\n"
+      "      <keyword>union</keyword>\n"
+      "      <keyword>enum</keyword>\n"
+      "      <keyword>input</keyword>\n"
+      "      <keyword>scalar</keyword>\n"
+      "      <keyword>directive</keyword>\n"
+      "      <keyword>extend</keyword>\n"
+      "      <keyword>implements</keyword>\n"
+      "      <keyword>repeatable</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"constant\" style-ref=\"def:constant\">\n"
+      "      <keyword>true</keyword>\n"
+      "      <keyword>false</keyword>\n"
+      "      <keyword>null</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"type\" style-ref=\"def:type\">\n"
+      "      <keyword>Int</keyword>\n"
+      "      <keyword>Float</keyword>\n"
+      "      <keyword>String</keyword>\n"
+      "      <keyword>Boolean</keyword>\n"
+      "      <keyword>ID</keyword>\n"
+      "    </context>\n"
+      "    <context id=\"annotation\" style-ref=\"def:preprocessor\" end-at-line-end=\"true\">\n"
+      "      <start>@</start>\n"
+      "      <end>\\s</end>\n"
+      "    </context>\n"
+      "    <context id=\"variable\" style-ref=\"def:special-char\">\n"
+      "      <match>\\$[A-Za-z_][A-Za-z0-9_]*</match>\n"
+      "    </context>\n"
+      "    <context id=\"number\" style-ref=\"def:number\">\n"
+      "      <match>-?\\b[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?\\b</match>\n"
+      "    </context>\n"
+      "    <context id=\"operator\" style-ref=\"def:operator\">\n"
+      "      <match>[=!&lt;&gt;&amp;|:.,(){}\\[\\]]</match>\n"
+      "    </context>\n"
+      "  </definitions>\n"
+      "</language>\n" },
+};
+
+static void
+install_extra_languages(void)
+{
+    gchar *dir = g_build_filename(g_get_user_data_dir(),
+        "gtksourceview-3.0", "language-specs", NULL);
+    g_mkdir_with_parents(dir, 0755);
+
+    for (guint i = 0; i < G_N_ELEMENTS(extra_langs); i++) {
+        gchar *path = g_build_filename(dir, extra_langs[i].file, NULL);
+        gchar *existing = NULL;
+        gboolean same = g_file_get_contents(path, &existing, NULL, NULL) &&
+                        g_strcmp0(existing, extra_langs[i].spec) == 0;
+        g_free(existing);
+        if (!same)
+            g_file_set_contents(path, extra_langs[i].spec, -1, NULL);
+        g_free(path);
+    }
+    g_free(dir);
+}
+
+/* Filenames without an extension need an explicit mapping. */
+static const gchar *
+language_id_for_basename(const gchar *basename)
+{
+    static const struct { const gchar *name; const gchar *id; } table[] = {
+        { "Makefile",     "makefile" },
+        { "GNUmakefile",  "makefile" },
+        { "makefile",     "makefile" },
+        { "Dockerfile",   "dockerfile" },
+        { "Containerfile","dockerfile" },
+        { "CMakeLists.txt","cmake" },
+        { "SConstruct",   "python3" },
+        { "meson.build",  "meson" },
+        { "PKGBUILD",     "sh" },
+        { "Rakefile",     "ruby" },
+        { "Gemfile",      "ruby" },
+    };
+    for (guint i = 0; i < G_N_ELEMENTS(table); i++)
+        if (g_strcmp0(basename, table[i].name) == 0)
+            return table[i].id;
+    return NULL;
+}
 
 static void
 apply_language_for_path(GtkSourceBuffer *buffer, const gchar *path)
 {
     GtkSourceLanguageManager *lm = gtk_source_language_manager_get_default();
-    GtkSourceLanguage *lang = gtk_source_language_manager_guess_language(lm, path, NULL);
-    gtk_source_buffer_set_language(buffer, lang);
+    GtkSourceLanguage *lang = NULL;
 
+    if (path) {
+        const gchar *base = strrchr(path, '/');
+        base = base ? base + 1 : path;
+
+        const gchar *forced = language_id_for_basename(base);
+        if (forced)
+            lang = gtk_source_language_manager_get_language(lm, forced);
+
+        /* Extensionless files have no MIME guess, so also try the content. */
+        if (!lang)
+            lang = gtk_source_language_manager_guess_language(lm, path, NULL);
+        if (!lang && !strchr(base, '.')) {
+            gchar *contents = NULL;
+            if (g_file_get_contents(path, &contents, NULL, NULL)) {
+                gchar *first = contents;
+                gchar *nl = strchr(contents, '\n');
+                if (nl) *nl = '\0';
+                lang = gtk_source_language_manager_guess_language(lm, base, first);
+                g_free(first);
+            }
+        }
+    }
+
+    gtk_source_buffer_set_language(buffer, lang);
+}
+
+static GtkSourceStyleScheme *
+current_style_scheme(void)
+{
     GtkSourceStyleSchemeManager *sm = gtk_source_style_scheme_manager_get_default();
-    GtkSourceStyleScheme *scheme = gtk_source_style_scheme_manager_get_scheme(sm, "classic");
-    if (scheme) gtk_source_buffer_set_style_scheme(buffer, scheme);
+    GtkSourceStyleScheme *scheme = NULL;
+    if (settings.style_scheme)
+        scheme = gtk_source_style_scheme_manager_get_scheme(sm, settings.style_scheme);
+    if (!scheme)
+        scheme = gtk_source_style_scheme_manager_get_scheme(sm, "classic");
+    return scheme;
+}
+
+static GtkCssProvider *font_provider = NULL;
+
+static void
+apply_font_css(void)
+{
+    if (!font_provider) {
+        font_provider = gtk_css_provider_new();
+        gtk_style_context_add_provider_for_screen(gdk_screen_get_default(),
+            GTK_STYLE_PROVIDER(font_provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    }
+    gchar *css = g_strdup_printf(
+        "textview { font-family: %s; font-size: %dpt; }",
+        settings.font_family ? settings.font_family : "Monospace",
+        settings.font_size);
+    gtk_css_provider_load_from_data(font_provider, css, -1, NULL);
+    g_free(css);
+}
+
+static void
+apply_appearance(EditorTab *tab)
+{
+    GtkSourceStyleScheme *scheme = current_style_scheme();
+    if (scheme)
+        gtk_source_buffer_set_style_scheme(tab->buffer, scheme);
+}
+
+static void
+apply_style_to_all_tabs(void)
+{
+    apply_font_css();
+    gint n = gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook));
+    for (gint i = 0; i < n; i++) {
+        GtkWidget *scroll = gtk_notebook_get_nth_page(GTK_NOTEBOOK(notebook), i);
+        EditorTab *tab = g_object_get_data(G_OBJECT(scroll), "tab");
+        if (tab) apply_appearance(tab);
+    }
 }
 
 /* ---------- tab title helpers ---------- */
@@ -138,6 +1010,7 @@ new_tab(const gchar *path)
         apply_language_for_path(tab->buffer, path);
     }
     gtk_text_buffer_set_modified(GTK_TEXT_BUFFER(tab->buffer), FALSE);
+    apply_appearance(tab);
 
     GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
     gtk_container_add(GTK_CONTAINER(scroll), tab->source_view);
@@ -357,6 +1230,307 @@ on_tree_row_activated(GtkTreeView *tv, GtkTreePath *path, GtkTreeViewColumn *col
     g_free(filepath);
 }
 
+/* ---------- search ---------- */
+
+static GtkWidget *search_entry;
+static GtkWidget *search_status;
+static GtkWidget *settings_notebook;
+
+static gboolean
+do_search(gboolean forward)
+{
+    EditorTab *tab = current_tab();
+    if (!tab) return FALSE;
+
+    const gchar *needle = gtk_entry_get_text(GTK_ENTRY(search_entry));
+    if (!needle || !*needle) {
+        if (search_status) gtk_label_set_text(GTK_LABEL(search_status), "");
+        return FALSE;
+    }
+
+    GtkTextBuffer *buf = GTK_TEXT_BUFFER(tab->buffer);
+    GtkTextIter start, ms, me;
+    GtkTextSearchFlags flags = 0;
+    if (!settings.search_case) flags |= GTK_TEXT_SEARCH_CASE_INSENSITIVE;
+
+    GtkTextIter sel_start, sel_end;
+    gboolean has_sel = gtk_text_buffer_get_selection_bounds(buf, &sel_start, &sel_end);
+    gboolean found = FALSE;
+
+    if (forward) {
+        if (has_sel)
+            start = sel_end;              /* continue past current match */
+        else
+            gtk_text_buffer_get_iter_at_mark(buf, &start, gtk_text_buffer_get_insert(buf));
+
+        found = gtk_text_iter_forward_search(&start, needle, flags, &ms, &me, NULL);
+        if (!found && settings.search_wrap) {
+            gtk_text_buffer_get_start_iter(buf, &start);
+            found = gtk_text_iter_forward_search(&start, needle, flags, &ms, &me, NULL);
+        }
+    } else {
+        if (has_sel)
+            start = sel_start;            /* continue before current match */
+        else
+            gtk_text_buffer_get_iter_at_mark(buf, &start, gtk_text_buffer_get_insert(buf));
+
+        found = gtk_text_iter_backward_search(&start, needle, flags, &ms, &me, NULL);
+        if (!found && settings.search_wrap) {
+            gtk_text_buffer_get_end_iter(buf, &start);
+            found = gtk_text_iter_backward_search(&start, needle, flags, &ms, &me, NULL);
+        }
+    }
+
+    if (found) {
+        gtk_text_buffer_select_range(buf, &ms, &me);
+        gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(tab->source_view), &ms, 0.0, TRUE, 0.0, 0.5);
+        if (search_status) gtk_label_set_text(GTK_LABEL(search_status), "");
+    } else if (search_status) {
+        gtk_label_set_text(GTK_LABEL(search_status), "Not found");
+    }
+    return found;
+}
+
+static void on_search_activate(GtkEntry *e, gpointer d) { (void)e; (void)d; do_search(TRUE); }
+static void on_search_next(GtkButton *b, gpointer d)    { (void)b; (void)d; do_search(TRUE); }
+static void on_search_prev(GtkButton *b, gpointer d)    { (void)b; (void)d; do_search(FALSE); }
+
+/* ---------- settings window ---------- */
+
+static GtkWidget *settings_window = NULL;
+static GtkWidget *theme_combo;
+static GtkWidget *zoom_spin;
+static GtkWidget *dark_check;
+static GtkWidget *font_button;
+static gboolean is_fullscreen = FALSE;
+
+/*
+ * gtk_window_get_window_type() stays TOPLEVEL while fullscreen, so the state
+ * has to be tracked from the state-event instead.
+ */
+static gboolean
+on_window_state(GtkWidget *w, GdkEventWindowState *e, gpointer d)
+{
+    (void)w; (void)d;
+    is_fullscreen = (e->new_window_state & GDK_WINDOW_STATE_FULLSCREEN) != 0;
+    return FALSE;
+}
+
+static void
+toggle_fullscreen(void)
+{
+    if (is_fullscreen)
+        gtk_window_unfullscreen(GTK_WINDOW(window));
+    else
+        gtk_window_fullscreen(GTK_WINDOW(window));
+}
+
+static void
+on_font_set(GtkFontButton *b, gpointer d)
+{
+    (void)d;
+    const gchar *name = gtk_font_chooser_get_font(GTK_FONT_CHOOSER(b));
+    if (!name || !*name) return;
+
+    /* The button reports "Family Style Size"; keep family and size, drop style. */
+    PangoFontDescription *fd = pango_font_description_from_string(name);
+    const gchar *family = pango_font_description_get_family(fd);
+    gint size = pango_font_description_get_size(fd) / PANGO_SCALE;
+
+    if (family) {
+        g_free(settings.font_family);
+        settings.font_family = g_strdup(family);
+    }
+    if (size >= 6 && size <= 48) {
+        settings.font_size = size;
+        if (zoom_spin)
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(zoom_spin), size);
+    }
+    pango_font_description_free(fd);
+
+    apply_style_to_all_tabs();
+    save_config();
+}
+
+static gboolean
+on_key_press(GtkWidget *w, GdkEventKey *e, gpointer d)
+{
+    (void)w; (void)d;
+    /* F11 is bound through the menu accelerator; Escape leaves fullscreen. */
+    if (e->keyval == GDK_KEY_Escape && is_fullscreen) {
+        gtk_window_unfullscreen(GTK_WINDOW(window));
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static void
+on_scheme_changed(GtkComboBox *c, gpointer d)
+{
+    (void)d;
+    /* The active *id* is the scheme id; the visible text is the scheme's
+     * display name, so reading the text would never resolve a scheme. */
+    const gchar *id = gtk_combo_box_get_active_id(c);
+    if (!id) return;
+    g_free(settings.style_scheme);
+    settings.style_scheme = g_strdup(id);
+    apply_style_to_all_tabs();
+    save_config();
+}
+
+static void
+on_zoom_changed(GtkSpinButton *s, gpointer d)
+{
+    (void)d;
+    settings.font_size = gtk_spin_button_get_value_as_int(s);
+    apply_style_to_all_tabs();
+    save_config();
+}
+
+static void
+on_dark_toggled(GtkToggleButton *t, gpointer d)
+{
+    (void)d;
+    settings.dark_ui = gtk_toggle_button_get_active(t);
+    g_object_set(gtk_settings_get_default(),
+        "gtk-application-prefer-dark-theme", settings.dark_ui, NULL);
+    save_config();
+}
+
+static void
+on_search_wrap_toggled(GtkToggleButton *t, gpointer d)
+{
+    (void)d;
+    settings.search_wrap = gtk_toggle_button_get_active(t);
+    save_config();
+}
+
+static void
+on_search_case_toggled(GtkToggleButton *t, gpointer d)
+{
+    (void)d;
+    settings.search_case = gtk_toggle_button_get_active(t);
+    save_config();
+}
+
+static gboolean
+on_settings_delete(GtkWidget *w, GdkEvent *e, gpointer d)
+{
+    (void)e; (void)d;
+    gtk_widget_hide(w);
+    return TRUE;
+}
+
+static void
+build_settings_window(void)
+{
+    settings_window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gtk_window_set_title(GTK_WINDOW(settings_window), "Settings");
+    gtk_window_set_transient_for(GTK_WINDOW(settings_window), GTK_WINDOW(window));
+    gtk_window_set_default_size(GTK_WINDOW(settings_window), 440, 340);
+    g_signal_connect(settings_window, "delete-event", G_CALLBACK(on_settings_delete), NULL);
+
+    settings_notebook = gtk_notebook_new();
+    gtk_container_add(GTK_CONTAINER(settings_window), settings_notebook);
+
+    /* --- Appearance --- */
+    GtkWidget *grid = gtk_grid_new();
+    gtk_grid_set_row_spacing(GTK_GRID(grid), 10);
+    gtk_grid_set_column_spacing(GTK_GRID(grid), 12);
+    gtk_container_set_border_width(GTK_CONTAINER(grid), 14);
+
+    gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Color scheme:"), 0, 0, 1, 1);
+    theme_combo = gtk_combo_box_text_new();
+    GtkSourceStyleSchemeManager *sm = gtk_source_style_scheme_manager_get_default();
+    const gchar * const *ids = gtk_source_style_scheme_manager_get_scheme_ids(sm);
+    for (gint i = 0; ids && ids[i]; i++) {
+        GtkSourceStyleScheme *sch = gtk_source_style_scheme_manager_get_scheme(sm, ids[i]);
+        const gchar *label = sch ? gtk_source_style_scheme_get_name(sch) : ids[i];
+        gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(theme_combo), ids[i], label);
+    }
+    if (settings.style_scheme) {
+        gtk_combo_box_set_active_id(GTK_COMBO_BOX(theme_combo), settings.style_scheme);
+    } else {
+        GtkSourceStyleScheme *active = current_style_scheme();
+        if (active)
+            gtk_combo_box_set_active_id(GTK_COMBO_BOX(theme_combo),
+                gtk_source_style_scheme_get_id(active));
+    }
+    g_signal_connect(theme_combo, "changed", G_CALLBACK(on_scheme_changed), NULL);
+    gtk_grid_attach(GTK_GRID(grid), theme_combo, 1, 0, 1, 1);
+
+    gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Font:"), 0, 1, 1, 1);
+    font_button = gtk_font_button_new_with_font(
+        settings.font_family ? settings.font_family : "Monospace");
+    gtk_font_button_set_use_font(GTK_FONT_BUTTON(font_button), TRUE);
+    gtk_font_button_set_use_size(GTK_FONT_BUTTON(font_button), TRUE);
+    gtk_font_button_set_show_style(GTK_FONT_BUTTON(font_button), FALSE);
+    gtk_font_button_set_title(GTK_FONT_BUTTON(font_button), "Select editor font");
+    g_signal_connect(font_button, "font-set", G_CALLBACK(on_font_set), NULL);
+    gtk_grid_attach(GTK_GRID(grid), font_button, 1, 1, 1, 1);
+
+    gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Font size:"), 0, 2, 1, 1);
+    zoom_spin = gtk_spin_button_new_with_range(6, 48, 1);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(zoom_spin), settings.font_size);
+    g_signal_connect(zoom_spin, "value-changed", G_CALLBACK(on_zoom_changed), NULL);
+    gtk_grid_attach(GTK_GRID(grid), zoom_spin, 1, 2, 1, 1);
+
+    dark_check = gtk_check_button_new_with_label("Dark interface theme");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(dark_check), settings.dark_ui);
+    g_signal_connect(dark_check, "toggled", G_CALLBACK(on_dark_toggled), NULL);
+    gtk_grid_attach(GTK_GRID(grid), dark_check, 0, 3, 2, 1);
+
+    gtk_notebook_append_page(GTK_NOTEBOOK(settings_notebook), grid,
+        gtk_label_new("Appearance"));
+
+    /* --- Search --- */
+    GtkWidget *sbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+    gtk_container_set_border_width(GTK_CONTAINER(sbox), 14);
+
+    search_entry = gtk_search_entry_new();
+    gtk_entry_set_placeholder_text(GTK_ENTRY(search_entry), "Search text");
+    g_signal_connect(search_entry, "activate", G_CALLBACK(on_search_activate), NULL);
+    gtk_box_pack_start(GTK_BOX(sbox), search_entry, FALSE, FALSE, 0);
+
+    GtkWidget *btn_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    GtkWidget *prev_btn = gtk_button_new_with_label("Previous");
+    GtkWidget *next_btn = gtk_button_new_with_label("Next");
+    g_signal_connect(prev_btn, "clicked", G_CALLBACK(on_search_prev), NULL);
+    g_signal_connect(next_btn, "clicked", G_CALLBACK(on_search_next), NULL);
+    gtk_box_pack_start(GTK_BOX(btn_row), prev_btn, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(btn_row), next_btn, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(sbox), btn_row, FALSE, FALSE, 0);
+
+    GtkWidget *wrap_check = gtk_check_button_new_with_label("Wrap around");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(wrap_check), settings.search_wrap);
+    g_signal_connect(wrap_check, "toggled", G_CALLBACK(on_search_wrap_toggled), NULL);
+    gtk_box_pack_start(GTK_BOX(sbox), wrap_check, FALSE, FALSE, 0);
+
+    GtkWidget *case_check = gtk_check_button_new_with_label("Match case");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(case_check), settings.search_case);
+    g_signal_connect(case_check, "toggled", G_CALLBACK(on_search_case_toggled), NULL);
+    gtk_box_pack_start(GTK_BOX(sbox), case_check, FALSE, FALSE, 0);
+
+    search_status = gtk_label_new("");
+    gtk_label_set_xalign(GTK_LABEL(search_status), 0.0);
+    gtk_box_pack_start(GTK_BOX(sbox), search_status, FALSE, FALSE, 0);
+
+    gtk_notebook_append_page(GTK_NOTEBOOK(settings_notebook), sbox,
+        gtk_label_new("Search"));
+}
+
+static void
+show_settings(gint page_index)
+{
+    if (!settings_window) build_settings_window();
+    gtk_widget_show_all(settings_window);
+    gtk_window_present(GTK_WINDOW(settings_window));
+    if (page_index >= 0)
+        gtk_notebook_set_current_page(GTK_NOTEBOOK(settings_notebook), page_index);
+    if (page_index == 1 && search_entry)
+        gtk_widget_grab_focus(search_entry);
+}
+
 /* ---------- menu / hotkey actions ---------- */
 
 static void action_new(GtkMenuItem *m, gpointer d)   { (void)m; (void)d; new_tab(NULL); }
@@ -440,6 +1614,60 @@ action_redo(GtkMenuItem *m, gpointer d)
         gtk_source_buffer_redo(tab->buffer);
 }
 
+static void
+sync_zoom_spin(void)
+{
+    if (zoom_spin)
+        gtk_spin_button_set_value(GTK_SPIN_BUTTON(zoom_spin), settings.font_size);
+    if (font_button)
+        gtk_font_chooser_set_font(GTK_FONT_CHOOSER(font_button),
+            settings.font_family ? settings.font_family : "Monospace");
+}
+
+static void
+action_zoom_in(GtkMenuItem *m, gpointer d)
+{
+    (void)m; (void)d;
+    if (settings.font_size >= 48) return;
+    settings.font_size++;
+    apply_style_to_all_tabs();
+    sync_zoom_spin();
+    save_config();
+}
+
+static void
+action_zoom_out(GtkMenuItem *m, gpointer d)
+{
+    (void)m; (void)d;
+    if (settings.font_size <= 6) return;
+    settings.font_size--;
+    apply_style_to_all_tabs();
+    sync_zoom_spin();
+    save_config();
+}
+
+static void
+action_zoom_reset(GtkMenuItem *m, gpointer d)
+{
+    (void)m; (void)d;
+    settings.font_size = 11;
+    apply_style_to_all_tabs();
+    sync_zoom_spin();
+    save_config();
+}
+
+static void action_find(GtkMenuItem *m, gpointer d)      { (void)m; (void)d; show_settings(1); }
+static void action_settings(GtkMenuItem *m, gpointer d)  { (void)m; (void)d; show_settings(0); }
+static void action_find_next(GtkMenuItem *m, gpointer d) { (void)m; (void)d; do_search(TRUE); }
+static void action_find_prev(GtkMenuItem *m, gpointer d) { (void)m; (void)d; do_search(FALSE); }
+
+static void
+action_fullscreen(GtkMenuItem *m, gpointer d)
+{
+    (void)m; (void)d;
+    toggle_fullscreen();
+}
+
 /* ---------- menu bar with accelerators ---------- */
 
 static GtkWidget *
@@ -485,9 +1713,33 @@ build_menu_bar(void)
         menu_item_with_accel("Undo", GDK_KEY_z, GDK_CONTROL_MASK, action_undo));
     gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
         menu_item_with_accel("Redo", GDK_KEY_y, GDK_CONTROL_MASK, action_redo));
+    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu), gtk_separator_menu_item_new());
+    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
+        menu_item_with_accel("Find...", GDK_KEY_f, GDK_CONTROL_MASK, action_find));
+    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
+        menu_item_with_accel("Find Next", GDK_KEY_F3, 0, action_find_next));
+    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
+        menu_item_with_accel("Find Previous", GDK_KEY_F3, GDK_SHIFT_MASK, action_find_prev));
+    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu), gtk_separator_menu_item_new());
+    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
+        menu_item_with_accel("Settings...", GDK_KEY_comma, GDK_CONTROL_MASK, action_settings));
+
+    GtkWidget *view_menu = gtk_menu_new();
+    GtkWidget *view_item = gtk_menu_item_new_with_label("View");
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(view_item), view_menu);
+    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu),
+        menu_item_with_accel("Zoom In", GDK_KEY_plus, GDK_CONTROL_MASK, action_zoom_in));
+    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu),
+        menu_item_with_accel("Zoom Out", GDK_KEY_minus, GDK_CONTROL_MASK, action_zoom_out));
+    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu),
+        menu_item_with_accel("Zoom Reset", GDK_KEY_0, GDK_CONTROL_MASK, action_zoom_reset));
+    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu), gtk_separator_menu_item_new());
+    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu),
+        menu_item_with_accel("Fullscreen", GDK_KEY_F11, 0, action_fullscreen));
 
     gtk_menu_shell_append(GTK_MENU_SHELL(menubar), file_item);
     gtk_menu_shell_append(GTK_MENU_SHELL(menubar), edit_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menubar), view_item);
     return menubar;
 }
 
@@ -496,10 +1748,20 @@ main(int argc, char *argv[])
 {
     gtk_init(&argc, &argv);
 
+    load_config();
+    install_extra_languages();
+    apply_font_css();
+
+    /* Rewrite once so the file is created on first run and always carries
+     * every key, including ones added after the config was first written. */
+    save_config();
+
     window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(window), "rezzedit");
     gtk_window_set_default_size(GTK_WINDOW(window), 1000, 680);
     g_signal_connect(window, "delete-event", G_CALLBACK(on_delete_event), NULL);
+    g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), NULL);
+    g_signal_connect(window, "window-state-event", G_CALLBACK(on_window_state), NULL);
     g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
 
     accel_group = gtk_accel_group_new();
