@@ -5,14 +5,14 @@
 
   <!-- Desktop Context Menu (Right Click) -->
   <RootMenu onroot="3">
-    <Program label="Terminal">st</Program>
-    <Program label="Configuration">rezzconfig</Program>
+    <Program label="Create File...">create_file.sh</Program>
+    <Program label="Create Folder...">create_folder.sh</Program>
+    <Separator/>
     <Program label="File Manager">pcmanfm -n</Program>
     <Program label="Browser">rezzbrowser</Program>
-    <Program label="Editor">edit</Program>
+    <Program label="Terminal">st</Program>
     <Separator/>
     <Program label="Install on disk">rezzinstall</Program>
-    <Program label="Aboout System">rezzabout</Program>
     <Program label="Rtop">rtopg</Program>
   </RootMenu>
 
@@ -26,7 +26,7 @@
     <Clock format="%d.%m.%Y %H:%M"/>
   </Tray>
 
-  <!-- Visual Styles  -->
+  <!-- Visual Styles (Plan 9 / 9front-inspired) -->
   <WindowStyle>
     <Font>monospace-10</Font>
     <Width>1</Width>
@@ -46,42 +46,42 @@
   <TrayStyle group="false" list="desktop">
     <Opacity>1.0</Opacity>
     <Font>monospace-10</Font>
-    <Outline>#FFFFFF</Outline>
-    <Foreground>#FFFFFF</Foreground>
-    <Background>#FFFFFF</Background>
+    <Outline>#000000</Outline> <!-- Черная рамка панели -->
+    <Foreground>#000000</Foreground> <!-- Черный текст часов и окон -->
+    <Background>#FFFFFF</Background> <!-- Белый фон панели -->
     <Active>
-      <Outline>#FFFFFF</Outline>
-      <Foreground>#FFFFFF</Foreground>
-      <Background>#FFFFFF</Background>
+      <Outline>#000000</Outline>
+      <Foreground>#FFFFFF</Foreground> <!-- Белый текст активного окна на панели -->
+      <Background>#000000</Background> <!-- Черный фон активного окна на панели -->
     </Active>
   </TrayStyle>
 
   <PagerStyle>
-    <Outline>#FFFFFF</Outline>
-    <Foreground>#FFFFFF</Foreground>
-    <Background>#FFFFFF</Background>
-    <Text>#FFFFFF</Text>
+    <Outline>#000000</Outline> <!-- Черная рамка переключателя -->
+    <Foreground>#000000</Foreground>
+    <Background>#FFFFFF</Background> <!-- Белый фон неактивных столов -->
+    <Text>#000000</Text>
     <Active>
       <Foreground>#FFFFFF</Foreground>
-      <Background>#FFFFFF</Background>
+      <Background>#000000</Background> <!-- Черный фон активного стола -->
     </Active>
   </PagerStyle>
 
   <MenuStyle>
     <Font>monospace-13</Font>
-    <Foreground>#FFFFFF</Foreground>
-    <Background>#FFFFFF</Background>
-    <Outline>#FFFFFF</Outline>
+    <Foreground>#000000</Foreground> <!-- Черный текст в меню по ПКМ -->
+    <Background>#FFFFFF</Background> <!-- Белый фон меню -->
+    <Outline>#000000</Outline> <!-- Черная рамка меню -->
     <Active>
-      <Foreground>#FFFFFF</Foreground>
-      <Background>#FFFFFF</Background>
+      <Foreground>#FFFFFF</Foreground> <!-- Белый текст выбранного пункта -->
+      <Background>#000000</Background> <!-- Черный фон выбранного пункта -->
     </Active>
   </MenuStyle>
 
   <PopupStyle>
     <Font>monospace-12</Font>
-    <Foreground>#FFFFFF</Foreground>
-    <Background>#FFFFFF</Background>
+    <Foreground>#000000</Foreground> <!-- Черный текст подсказок -->
+    <Background>#FFFFFF</Background> <!-- Белый фон подсказок -->
   </PopupStyle>
 
   <!-- Rules for Applications (Icons on Taskbar and Window Titles) -->
