@@ -46,42 +46,42 @@
   <TrayStyle group="false" list="desktop">
     <Opacity>1.0</Opacity>
     <Font>monospace-10</Font>
-    <Outline>#000000</Outline>
-    <Foreground>#000000</Foreground>
-    <Background>#FFFFFF</Background> <!-- Белая панель -->
+    <Outline>#FFFFFF</Outline>
+    <Foreground>#FFFFFF</Foreground>
+    <Background>#FFFFFF</Background>
     <Active>
-      <Outline>#0000AA</Outline>
-      <Foreground>#000000</Foreground>
-      <Background>#99CCFF</Background>
+      <Outline>#FFFFFF</Outline>
+      <Foreground>#FFFFFF</Foreground>
+      <Background>#FFFFFF</Background>
     </Active>
   </TrayStyle>
 
   <PagerStyle>
-    <Outline>#000000</Outline>
-    <Foreground>#000000</Foreground>
-    <Background>#FFFFFF</Background> <!-- Белый переключатель (был #FFFFEA) -->
-    <Text>#000000</Text>
+    <Outline>#FFFFFF</Outline>
+    <Foreground>#FFFFFF</Foreground>
+    <Background>#FFFFFF</Background>
+    <Text>#FFFFFF</Text>
     <Active>
       <Foreground>#FFFFFF</Foreground>
-      <Background>#0000AA</Background>
+      <Background>#FFFFFF</Background>
     </Active>
   </PagerStyle>
 
   <MenuStyle>
     <Font>monospace-13</Font>
-    <Foreground>#000000</Foreground>
-    <Background>#FFFFEA</Background>
-    <Outline>#000000</Outline>
+    <Foreground>#FFFFFF</Foreground>
+    <Background>#FFFFFF</Background>
+    <Outline>#FFFFFF</Outline>
     <Active>
       <Foreground>#FFFFFF</Foreground>
-      <Background>#0000AA</Background>
+      <Background>#FFFFFF</Background>
     </Active>
   </MenuStyle>
 
   <PopupStyle>
     <Font>monospace-12</Font>
-    <Foreground>#000000</Foreground>
-    <Background>#FFFFEA</Background>
+    <Foreground>#FFFFFF</Foreground>
+    <Background>#FFFFFF</Background>
   </PopupStyle>
 
   <!-- Rules for Applications (Icons on Taskbar and Window Titles) -->
@@ -152,7 +152,7 @@
 
   <!-- Virtual Desktops -->
   <Desktops width="4" height="1">
-    <Background type="solid">#FFFFEA</Background>
+    <Background type="solid">#FFFFFF</Background>
   </Desktops>
 
   <!-- Key bindings -->
