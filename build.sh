@@ -552,7 +552,7 @@ cd "$REPO_DIR"
 # create disk.img
 if [ ! -f "$REPO_DIR/disk.img" ]; then
     step "Creating disk.img"
-    qemu-img create -f raw disk.img 1G
+    qemu-img create -f raw disk.img 5G
     mkfs.ext4 -F disk.img
 fi
 
@@ -611,13 +611,9 @@ if [ -f "$REPO_DIR/start.sh" ]; then
 else
     cat << 'EOF'
 
-Run:
-    qemu-system-x86_64 \
-        -kernel bzImage \
-        -initrd rootfs.cpio.gz \
-        -append "console=ttyS0" \
-        -netdev user,id=net0,hostfwd=tcp::2222-:22 -device virtio-net,netdev=net0 \
-        -drive file=disk.img,format=raw,if=virtio \
-        -m 512M -nographic
+Run in qemu:
+sudo start.sh 
+or
+sudo start-gui.sh
 EOF
 fi
