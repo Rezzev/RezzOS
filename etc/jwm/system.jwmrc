@@ -1,199 +1,179 @@
 <?xml version="1.0"?>
 <JWM>
-    <!-- Start Menu (Left Click) -->
-    <IconPath>/usr/share/icons/RezzOS</IconPath>
-    <RootMenu onroot="1">
-        <Program icon="terminal.png" label="Terminal">st</Program>
-        <Program icon="browser.png" label="Browser">rezzbrowser</Program>
-        <Program icon="folder.png" label="File Manager">pcmanfm -n</Program>
-        <Program icon="notepad.png" label="Editor">edit</Program>
-        <Program icon="monitor.png" label="System Monitor">rtopg</Program>
-        <Program icon="view.png" label="Image viewer">rezzview</Program>
-        <Program icon="manager.png" label="Service Manager">rsv-gui</Program>
-        <Program icon="about.png" label="About System">rezzabout</Program>
-        <Separator/>
-        <Program icon="settings.png" label="settings">rezzconfig</Program>
-        <Program icon="install.png" label="Install RezzOS to Disk">rezzinstall</Program>
-        <Separator/>
-        <Menu icon="info.png" label="Power">
-            <Program label="Suspend">sh -c 'zenity --info --title="RezzOS" --text="Suspending..." --timeout=2 &amp; suspend'</Program>
-            <Program label="Hibernate">sh -c 'zenity --info --title="RezzOS" --text="Hibernating..." --timeout=3 &amp; hibernate'</Program>
-            <Program label="Reboot">sh -c 'zenity --info --title="RezzOS" --text="Rebooting..." --timeout=5 &amp; reboot'</Program>
-            <Program label="Shutdown">sh -c 'zenity --info --title="RezzOS" --text="Shutting down..." --timeout=5 &amp; poweroff'</Program>
-            <Separator/>
-            <Restart label="Restart JWM"/>
-            <Exit label="Log Out of GUI" confirm="true"/>
-        </Menu>
-    </RootMenu>
+  <!-- Start Menu (Left Click) -->
+  <IconPath>/usr/share/icons/RezzOS</IconPath>
 
-    <!-- Desktop Context Menu (Right Click) -->
-    <RootMenu onroot="3">
-        <Program label="Create File...">create_file.sh</Program>
-        <Program label="Create Folder...">create_folder.sh</Program>
-        <Separator/>
-        <Program label="Open File Manager Here">pcmanfm -n</Program>
-        <Program label="Open Terminal Here">st</Program>
-        <Separator/>
-        <Program label="System Info">sysinfo.sh</Program>
-    </RootMenu>
+  <!-- Desktop Context Menu (Right Click) -->
+  <RootMenu onroot="3">
+    <Program label="Create File...">create_file.sh</Program>
+    <Program label="Create Folder...">create_folder.sh</Program>
+    <Separator/>
+    <Program label="File Manager">pcmanfm -n</Program>
+    <Program label="Browser">rezzbrowser</Program>
+    <Program label="Terminal">st</Program>
+    <Separator/>
+    <Program label="Install on disk">rezzinstall</Program>
+    <Program label="Rtop">rtopg</Program>
+  </RootMenu>
 
-    <!-- Options for program interfaces. -->
-    <Tray x="0" y="-1" autohide="off">
-        <TrayButton icon="menu.png">root:1</TrayButton>
-        <Spacer width="2"/>
-        <TrayButton label="_">showdesktop</TrayButton>
-        <Spacer width="2"/>
-        <Pager labeled="false"/>
-        <TaskList maxwidth="40"/>
-        <Dock/>
-        <Clock format="%d.%m.%Y %H:%M"></Clock>
-    </Tray>
+  <!-- Options for program interfaces. -->
+  <Tray x="0" y="-1" autohide="off">
+    <TrayButton label="_">showdesktop</TrayButton>
+    <Spacer width="2"/>
+    <Pager labeled="false"/>
+    <TaskList maxwidth="40"/>
+    <Dock/>
+    <Clock format="%d.%m.%Y %H:%M"/>
+  </Tray>
 
-    <!-- Visual Styles (Breeze Dark) -->
-    <WindowStyle>
-        <Font>Sans-10:Bold</Font>
-        <Width>7</Width>
-        <Height>34</Height>
-        <Corner>5</Corner>
-        <Opacity>1.0</Opacity>
-        <Foreground>#FFFFFF</Foreground>
-        <Background>#000000:#343434</Background>
-        <Outline>#5B5B5D</Outline>
-        <Active>
-            <Foreground>#FFFFFF</Foreground>
-            <Background>#000000:#343434</Background>
-            <Outline>#5B5B5D</Outline>
-        </Active>
-    </WindowStyle>
-    <TrayStyle group="false" list="desktop">
-        <Opacity>0.8</Opacity>
-        <Font>Sans-10</Font>
-        <Outline>#5B5B5D</Outline>
-        <Foreground>#FFFFFF</Foreground>
-        <Background>#000000:#343434</Background>
-        <Active>
-            <Outline>#5B5B5D</Outline>
-            <Foreground>#FFFFFF</Foreground>
-            <Background>#343434:#000000</Background>
-        </Active>
-    </TrayStyle>
-    <PagerStyle>
-        <Outline>#000000</Outline>
-        <Foreground>#FFFFFF</Foreground>
-        <Background>#000000</Background>
-        <Text>#ACABAB</Text>
-        <Active>
-            <Foreground>#FFFFFF</Foreground>
-            <Background>#5B5B5D</Background>
-        </Active>
-    </PagerStyle>
-    <MenuStyle>
-        <Font>Sans-13</Font>
-        <Foreground>#323232</Foreground>
-        <Background>#FCFCFC</Background>
-        <Outline>#CDC7C2</Outline>
-        <Active>
-            <Foreground>#FCFCFC</Foreground>
-            <Background>#3584E4</Background>
-        </Active>
-    </MenuStyle>
-    <PopupStyle>
-        <Font>Sans-12</Font>
-        <Foreground>#ACAFC6</Foreground>
-        <Background>#343434</Background>
-    </PopupStyle>
+  <!-- Visual Styles (Plan 9 / 9front-inspired) -->
+  <WindowStyle>
+    <Font>monospace-10</Font>
+    <Width>1</Width>
+    <Height>20</Height>
+    <Corner>0</Corner>
+    <Opacity>1.0</Opacity>
+    <Foreground>#000000</Foreground>
+    <Background>#FFFFEA</Background>
+    <Outline>#000000</Outline>
+    <Active>
+      <Foreground>#000000</Foreground>
+      <Background>#99CCFF</Background>
+      <Outline>#0000AA</Outline>
+    </Active>
+  </WindowStyle>
 
-    <!-- Rules for Applications (Icons on Taskbar and Window Titles) -->
-    <!-- Terminal (st) -->
-    <Group>
-        <Class>st-256color</Class>
-        <Class>st</Class>
-        <Class>St</Class>
-        <Option>icon:terminal.png</Option>
-    </Group>
+  <TrayStyle group="false" list="desktop">
+    <Opacity>1.0</Opacity>
+    <Font>monospace-10</Font>
+    <Outline>#000000</Outline>
+    <Foreground>#000000</Foreground>
+    <Background>#FFFFFF</Background> <!-- Белая панель -->
+    <Active>
+      <Outline>#0000AA</Outline>
+      <Foreground>#000000</Foreground>
+      <Background>#99CCFF</Background>
+    </Active>
+  </TrayStyle>
 
-    <!-- Browser (rezzbrowser) -->
-    <Group>
-        <Class>rezzbrowser</Class>
-        <Class>Rezzbrowser</Class>
-        <Option>icon:browser.png</Option>
-    </Group>
+  <PagerStyle>
+    <Outline>#000000</Outline>
+    <Foreground>#000000</Foreground>
+    <Background>#FFFFFF</Background> <!-- Белый переключатель (был #FFFFEA) -->
+    <Text>#000000</Text>
+    <Active>
+      <Foreground>#FFFFFF</Foreground>
+      <Background>#0000AA</Background>
+    </Active>
+  </PagerStyle>
 
-    <!-- File Manager (PCManFM) -->
-    <Group>
-        <Class>pcmanfm</Class>
-        <Class>Pcmanfm</Class>
-        <Class>PCManFM</Class>
-        <Option>icon:folder.png</Option>
-    </Group>
+  <MenuStyle>
+    <Font>monospace-13</Font>
+    <Foreground>#000000</Foreground>
+    <Background>#FFFFEA</Background>
+    <Outline>#000000</Outline>
+    <Active>
+      <Foreground>#FFFFFF</Foreground>
+      <Background>#0000AA</Background>
+    </Active>
+  </MenuStyle>
 
-    <!-- Text Editor (edit) -->
-    <Group>
-        <Class>edit</Class>
-        <Class>Edit</Class>
-        <Option>icon:notepad.png</Option>
-    </Group>
+  <PopupStyle>
+    <Font>monospace-12</Font>
+    <Foreground>#000000</Foreground>
+    <Background>#FFFFEA</Background>
+  </PopupStyle>
 
-    <!-- System Monitor (rtopg) -->
-    <Group>
-        <Class>rtopg</Class>
-        <Class>Rtopg</Class>
-        <Option>icon:monitor.png</Option>
-    </Group>
+  <!-- Rules for Applications (Icons on Taskbar and Window Titles) -->
+  <!-- Terminal (st) -->
+  <Group>
+    <Class>st-256color</Class>
+    <Class>st</Class>
+    <Class>St</Class>
+    <Option>icon:terminal.png</Option>
+  </Group>
 
-    <!-- Image Viewer (rezzview) -->
-    <Group>
-        <Class>rezzview</Class>
-        <Class>Rezzview</Class>
-        <Option>icon:view.png</Option>
-    </Group>
+  <!-- Browser (rezzbrowser) -->
+  <Group>
+    <Class>rezzbrowser</Class>
+    <Class>Rezzbrowser</Class>
+    <Option>icon:browser.png</Option>
+  </Group>
 
-    <!-- Service Manager (rsv-gui) -->
-    <Group>
-        <Class>rsv-gui</Class>
-        <Class>Rsv-gui</Class>
-        <Option>icon:manager.png</Option>
-    </Group>
+  <!-- File Manager (PCManFM) -->
+  <Group>
+    <Class>pcmanfm</Class>
+    <Class>Pcmanfm</Class>
+    <Class>PCManFM</Class>
+    <Option>icon:folder.png</Option>
+  </Group>
 
-    <!-- Settings Configuration (rezzconfig) -->
-    <Group>
-        <Class>rezzconfig</Class>
-        <Class>Rezzconfig</Class>
-        <Option>icon:settings.png</Option>
-    </Group>
+  <!-- Text Editor (edit) -->
+  <Group>
+    <Class>edit</Class>
+    <Class>Edit</Class>
+    <Option>icon:notepad.png</Option>
+  </Group>
 
-    <!-- OS Installer (rezzinstall) -->
-    <Group>
-        <Class>rezzinstall</Class>
-        <Class>Rezzinstall</Class>
-        <Option>icon:install.png</Option>
-    </Group>
+  <!-- System Monitor (rtopg) -->
+  <Group>
+    <Class>rtopg</Class>
+    <Class>Rtopg</Class>
+    <Option>icon:monitor.png</Option>
+  </Group>
 
-    <!-- Virtual Desktops -->
-    <Desktops width="4" height="1">
-        <Background type="solid">#1e2227</Background>
-    </Desktops>
+  <!-- Image Viewer (rezzview) -->
+  <Group>
+    <Class>rezzview</Class>
+    <Class>Rezzview</Class>
+    <Option>icon:view.png</Option>
+  </Group>
 
-    <!-- Key bindings -->
-    <Key key="Up">up</Key>
-    <Key key="Down">down</Key>
-    <Key key="Right">right</Key>
-    <Key key="Left">left</Key>
-    <Key key="h">left</Key>
-    <Key key="j">down</Key>
-    <Key key="k">up</Key>
-    <Key key="l">right</Key>
-    <Key key="Return">select</Key>
-    <Key key="Escape">escape</Key>
+  <!-- Service Manager (rsv-gui) -->
+  <Group>
+    <Class>rsv-gui</Class>
+    <Class>Rsv-gui</Class>
+    <Option>icon:manager.png</Option>
+  </Group>
 
-    <Key mask="A" key="Tab">nextstacked</Key>
-    <Key mask="A" key="F4">close</Key>
-    <Key mask="A" key="F1">root:3</Key>
-    <Key mask="A" key="F2">window</Key>
-    <Key mask="A" key="F10">maximize</Key>
-    <Key mask="A" key="Right">rdesktop</Key>
-    <Key mask="A" key="Left">ldesktop</Key>
-    <Key mask="A" key="Up">udesktop</Key>
-    <Key mask="A" key="Down">ddesktop</Key>
-    <Key mask="CA" key="t">exec:st</Key>
+  <!-- Settings Configuration (rezzconfig) -->
+  <Group>
+    <Class>rezzconfig</Class>
+    <Class>Rezzconfig</Class>
+    <Option>icon:settings.png</Option>
+  </Group>
+
+  <!-- OS Installer (rezzinstall) -->
+  <Group>
+    <Class>rezzinstall</Class>
+    <Class>Rezzinstall</Class>
+    <Option>icon:install.png</Option>
+  </Group>
+
+  <!-- Virtual Desktops -->
+  <Desktops width="4" height="1">
+    <Background type="solid">#FFFFEA</Background>
+  </Desktops>
+
+  <!-- Key bindings -->
+  <Key key="Up">up</Key>
+  <Key key="Down">down</Key>
+  <Key key="Right">right</Key>
+  <Key key="Left">left</Key>
+  <Key key="h">left</Key>
+  <Key key="j">down</Key>
+  <Key key="k">up</Key>
+  <Key key="l">right</Key>
+  <Key key="Return">select</Key>
+  <Key key="Escape">escape</Key>
+  <Key mask="A" key="Tab">nextstacked</Key>
+  <Key mask="A" key="F4">close</Key>
+  <Key mask="A" key="F1">root:3</Key>
+  <Key mask="A" key="F2">window</Key>
+  <Key mask="A" key="F10">maximize</Key>
+  <Key mask="A" key="Right">rdesktop</Key>
+  <Key mask="A" key="Left">ldesktop</Key>
+  <Key mask="A" key="Up">udesktop</Key>
+  <Key mask="A" key="Down">ddesktop</Key>
+  <Key mask="CA" key="t">exec:st</Key>
 </JWM>
