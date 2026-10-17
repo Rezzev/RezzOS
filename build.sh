@@ -345,7 +345,7 @@ if [ -f "$REPO_DIR/usr/bin/rezzbrowser.c" ]; then
     if pkg-config --exists gtk+-3.0 webkit2gtk-4.1 2>/dev/null; then
         log "Compiling rezzbrowser"
         gcc -O2 "$REPO_DIR/usr/bin/rezzbrowser.c" \
-            $(pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.0) \
+            $(pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.1) \
             -o "$ROOTFS_DIR/usr/bin/rezzbrowser"
         chmod +x "$ROOTFS_DIR/usr/bin/rezzbrowser"
     else
