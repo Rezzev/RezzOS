@@ -291,8 +291,15 @@ tar -xzf "$CACHE_DIR/apk-tools-static.apk" sbin/apk.static 2>/dev/null || true
 if [ -f sbin/apk.static ]; then
     mkdir -p "$ROOTFS_DIR/etc/apk" "$ROOTFS_DIR/lib/apk/db" "$ROOTFS_DIR/var/cache/apk"
     touch "$ROOTFS_DIR/etc/apk/world"
-    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" --initdb -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted update
-    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm zenity neofetch adwaita-icon-theme menu-cache gvfs mesa-dri-gallium webkit2gtk gtk+3.0
+
+    # 1. Инициализируем базу данных (без установки пакетов)
+    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" --initdb -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted add
+
+    # 2. Обновляем индексы пакетов (теперь БЕЗ флага --initdb)
+    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted update
+
+    # 3. Устанавливаем нужные пакеты (флаг --initdb здесь уже не нужен, база создана)
+    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm zenity neofetch adwaita-icon-theme menu-cache gvfs mesa-dri-gallium webkit2gtk-4.1 gtk+3.0
 fi
 
 # Restore custom busybox and remove conflicting Alpine busybox symlinks for runit
