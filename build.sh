@@ -609,7 +609,7 @@ else
 fi
 
 step "Done"
-ls -la bzImage rootfs.cpio.gz disk.img
+ls -la bzImage rootfs.cpio.gz disk.qcow2
 # The script runs under `set -e` and this is the last command, so a plain
 # `[ -f ... ] && ls` would exit 1 whenever the ISO was skipped.
 if [ -f "$REPO_DIR/rezzos.iso" ]; then
