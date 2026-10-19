@@ -8,11 +8,13 @@
     <Program label="Create File...">create_file.sh</Program>
     <Program label="Create Folder...">create_folder.sh</Program>
     <Separator/>
-    <Program label="File Manager">pcmanfm -n</Program>
-    <Program label="Browser">rezzbrowser</Program>
     <Program label="Terminal">st</Program>
+    <Program label="Code Editor">edit</Program>
+    <Program label="Browser">rezzbrowser</Program>
+    <Program label="Fetch">st -e rezzfetch</Program>
     <Separator/>
     <Program label="Install on disk">rezzinstall</Program>
+    <Program label="About System">rezzabout</Program>
     <Program label="Rtop">rtopg</Program>
   </RootMenu>
 
