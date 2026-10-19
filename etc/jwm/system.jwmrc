@@ -11,7 +11,6 @@
     <Program label="Terminal">st</Program>
     <Program label="Code Editor">edit</Program>
     <Program label="Browser">rezzbrowser</Program>
-    <Program label="Fetch">st -e rezzfetch</Program>
     <Separator/>
     <Program label="Install on disk">rezzinstall</Program>
     <Program label="About System">rezzabout</Program>
