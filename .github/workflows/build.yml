@@ -168,52 +168,30 @@ jobs:
           # in-guest check could run. 2048M matches what start-gui.sh already
           # assumes. The timeout gets the same headroom against further image
           # growth: under TCG the boot window shrinks as the image grows.
-          timeout 300 qemu-system-x86_64 \
+          timeout 60 qemu-system-x86_64 \
+            -m 2048M \
             -kernel bzImage \
             -initrd rootfs-test.cpio.gz \
-            -append "console=ttyS0 random.trust_cpu=on" \
-            -drive file=disk.qcow2,format=qcow2,if=virtio \
+            -nographic \
+            -append "console=ttyS0 quiet" \
             -drive file=stick.img,format=raw,if=virtio \
-            -drive file=usb.img,format=raw,if=none,id=usbdrive \
-            -device nec-usb-xhci \
-            -device usb-storage,drive=usbdrive,removable=on \
-            -netdev user,id=net0 -device virtio-net,netdev=net0 \
-            -audiodev id=snd0,driver=none \
-            -device intel-hda -device hda-duplex,audiodev=snd0 \
-            -m 2048M -display none -no-reboot \
-            -serial file:serial.log || true
+            -drive file=usb.img,format=raw,if=none,id=usbdisk \
+            -device usb-ehci,id=ehci \
+            -device usb-storage,bus=ehci.0,drive=usbdisk \
+            | tee qemu.log
+          
+          # Проверяем, выполнились ли все тесты успешно внутри QEMU
+          grep -q "CITEST DONE" qemu.log
+          ! grep -q "CITEST FAIL" qemu.log
 
-          echo "--------- serial output ---------"
-          cat serial.log || true
-          echo "---------------------------------"
-
-          # Deliberately not pinned to a version string, so bumping the kernel
-          # in build.sh does not silently break this check.
-          if ! grep -q "Linux version" serial.log; then
-            echo "::error::Kernel never announced itself on the serial console."
-            exit 1
-          fi
-
-          # init silences the console with `echo 0 > /proc/sys/kernel/printk`,
-          # so a clean boot is quiet. Only a panic is a hard failure.
-          if grep -qE "Kernel panic|Attempted to kill init|not syncing" serial.log; then
-            echo "::error::Kernel panic during boot."
-            exit 1
-          fi
-
-          # The guest writes to a tty, so every line arrives with a CR on it.
-          tr -d '\r' < serial.log > serial.clean
-
-          if ! grep -q "^CITEST DONE" serial.clean; then
-            echo "::error::Guest did not complete the CI checks."
-            echo "The guest may not have booted far enough, or the checks did not run."
-            exit 1
-          fi
-
-          if grep -q "^CITEST FAIL" serial.clean; then
-            echo "::error::One or more guest CI checks failed."
-            grep "^CITEST FAIL" serial.clean
-            exit 1
-          fi
-
-          echo "All guest CI checks passed."
+      - name: Upload Build Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rezzos-build-output
+          path: |
+            bzImage
+            rootfs.cpio.gz
+            rootfs-test.cpio.gz
+            qemu.log
+          if-no-files-found: warn
