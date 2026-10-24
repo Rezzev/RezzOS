@@ -40,6 +40,9 @@
 | `rezzuser` | User management utility (add, remove, passwd, lock, groups)                                   |
 | `rezzfetch` | System info banner & specs                                                                    |
 | `rezzhw` | Hardware diagnostics utility                                                                  |
+| `rezzbrowser` | Minimal browser for system                                                                  |
+| `rezzedit` | Code editor                                                                  |
+| `rezzabout` | Version and links                                                                  |
 | `rezzdoctor` | System diagnostic & health check                                                              |
 | `rezzwifi` | Wi-Fi manager: status, scan, connect, saved networks                                          |
 | `rezzusb` | USB/removable disk manager: list, mount, umount, eject, format, fsck                          |
@@ -55,10 +58,3 @@
 | `font list` | List all available built-in kernel console fonts |
 | `font set <name>` | Change OS font (e.g. `font set SUN12x22` or `font set TER16x32`) |
 | `font current` | Show currently active OS font |
-
-## Development
-| Command | Description |
-|---------|----------|
-| `tcc <file.c>` | Compile C code |
-| `lua5.3 <file.lua>` | Run Lua script |
-| `make` | Build projects |
