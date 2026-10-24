@@ -81,6 +81,7 @@ Once the system starts successfully, you will be able to use RezzOS normally.
 - This guide is intended for general-purpose users and follows a simplified installation flow.
 - Before continuing, review all installation prompts carefully.
 - If additional clarification is needed, refer to the project documentation and technical resources provided in the repository.
+- Since the project is still in development, you may encounter bugs and issues during installation or within the installer itself.
 
 We recommend proceeding with caution when choosing the target drive and installation options.
 
