@@ -11,6 +11,8 @@
 [![BusyBox](https://img.shields.io/badge/BusyBox-000000?style=for-the-badge&logo=busybox&logoColor=white)](https://busybox.net)
 [![Shell](https://img.shields.io/badge/Shell-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)](https://www.gnu.org/software/bash/)
 
+<img width="300" height="150" alt="image" src="https://github.com/user-attachments/assets/b7ae7b41-ba0d-41f9-bb4d-6038aa5076ee" />
+
 
 ## About the system
 
