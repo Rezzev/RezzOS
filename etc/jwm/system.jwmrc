@@ -9,6 +9,7 @@
     <Program label="Create Folder...">create_folder.sh</Program>
     <Separator/>
     <Program label="Terminal">st</Program>
+    <Program label="Configuration">rezzconfig</Program>
     <Program label="Code Editor">edit</Program>
     <Program label="Browser">rezzbrowser</Program>
     <Separator/>
