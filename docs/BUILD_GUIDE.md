@@ -1,29 +1,41 @@
-# Инструкция по сборке RezzOS
-Следуйте данной инструкции для сборки ос на вашем ПК
-## Установка необходимого 
-Скачиваем репозиторий:
+# RezzOS Build Guide
+
+Follow this guide to build RezzOS on your PC.
+
+## Prerequisites
+
+First, clone the repository:
+
 ```bash
 git clone https://github.com/Rezzev/RezzOS.git
 ```
-Установка зависимостей для сборки
+
+Then install the required build dependencies:
+
 ```bash
-apk add build-base flex bison linux-headers elfutils-dev openssl-dev perl bc cpio gzip wget tar grub-bios xorriso qemu-system-x86_64 qemu-img fakeroot gtk+3.0-dev gtksourceview-dev webkit2gtk-4.1 libxcomposite-dev libxrender-dev libxfixes-dev libxdamage-dev libx11-dev e2fsprogs gtk+3.0-dev webkit2gtk-4.1-dev
+apk add build-base flex bison linux-headers elfutils-dev openssl-dev perl bc cpio gzip wget tar grub-bios xorriso qemu-system-x86_64 qemu-img fakeroot gtk+3.0-dev gtksourceview-dev webkit2gtk-4.1
 ```
-!!ВАЖНО!!
 
-*Вам нужен установленный alpine linux в docker или полноценный alpine на вашем ПК*
+> Important: You need Alpine Linux installed either in Docker or directly on your machine.
+>
+> Otherwise, the required tools may not compile correctly under musl.
+>
+> You may try building on another musl-based distribution, but Alpine is strongly recommended.
 
-*Иначее собсветнные программы не смогут собратся под musl*
+## Build
 
-*Вы моежете попробывать собрать на другом musl дистрибутиве,но рекомендуется alpine*
+Run the build as root or with sudo/doas:
 
-## Сборка
-Запускай сборку из под root или с помошью sudo/doas
 ```bash
-sudo/doas ./build.sh
+sudo ./build.sh
+# or
+#doas ./build.sh
 ```
-Начнется процесс сборки ОС:
+
+The build process will start and progress through the following stages:
+
 ```
-Busybox -> Kernel -> Build Programs -> Create rootfs -> Create ISO
+BusyBox -> Kernel -> Build Programs -> Create rootfs -> Create ISO
 ```
-после успешной сборки у вас будет готовый ISO-образ
+
+After the build completes successfully, you will have a ready-to-use ISO image.
