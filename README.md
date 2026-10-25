@@ -3,16 +3,9 @@
   Improved and formatted version of the README in English
 -->
 
-# <img width="40" height="40" src="https://github.com/user-attachments/assets/2ea53faa-fcd1-4380-b317-6dc3e521ccd4" alt="RezzOS logo" /> RezzOS - simple distribution
+# RezzOS - Linux distro 
 
 **A minimalist Linux build based on the Linux 6.6.40 kernel and BusyBox**
-
-[![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://kernel.org)
-[![BusyBox](https://img.shields.io/badge/BusyBox-000000?style=for-the-badge&logo=busybox&logoColor=white)](https://busybox.net)
-[![Shell](https://img.shields.io/badge/Shell-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)](https://www.gnu.org/software/bash/)
-
-<img width="300" height="150" alt="image" src="https://github.com/user-attachments/assets/b7ae7b41-ba0d-41f9-bb4d-6038aa5076ee" />
-
 
 ## About the system
 
@@ -27,65 +20,30 @@
 
 > Change versions in <code>build.sh</code> if you need to build different versions.
 
+## Documentation 
+- [PROGRAMS](/docs/COMMANDS.md)  - уникальные программы и команды 
+- [BUILD](/docs/BUILD_GUIDE.md) - Гайд на сборку из исходников
+- [CONTRIBUTING](/docs/CONTRIBUTING.md) - информация для контербьюетров 
+- [HOW INSTALL](/docs/HOW_INSTALL.md) - гайд на установку
+- [NUANCES](/docs/NUANCES.md) - нюансы при использовании
+
 ## Features
 ### Package manager (Alpine repositories and its own repository)
 ```bash
 apk update - from alpine repository
 pkg update - from our repository
 ```
-### Key system utilities
-- Rcomp - composer(x11)
-- Redit - code editor
-- Rbrowser - simple built-in browser on webkit2gtk
-- Rconfig - settings menu
-- Rinstall - minimal graphical installer
-*These aren't all the utilities.*
-### Other
-- Persistent storage (ext4)
-- Lightweight and fast development environment: TCC and Lua in the root filesystem
-
-
-
-## Installation on hardware
-```bash
-startx # Start GUI
-```
-Open installer
-Fill in the input fields and install the system.
-
-## Building from source
-If you are NOT using Alpine Linux:
-Install alpine in Docker
-
-Then, install the build dependencies:
-```bash
-apk add build-base flex bison linux-headers elfutils-dev openssl-dev perl bc cpio gzip wget tar grub-bios xorriso qemu-system-x86_64 qemu-img fakeroot gtk+3.0-dev gtksourceview-dev webkit2gtk-4.1 libxcomposite-dev libxrender-dev libxfixes-dev libxdamage-dev libx11-dev e2fsprogs gtk+3.0-dev webkit2gtk-4.1-dev
-```
-
----
-
-
-
-## Before using the package manager run:
-
-```bash
-apk update - download from alpine linux repository 
-pkg update - download from RezzOS linux repository 
-```
-
----
 
 ## Quick start (in QEMU)
 Run from the repository root:
 
 ```bash
-./start.sh        # text mode
 ./start-gui.sh    # with GUI (if built)
 ```
 
 ---
 
-## links
+## Links
 - Main repository: [open](https://github.com/Rezzev/RezzOS)
 - Pkg repository: [open](https://github.com/Rezzev/RezzOS-Packages)
 
