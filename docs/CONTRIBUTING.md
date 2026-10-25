@@ -1,49 +1,43 @@
-# Руководство по контрибуции в RezzOS (CONTRIBUTING.md)
+# Contributing Guide for RezzOS (CONTRIBUTING.md)
 
-Привет! Спасибо, что решили помочь в развитии **RezzOS** — легковесного учебного дистрибутива Linux.
+Hello! Thank you for deciding to help develop **RezzOS** — a lightweight educational Linux distribution.
 
-Перед тем как отправить свой первый Pull Request (PR), пожалуйста, ознакомьтесь с этим руководством.
+Before submitting your first Pull Request (PR), please read this guide carefully.
 
 ---
 
-##  Процесс отправки изменений 
+## Contribution process
 
-1. **Форкните репозиторий:** Сделайте Fork проекта [RezzOS](https://github.com/Rezzev/RezzOS) в свой аккаунт.
-2. **Внесите изменения:** Пишите документированный код. Если вы правите Shell-скрипты, следуйте правилам оформления (см. раздел ниже).
-3. **Закоммитьте изменения:** Пишите понятные сообщения к коммитам на русском или английском языке:
+1. **Fork the repository:** Create a fork of the [RezzOS](https://github.com/Rezzev/RezzOS) project in your own account.
+2. **Make your changes:** Write documented code. If you modify shell scripts, follow the project’s style and formatting rules.
+3. **Commit your changes:** Use clear commit messages in English or Russian:
    ```bash
-   git commit -m "feat(pkg): добавлена автоматическая очистка кэша после установки"
-   ```
+   git commit -m "feat(pkg): added automatic cache cleanup after installation"# Contributing Guide for RezzOS (CONTRIBUTING.md)
+
+Hello! Thank you for deciding to help develop **RezzOS** — a lightweight educational Linux distribution.
+
+Before submitting your first Pull Request (PR), please read this guide carefully.
 
 ---
 
-## Стандарты кода
+## Contribution process
 
-Поскольку проект ориентирован на легковесность и минимализм, мы придерживаемся следующих правил:
+1. **Fork the repository:** Create a fork of the [RezzOS](https://github.com/Rezzev/RezzOS) project in your own account.
+2. **Make your changes:** Write documented code. If you modify shell scripts, follow the project’s style and formatting rules.
+3. **Commit your changes:** Use clear commit messages in English or Russian:
+   ```bash
+   git commit -m "feat(pkg): added automatic cache cleanup after installation"# Contributing Guide for RezzOS (CONTRIBUTING.md)
 
-### Shell-скрипты (sh / bash)
-* Всегда проверяйте возвращаемые значения критических команд (`cd`, `mkdir`) или используйте `set -e` там, где это уместно.
-* Код должен быть читаемым: используйте отступы в 4 пробела или 1 таб (придерживайтесь стиля изменяемого файла).
+Hello! Thank you for deciding to help develop **RezzOS** — a lightweight educational Linux distribution.
 
-### Системный код.
-* Избегайте утечек памяти и всегда проверяйте результаты системных вызовов (`malloc`, `open` и др.).
-
----
-
-##  Сообщения о багах и обратная связь
-
-Если вы нашли ошибку, но не знаете, как её исправить:
-1. Проверьте раздел **Issues** на GitHub — возможно, эту проблему уже решают.
-2. Если бага там нет, создайте новый Issue.
-3. Подробно опишите:
-   * Какую версию ядра/образа вы используете.
-   * Шаги для воспроизведения багов.
-   * Ожидаемый результат и то, что произошло на самом деле (желательно прикрепить логи или скриншот ошибки).
+Before submitting your first Pull Request (PR), please read this guide carefully.
 
 ---
 
-##  Сообщество и связь
+## Contribution process
 
-Если у вас возникли вопросы по архитектуре RezzOS или нужна помощь со сборкой, вы можете связаться с мейнтейнером проекта через GitHub Issues или официальные каналы связи проекта (если они добавлены в README).
-
-Спасибо за ваш вклад в развитие независимого и легковесного Linux!
+1. **Fork the repository:** Create a fork of the [RezzOS](https://github.com/Rezzev/RezzOS) project in your own account.
+2. **Make your changes:** Write documented code. If you modify shell scripts, follow the project’s style and formatting rules.
+3. **Commit your changes:** Use clear commit messages in English or Russian:
+   ```bash
+   git commit -m "feat(pkg): added automatic cache cleanup after installation"
