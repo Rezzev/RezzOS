@@ -13,7 +13,7 @@ git clone https://github.com/Rezzev/RezzOS.git
 Then install the required build dependencies:
 
 ```bash
-apk add build-base flex bison linux-headers elfutils-dev openssl-dev perl bc cpio gzip wget tar grub-bios xorriso qemu-system-x86_64 qemu-img fakeroot gtk+3.0-dev gtksourceview-dev webkit2gtk-4.1
+apk add build-base flex bison linux-headers elfutils-dev openssl-dev perl bc cpio gzip wget tar grub-bios xorriso qemu-system-x86_64 qemu-img fakeroot gtk+3.0-dev gtksourceview-dev e2fsprogs webkit2gtk-4.1
 ```
 
 > Important: You need Alpine Linux installed either in Docker or directly on your machine.
