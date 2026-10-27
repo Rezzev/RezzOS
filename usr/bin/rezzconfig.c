@@ -1,24 +1,7 @@
 /*
  * rezzconfig — GTK3 control center for RezzOS.
  *
- * Merges the original shell "rezzconfig" text menu (network, hostname,
- * font, keyboard, swap, services, users, packages, install, power) with
- * the GTK3 front-end that used to sit on top of it.
- *
- * Execution model:
- *   - Fixed multi-step scripts (network, hostname) run through run_cmd(),
- *     i.e. "sh -c <script>". Every value spliced into such a script has
- *     already passed a strict per-field validator (is_ip, is_iface,
- *     is_hostname, ...), not just a character whitelist.
- *   - Everything that takes a free-form name (package, service, user,
- *     font) runs through run_argv(): no shell at all, the value is a
- *     single argv element, so it can neither inject shell syntax nor
- *     extra options (validators also reject a leading '-').
- *   - Commands run asynchronously and stream their output into the log,
- *     so the window never freezes during `pkg install`, `ping`, etc.
- *     While a command runs the tab area is disabled.
- *
- * Build (on the Alpine build host, same as rezzbrowser/rezzinstall):
+ * Build:
  *   gcc -O2 -Wall -Wextra rezzconfig.c $(pkg-config --cflags --libs gtk+-3.0) \
  *       -o rezzconfig
  */
@@ -178,8 +161,6 @@ run_async(const char * const *argv, const char *shown, void (*done)(void))
     read_next_line(ctx);
 }
 
-/* Runs `script` through sh -c (pipes, heredocs, $(...) all work). Only
- * ever pass scripts whose variable parts were validated. */
 static void
 run_cmd(const char *script, void (*done)(void))
 {
@@ -187,7 +168,6 @@ run_cmd(const char *script, void (*done)(void))
     run_async(argv, script, done);
 }
 
-/* Runs a program directly, no shell. */
 static void
 run_argv(const char * const *argv, void (*done)(void))
 {
@@ -216,9 +196,6 @@ capture_shell(const char *script)
 /* Input validation                                                       */
 /* ====================================================================== */
 
-/* Names (user, service, package, font): starts with a letter/digit, so it
- * can never be mistaken for an option; then letters, digits, . _ - and
- * optionally '+' (Alpine package names such as "g++"). */
 static gboolean
 is_name_token(const char *s, gboolean allow_plus)
 {
@@ -271,7 +248,6 @@ is_ip(const char *s)
            (inet_pton(AF_INET, s, &a4) == 1 || inet_pton(AF_INET6, s, &a6) == 1);
 }
 
-/* "8.8.8.8, 1.1.1.1" -> "8.8.8.8 1.1.1.1"; NULL if any item is not an IP. */
 static gchar *
 normalize_dns(const char *in)
 {
@@ -295,8 +271,6 @@ normalize_dns(const char *in)
 /* Passwords                                                              */
 /* ====================================================================== */
 
-/* Feeds "user:password" to chpasswd's stdin so the password never shows
- * up in argv / `ps`. `user` must already be validated (no ':'). */
 static gboolean
 set_password(const char *user, const char *password)
 {
@@ -343,8 +317,6 @@ set_password(const char *user, const char *password)
 /* Status bar                                                             */
 /* ====================================================================== */
 
-/* First non-loopback interface that is up and already has an address;
- * failing that, the first one that is merely up; failing that, eth0. */
 static gchar *
 detect_iface(void)
 {
@@ -363,8 +335,6 @@ static void
 refresh_status_bar(void)
 {
     gchar *hn = capture_shell("hostname 2>/dev/null || echo rezzos");
-    /* Pick the word after "src" instead of a fixed column: the column
-     * moves when the route has no "via" (directly connected network). */
     gchar *ip = capture_shell(
         "IP=$(ip route get 1 2>/dev/null | "
         "awk '{for(i=1;i<=NF;i++) if($i==\"src\"){print $(i+1); exit}}'); "
@@ -426,6 +396,121 @@ tab_box(void)
 static GtkWidget *net_iface, *net_ip, *net_mask, *net_gw, *net_dns;
 
 static void
+set_entry_if(GtkWidget *entry, const char *value, gboolean only_empty)
+{
+    if (!value || !*value) return;
+    if (only_empty && *gtk_entry_get_text(GTK_ENTRY(entry))) return;
+    gtk_entry_set_text(GTK_ENTRY(entry), value);
+}
+
+static gchar *
+iface_cidr(const char *iface)
+{
+    gchar *out, *sc;
+
+    sc = g_strdup_printf(
+        "ip -4 -o addr show dev %s 2>/dev/null | "
+        "awk '{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\//){print $i; exit}}'",
+        iface);
+    out = capture_shell(sc);
+    g_free(sc);
+    if (out && *out) return out;
+    g_free(out);
+
+    sc = g_strdup_printf(
+        "ifconfig %s 2>/dev/null | awk '/inet /{"
+        "  ip=\"\"; m=\"\";"
+        "  for(i=1;i<=NF;i++){"
+        "    if($i ~ /^addr:/){v=$i; sub(/addr:/,\"\",v); ip=v}"
+        "    if($i ~ /^Mask:/){v=$i; sub(/Mask:/,\"\",v); m=v}"
+        "    if($i==\"netmask\"){m=$(i+1)}"
+        "    if($i ~ /^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$/ && ip==\"\"){ip=$i}"
+        "  }"
+        "  if(ip && m) print ip\"/\"m; else if(ip) print ip; exit}'",
+        iface);
+    out = capture_shell(sc);
+    g_free(sc);
+    return out;
+}
+
+static gchar *
+prefix_to_mask(guint32 prefix)
+{
+    if (prefix == 0) return g_strdup("0.0.0.0");
+    if (prefix > 32) return NULL;
+    guint32 m = 0xFFFFFFFFu << (32 - prefix);
+    return g_strdup_printf("%u.%u.%u.%u",
+        (m >> 24) & 0xFF, (m >> 16) & 0xFF, (m >> 8) & 0xFF, m & 0xFF);
+}
+
+static void
+fill_network_form(gboolean only_empty)
+{
+    const char *typed = net_iface ? gtk_entry_get_text(GTK_ENTRY(net_iface)) : NULL;
+    gchar *iface;
+
+    if (typed && *typed && is_iface(typed))
+        iface = g_strdup(typed);
+    else
+        iface = detect_iface();
+    if (!iface || !*iface) { g_free(iface); return; }
+
+    gchar *cidr = iface_cidr(iface);
+    gchar *ip_str = NULL, *mask_str = NULL;
+
+    if (cidr && *cidr) {
+        gchar *slash = strchr(cidr, '/');
+        if (slash) {
+            *slash = '\0';
+            ip_str = g_strdup(cidr);
+            const char *m = slash + 1;
+            if (*m && strchr(m, '.')) {
+                if (is_ipv4(m)) mask_str = g_strdup(m);
+            } else if (*m) {
+                mask_str = prefix_to_mask((guint32)atoi(m));
+            }
+        } else {
+            ip_str = g_strdup(cidr);
+        }
+    }
+
+    gchar *gw_str = capture_shell(
+        "ip route 2>/dev/null | awk '/^default /{print $3; exit}'");
+    if (!gw_str || !*gw_str) {
+        g_free(gw_str);
+        gw_str = capture_shell(
+            "route -n 2>/dev/null | awk '$1==\"0.0.0.0\"{print $2; exit}'");
+    }
+
+    gchar *dns_str = capture_shell(
+        "awk '$1==\"nameserver\"{printf \"%s \", $2}' /etc/resolv.conf 2>/dev/null");
+
+    set_entry_if(net_iface, iface, only_empty);
+    if (ip_str   && is_ipv4(ip_str))   set_entry_if(net_ip,   ip_str,   only_empty);
+    if (mask_str && is_ipv4(mask_str)) set_entry_if(net_mask, mask_str, only_empty);
+    if (gw_str   && is_ipv4(gw_str))   set_entry_if(net_gw,   gw_str,   only_empty);
+    if (dns_str  && *dns_str)          set_entry_if(net_dns,  dns_str,  only_empty);
+
+    g_free(iface); g_free(cidr);
+    g_free(ip_str); g_free(mask_str);
+    g_free(gw_str); g_free(dns_str);
+}
+
+static void
+after_network_change(void)
+{
+    refresh_status_bar();
+    fill_network_form(FALSE);
+}
+
+static void
+on_net_refresh_form(GtkButton *b, gpointer d)
+{
+    (void)b; (void)d;
+    fill_network_form(FALSE);
+}
+
+static void
 on_net_status(GtkButton *b, gpointer d)
 {
     (void)b; (void)d;
@@ -460,12 +545,6 @@ on_net_dhcp(GtkButton *b, gpointer d)
         return;
     }
 
-    /* The saved static config is only removed once DHCP actually worked,
-     * so a failed attempt does not destroy a working setup. -n makes
-     * udhcpc exit non-zero when there is no lease (the old -b returned 0
-     * after forking, so "completed" was printed even on failure); on
-     * success it daemonises itself for renewals. Output is redirected so
-     * the daemon does not keep our log pipe open. */
     gchar *script = g_strdup_printf(
         "IFACE=%s; "
         "echo \"Switching to DHCP on $IFACE...\"; "
@@ -479,7 +558,7 @@ on_net_dhcp(GtkButton *b, gpointer d)
         "fi",
         iface);
 
-    run_cmd(script, after_status);
+    run_cmd(script, after_network_change);
     g_free(script);
     g_free(iface);
 }
@@ -528,7 +607,7 @@ on_net_static_apply(GtkButton *b, gpointer d)
             "fi",
             iface, ip, mask, route_part, dns, iface, ip, mask, gw, dns);
 
-        run_cmd(script, after_status);
+        run_cmd(script, after_network_change);
         g_free(route_part);
         g_free(script);
     }
@@ -551,8 +630,6 @@ on_net_dns_only(GtkButton *b, gpointer d)
         return;
     }
 
-    /* Same persistence rule as the static-IP path: a mounted /mnt/disk
-     * that already holds a static config. */
     gchar *script = g_strdup_printf(
         ": > /etc/resolv.conf; for ns in %s; do echo nameserver $ns >> /etc/resolv.conf; done; "
         "if grep -q ' /mnt/disk ' /proc/mounts && [ -f /mnt/disk/etc/network.conf ]; then "
@@ -568,7 +645,7 @@ on_net_dns_only(GtkButton *b, gpointer d)
         "fi",
         dns, dns, dns, dns);
 
-    run_cmd(script, NULL);
+    run_cmd(script, after_network_change);
     g_free(script);
     g_free(dns);
 }
@@ -591,12 +668,15 @@ build_network_tab(void)
     GtkWidget *b1 = gtk_button_new_with_label("View Status");
     GtkWidget *b2 = gtk_button_new_with_label("Auto-Configure (DHCP)");
     GtkWidget *b3 = gtk_button_new_with_label("Test Connectivity");
+    GtkWidget *b4 = gtk_button_new_with_label("Refresh from system");
     g_signal_connect(b1, "clicked", G_CALLBACK(on_net_status), NULL);
     g_signal_connect(b2, "clicked", G_CALLBACK(on_net_dhcp), NULL);
     g_signal_connect(b3, "clicked", G_CALLBACK(on_net_ping), NULL);
+    g_signal_connect(b4, "clicked", G_CALLBACK(on_net_refresh_form), NULL);
     gtk_box_pack_start(GTK_BOX(btns), b1, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(btns), b2, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(btns), b3, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(btns), b4, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(box), btns, FALSE, FALSE, 0);
 
     gtk_box_pack_start(GTK_BOX(box), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), FALSE, FALSE, 4);
@@ -617,8 +697,9 @@ build_network_tab(void)
     net_dns  = labeled_entry(box, "DNS Servers", "e.g. 8.8.8.8 1.1.1.1");
 
     GtkWidget *warn = gtk_label_new(
-        "Note: the grey text above is just an example format, not your real network.\n"
-        "Click \"View Status\" first to see your actual IP/gateway before filling this in.");
+        "Fields were pre-filled from your current system settings.\n"
+        "Edit them and click \"Apply Static Config\" to switch to static addressing,\n"
+        "or \"Refresh from system\" to reload the current values.");
     gtk_label_set_xalign(GTK_LABEL(warn), 0.0);
     gtk_box_pack_start(GTK_BOX(box), warn, FALSE, FALSE, 0);
 
@@ -631,6 +712,7 @@ build_network_tab(void)
     gtk_box_pack_start(GTK_BOX(actions), dns_only, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(box), actions, FALSE, FALSE, 4);
 
+    fill_network_form(FALSE);
     return box;
 }
 
@@ -671,8 +753,6 @@ on_hostname_apply(GtkButton *b, gpointer d)
 
     gchar *script = g_strdup_printf(
         "hostname %s; echo %s > /etc/hostname; "
-        /* Keep 127.0.0.1 pointing at the machine's own name; add the
-         * line if /etc/hosts has none. */
         "if grep -q '^127\\.0\\.0\\.1' /etc/hosts 2>/dev/null; then "
         "  sed -i 's/^127\\.0\\.0\\.1 .*/127.0.0.1 %s localhost/' /etc/hosts; "
         "else echo '127.0.0.1 %s localhost' >> /etc/hosts; fi; "
@@ -786,8 +866,6 @@ build_keyboard_tab(void)
     gtk_label_set_xalign(GTK_LABEL(lbl), 0.0);
     gtk_box_pack_start(GTK_BOX(box), lbl, FALSE, FALSE, 0);
 
-    /* `-option ''` first clears previously set options: setxkbmap appends
-     * otherwise, so switching Alt+Shift -> Caps would leave both active. */
     static const struct { const char *label; const char *cmd; } opts[] = {
         {"US / RU (Alt + Shift)",  "setxkbmap -layout us,ru -option '' -option grp:alt_shift_toggle,grp_led:scroll"},
         {"US / RU (Caps Lock)",    "setxkbmap -layout us,ru -option '' -option grp:caps_toggle,grp_led:scroll"},
@@ -967,8 +1045,6 @@ on_add_user(GtkButton *b, gpointer d)
         return;
     }
 
-    /* -D: create without a password; set one via the fields above.
-     * Run without a shell, so the name is exactly one argument. */
     const char *argv[] = { "adduser", "-D", name, NULL };
     run_argv(argv, NULL);
 }
@@ -1107,8 +1183,6 @@ on_launch_installer(GtkButton *b, gpointer d)
         log_append("rezzinstall not found in /usr/bin!");
         return;
     }
-    /* rezzinstall is its own GTK3 window, so it is launched directly and
-     * asynchronously. */
     GError *error = NULL;
     if (!g_spawn_command_line_async("/usr/bin/rezzinstall", &error)) {
         log_appendf("Failed to launch rezzinstall: %s", error->message);
@@ -1187,8 +1261,10 @@ on_destroy(GtkWidget *w, gpointer d)
 static void
 on_switch_page(GtkNotebook *nb, GtkWidget *page, guint num, gpointer d)
 {
-    (void)nb; (void)page; (void)num; (void)d;
+    (void)nb; (void)page; (void)d;
     refresh_status_bar();
+    if (num == 0 && net_iface)
+        fill_network_form(TRUE);
 }
 
 int
@@ -1212,13 +1288,12 @@ main(int argc, char *argv[])
     gtk_box_pack_start(GTK_BOX(vbox), status_bar_label, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), FALSE, FALSE, 0);
 
-    /* The log is created before the tabs: building a tab may already log. */
     log_view = gtk_text_view_new();
     gtk_text_view_set_editable(GTK_TEXT_VIEW(log_view), FALSE);
     gtk_text_view_set_monospace(GTK_TEXT_VIEW(log_view), TRUE);
 
     notebook = gtk_notebook_new();
-    gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook), GTK_POS_RIGHT);  /* tabs on the right */
+    gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook), GTK_POS_RIGHT);
     gtk_notebook_set_scrollable(GTK_NOTEBOOK(notebook), TRUE);
     gtk_box_pack_start(GTK_BOX(vbox), notebook, TRUE, TRUE, 0);
 
