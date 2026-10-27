@@ -480,12 +480,6 @@ fi
 cp -f "$CACHE_DIR/rtop" "$ROOTFS_DIR/usr/bin/rtop"
 chmod +x "$ROOTFS_DIR/usr/bin/rtop"
 
-ZIG_URL="https://ziglang.org/download/0.17.0/zig-x86_64-linux-0.17.0.tar.xz"
-wget -q "$ZIG_URL" -O "$ROOTFS_DIR/usr/bin/zig-x86_64-linux-0.17.0.tar.xz" || { echo "Failed to download Zig"; exit 1; }
-tar -xf "$ROOTFS_DIR/usr/bin/zig-x86_64-linux-0.17.0.tar.xz" -C "$ROOTFS_DIR/usr/bin/"
-rm -f "$ROOTFS_DIR/usr/bin/zig-x86_64-linux-0.17.0.tar.xz"
-ln -s "/usr/bin/zig-x86_64-linux-0.17.0/zig" "$ROOTFS_DIR/usr/bin/zig"
-
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/usr/share/udhcpc/default.script" 2>/dev/null || true
