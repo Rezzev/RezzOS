@@ -19,18 +19,26 @@ static GtkTreeStore *tree_store;
 static GtkAccelGroup *accel_group;
 static gchar *current_root = NULL;
 
+/* Sidebar / paned state */
+static GtkWidget *paned_widget = NULL;
+static GtkWidget *sidebar_scroll = NULL;
+static GtkWidget *sidebar_menu_item = NULL;
+static gulong     sidebar_menu_handler_id = 0;
+
 /* ---------- settings state ---------- */
 
 typedef struct {
-    gchar *style_scheme;   /* GtkSourceView style scheme id */
-    gint font_size;        /* editor font size, pt */
-    gboolean dark_ui;      /* prefer-dark-theme */
-    gboolean search_wrap;  /* wrap search around buffer */
-    gboolean search_case;  /* case sensitive search */
-    gchar *font_family;    /* editor font family, NULL means Monospace */
+    gchar *style_scheme;
+    gint font_size;
+    gboolean dark_ui;
+    gboolean search_wrap;
+    gboolean search_case;
+    gchar *font_family;
+    gboolean sidebar_visible;
+    gint sidebar_position;
 } Settings;
 
-static Settings settings = { NULL, 11, FALSE, TRUE, FALSE, NULL };
+static Settings settings = { NULL, 11, FALSE, TRUE, FALSE, NULL, TRUE, 220 };
 
 /* ---------- configuration file ---------- */
 
@@ -42,7 +50,6 @@ static gchar *config_path(void)
     return g_build_filename(g_get_user_config_dir(), "rezzedit", CONFIG_FILE, NULL);
 }
 
-/* Loads persisted settings; missing keys keep their defaults. */
 static void
 load_config(void)
 {
@@ -72,6 +79,13 @@ load_config(void)
         else if (family && *family) { g_free(settings.font_family); settings.font_family = family; }
         else g_free(family);
 
+        b = g_key_file_get_boolean(kf, CFG_GROUP, "sidebar-visible", &err);
+        if (err) g_clear_error(&err); else settings.sidebar_visible = b;
+
+        gint sp = g_key_file_get_integer(kf, CFG_GROUP, "sidebar-position", &err);
+        if (err) g_clear_error(&err);
+        else if (sp >= 50 && sp <= 3000) settings.sidebar_position = sp;
+
         if (settings.dark_ui) {
             GtkSettings *gtks = gtk_settings_get_default();
             if (gtks)
@@ -99,6 +113,8 @@ save_config(void)
     g_key_file_set_boolean(kf, CFG_GROUP, "search-case", settings.search_case);
     g_key_file_set_string(kf, CFG_GROUP, "font-family",
         settings.font_family ? settings.font_family : "Monospace");
+    g_key_file_set_boolean(kf, CFG_GROUP, "sidebar-visible", settings.sidebar_visible);
+    g_key_file_set_integer(kf, CFG_GROUP, "sidebar-position", settings.sidebar_position);
 
     gsize len = 0;
     gchar *data = g_key_file_to_data(kf, &len, NULL);
@@ -113,7 +129,7 @@ save_config(void)
 typedef struct {
     GtkWidget *source_view;
     GtkSourceBuffer *buffer;
-    gchar *filepath;   /* NULL until saved once */
+    gchar *filepath;
     GtkWidget *tab_label;
 } EditorTab;
 
@@ -128,18 +144,10 @@ current_tab(void)
 
 /* ---------- language / appearance ---------- */
 
-/*
- * Extra syntax definitions installed on first run into
- * ~/.local/share/gtksourceview-3.0/language-specs, so highlighting covers
- * languages that the distro package does not ship (Zig, Nix, TypeScript,
- * Dockerfile, ...). They are deliberately plain: keywords, numbers, strings,
- * comments. Anything already provided by the system wins, since the manager
- * picks the first definition per id from its search path order.
- */
 typedef struct {
     const gchar *id;
-    const gchar *file;     /* file name inside the language-specs dir */
-    const gchar *spec;     /* full XML definition */
+    const gchar *file;
+    const gchar *spec;
 } ExtraLang;
 
 static const ExtraLang extra_langs[] = {
@@ -828,7 +836,6 @@ install_extra_languages(void)
     g_free(dir);
 }
 
-/* Filenames without an extension need an explicit mapping. */
 static const gchar *
 language_id_for_basename(const gchar *basename)
 {
@@ -865,7 +872,6 @@ apply_language_for_path(GtkSourceBuffer *buffer, const gchar *path)
         if (forced)
             lang = gtk_source_language_manager_get_language(lm, forced);
 
-        /* Extensionless files have no MIME guess, so also try the content. */
         if (!lang)
             lang = gtk_source_language_manager_guess_language(lm, path, NULL);
         if (!lang && !strchr(base, '.')) {
@@ -1108,7 +1114,7 @@ confirm_discard(EditorTab *tab)
 
     if (r == GTK_RESPONSE_CANCEL) return FALSE;
     if (r == GTK_RESPONSE_ACCEPT) return save_tab(tab, FALSE);
-    return TRUE; /* discard */
+    return TRUE;
 }
 
 static void
@@ -1150,7 +1156,7 @@ populate_dir(GtkTreeStore *store, GtkTreeIter *parent, const gchar *dirpath)
     GList *names = NULL;
     const gchar *name;
     while ((name = g_dir_read_name(dir)) != NULL) {
-        if (name[0] == '.') continue; /* skip dotfiles/hidden dirs */
+        if (name[0] == '.') continue;
         names = g_list_insert_sorted(names, g_strdup(name), (GCompareFunc)g_strcmp0);
     }
     g_dir_close(dir);
@@ -1165,8 +1171,6 @@ populate_dir(GtkTreeStore *store, GtkTreeIter *parent, const gchar *dirpath)
             COL_NAME, (const gchar *)l->data, COL_PATH, full, COL_IS_DIR, is_dir, -1);
 
         if (is_dir) {
-            /* Dummy child so the expander arrow shows; replaced with real
-             * children on first expand (lazy loading). */
             GtkTreeIter dummy;
             gtk_tree_store_append(store, &dummy, &iter);
             gtk_tree_store_set(store, &dummy, COL_NAME, "", COL_PATH, "", COL_IS_DIR, FALSE, -1);
@@ -1259,7 +1263,7 @@ do_search(gboolean forward)
 
     if (forward) {
         if (has_sel)
-            start = sel_end;              /* continue past current match */
+            start = sel_end;
         else
             gtk_text_buffer_get_iter_at_mark(buf, &start, gtk_text_buffer_get_insert(buf));
 
@@ -1270,7 +1274,7 @@ do_search(gboolean forward)
         }
     } else {
         if (has_sel)
-            start = sel_start;            /* continue before current match */
+            start = sel_start;
         else
             gtk_text_buffer_get_iter_at_mark(buf, &start, gtk_text_buffer_get_insert(buf));
 
@@ -1304,10 +1308,6 @@ static GtkWidget *dark_check;
 static GtkWidget *font_button;
 static gboolean is_fullscreen = FALSE;
 
-/*
- * gtk_window_get_window_type() stays TOPLEVEL while fullscreen, so the state
- * has to be tracked from the state-event instead.
- */
 static gboolean
 on_window_state(GtkWidget *w, GdkEventWindowState *e, gpointer d)
 {
@@ -1332,7 +1332,6 @@ on_font_set(GtkFontButton *b, gpointer d)
     const gchar *name = gtk_font_chooser_get_font(GTK_FONT_CHOOSER(b));
     if (!name || !*name) return;
 
-    /* The button reports "Family Style Size"; keep family and size, drop style. */
     PangoFontDescription *fd = pango_font_description_from_string(name);
     const gchar *family = pango_font_description_get_family(fd);
     gint size = pango_font_description_get_size(fd) / PANGO_SCALE;
@@ -1356,7 +1355,6 @@ static gboolean
 on_key_press(GtkWidget *w, GdkEventKey *e, gpointer d)
 {
     (void)w; (void)d;
-    /* F11 is bound through the menu accelerator; Escape leaves fullscreen. */
     if (e->keyval == GDK_KEY_Escape && is_fullscreen) {
         gtk_window_unfullscreen(GTK_WINDOW(window));
         return TRUE;
@@ -1368,8 +1366,6 @@ static void
 on_scheme_changed(GtkComboBox *c, gpointer d)
 {
     (void)d;
-    /* The active *id* is the scheme id; the visible text is the scheme's
-     * display name, so reading the text would never resolve a scheme. */
     const gchar *id = gtk_combo_box_get_active_id(c);
     if (!id) return;
     g_free(settings.style_scheme);
@@ -1433,7 +1429,6 @@ build_settings_window(void)
     settings_notebook = gtk_notebook_new();
     gtk_container_add(GTK_CONTAINER(settings_window), settings_notebook);
 
-    /* --- Appearance --- */
     GtkWidget *grid = gtk_grid_new();
     gtk_grid_set_row_spacing(GTK_GRID(grid), 10);
     gtk_grid_set_column_spacing(GTK_GRID(grid), 12);
@@ -1480,327 +1475,4 @@ build_settings_window(void)
     g_signal_connect(dark_check, "toggled", G_CALLBACK(on_dark_toggled), NULL);
     gtk_grid_attach(GTK_GRID(grid), dark_check, 0, 3, 2, 1);
 
-    gtk_notebook_append_page(GTK_NOTEBOOK(settings_notebook), grid,
-        gtk_label_new("Appearance"));
-
-    /* --- Search --- */
-    GtkWidget *sbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
-    gtk_container_set_border_width(GTK_CONTAINER(sbox), 14);
-
-    search_entry = gtk_search_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(search_entry), "Search text");
-    g_signal_connect(search_entry, "activate", G_CALLBACK(on_search_activate), NULL);
-    gtk_box_pack_start(GTK_BOX(sbox), search_entry, FALSE, FALSE, 0);
-
-    GtkWidget *btn_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
-    GtkWidget *prev_btn = gtk_button_new_with_label("Previous");
-    GtkWidget *next_btn = gtk_button_new_with_label("Next");
-    g_signal_connect(prev_btn, "clicked", G_CALLBACK(on_search_prev), NULL);
-    g_signal_connect(next_btn, "clicked", G_CALLBACK(on_search_next), NULL);
-    gtk_box_pack_start(GTK_BOX(btn_row), prev_btn, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(btn_row), next_btn, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(sbox), btn_row, FALSE, FALSE, 0);
-
-    GtkWidget *wrap_check = gtk_check_button_new_with_label("Wrap around");
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(wrap_check), settings.search_wrap);
-    g_signal_connect(wrap_check, "toggled", G_CALLBACK(on_search_wrap_toggled), NULL);
-    gtk_box_pack_start(GTK_BOX(sbox), wrap_check, FALSE, FALSE, 0);
-
-    GtkWidget *case_check = gtk_check_button_new_with_label("Match case");
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(case_check), settings.search_case);
-    g_signal_connect(case_check, "toggled", G_CALLBACK(on_search_case_toggled), NULL);
-    gtk_box_pack_start(GTK_BOX(sbox), case_check, FALSE, FALSE, 0);
-
-    search_status = gtk_label_new("");
-    gtk_label_set_xalign(GTK_LABEL(search_status), 0.0);
-    gtk_box_pack_start(GTK_BOX(sbox), search_status, FALSE, FALSE, 0);
-
-    gtk_notebook_append_page(GTK_NOTEBOOK(settings_notebook), sbox,
-        gtk_label_new("Search"));
-}
-
-static void
-show_settings(gint page_index)
-{
-    if (!settings_window) build_settings_window();
-    gtk_widget_show_all(settings_window);
-    gtk_window_present(GTK_WINDOW(settings_window));
-    if (page_index >= 0)
-        gtk_notebook_set_current_page(GTK_NOTEBOOK(settings_notebook), page_index);
-    if (page_index == 1 && search_entry)
-        gtk_widget_grab_focus(search_entry);
-}
-
-/* ---------- menu / hotkey actions ---------- */
-
-static void action_new(GtkMenuItem *m, gpointer d)   { (void)m; (void)d; new_tab(NULL); }
-
-static void
-action_open(GtkMenuItem *m, gpointer d)
-{
-    (void)m; (void)d;
-    GtkWidget *dlg = gtk_file_chooser_dialog_new("Open File", GTK_WINDOW(window),
-        GTK_FILE_CHOOSER_ACTION_OPEN,
-        "_Cancel", GTK_RESPONSE_CANCEL, "_Open", GTK_RESPONSE_ACCEPT, NULL);
-    if (current_root)
-        gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dlg), current_root);
-
-    if (gtk_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_ACCEPT) {
-        gchar *path = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dlg));
-        new_tab(path);
-        g_free(path);
-    }
-    gtk_widget_destroy(dlg);
-}
-
-static void
-action_open_folder(GtkMenuItem *m, gpointer d)
-{
-    (void)m; (void)d;
-    GtkWidget *dlg = gtk_file_chooser_dialog_new("Open Folder", GTK_WINDOW(window),
-        GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER,
-        "_Cancel", GTK_RESPONSE_CANCEL, "_Open", GTK_RESPONSE_ACCEPT, NULL);
-
-    if (gtk_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_ACCEPT) {
-        gchar *path = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dlg));
-        load_root(path);
-        g_free(path);
-    }
-    gtk_widget_destroy(dlg);
-}
-
-static void action_save(GtkMenuItem *m, gpointer d)    { (void)m; (void)d; save_tab(current_tab(), FALSE); }
-static void action_save_as(GtkMenuItem *m, gpointer d) { (void)m; (void)d; save_tab(current_tab(), TRUE); }
-
-static void
-action_close_tab(GtkMenuItem *m, gpointer d)
-{
-    (void)m; (void)d;
-    gint page = gtk_notebook_get_current_page(GTK_NOTEBOOK(notebook));
-    if (page >= 0)
-        close_tab_widget(gtk_notebook_get_nth_page(GTK_NOTEBOOK(notebook), page));
-}
-
-static gboolean
-on_delete_event(GtkWidget *w, GdkEvent *e, gpointer d)
-{
-    (void)w; (void)e; (void)d;
-    gint n = gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook));
-    for (gint i = 0; i < n; i++) {
-        GtkWidget *scroll = gtk_notebook_get_nth_page(GTK_NOTEBOOK(notebook), i);
-        EditorTab *tab = g_object_get_data(G_OBJECT(scroll), "tab");
-        if (!confirm_discard(tab)) return TRUE; /* cancel closing the window */
-    }
-    return FALSE;
-}
-
-static void action_quit(GtkMenuItem *m, gpointer d) { (void)m; (void)d; gtk_widget_destroy(window); }
-
-static void
-action_undo(GtkMenuItem *m, gpointer d)
-{
-    (void)m; (void)d;
-    EditorTab *tab = current_tab();
-    if (tab && gtk_source_buffer_can_undo(tab->buffer))
-        gtk_source_buffer_undo(tab->buffer);
-}
-
-static void
-action_redo(GtkMenuItem *m, gpointer d)
-{
-    (void)m; (void)d;
-    EditorTab *tab = current_tab();
-    if (tab && gtk_source_buffer_can_redo(tab->buffer))
-        gtk_source_buffer_redo(tab->buffer);
-}
-
-static void
-sync_zoom_spin(void)
-{
-    if (zoom_spin)
-        gtk_spin_button_set_value(GTK_SPIN_BUTTON(zoom_spin), settings.font_size);
-    if (font_button)
-        gtk_font_chooser_set_font(GTK_FONT_CHOOSER(font_button),
-            settings.font_family ? settings.font_family : "Monospace");
-}
-
-static void
-action_zoom_in(GtkMenuItem *m, gpointer d)
-{
-    (void)m; (void)d;
-    if (settings.font_size >= 48) return;
-    settings.font_size++;
-    apply_style_to_all_tabs();
-    sync_zoom_spin();
-    save_config();
-}
-
-static void
-action_zoom_out(GtkMenuItem *m, gpointer d)
-{
-    (void)m; (void)d;
-    if (settings.font_size <= 6) return;
-    settings.font_size--;
-    apply_style_to_all_tabs();
-    sync_zoom_spin();
-    save_config();
-}
-
-static void
-action_zoom_reset(GtkMenuItem *m, gpointer d)
-{
-    (void)m; (void)d;
-    settings.font_size = 11;
-    apply_style_to_all_tabs();
-    sync_zoom_spin();
-    save_config();
-}
-
-static void action_find(GtkMenuItem *m, gpointer d)      { (void)m; (void)d; show_settings(1); }
-static void action_settings(GtkMenuItem *m, gpointer d)  { (void)m; (void)d; show_settings(0); }
-static void action_find_next(GtkMenuItem *m, gpointer d) { (void)m; (void)d; do_search(TRUE); }
-static void action_find_prev(GtkMenuItem *m, gpointer d) { (void)m; (void)d; do_search(FALSE); }
-
-static void
-action_fullscreen(GtkMenuItem *m, gpointer d)
-{
-    (void)m; (void)d;
-    toggle_fullscreen();
-}
-
-/* ---------- menu bar with accelerators ---------- */
-
-static GtkWidget *
-menu_item_with_accel(const char *label, guint key, GdkModifierType mods,
-                      void (*cb)(GtkMenuItem *, gpointer))
-{
-    GtkWidget *item = gtk_menu_item_new_with_label(label);
-    gtk_widget_add_accelerator(item, "activate", accel_group, key, mods, GTK_ACCEL_VISIBLE);
-    g_signal_connect(item, "activate", G_CALLBACK(cb), NULL);
-    return item;
-}
-
-static GtkWidget *
-build_menu_bar(void)
-{
-    GtkWidget *menubar = gtk_menu_bar_new();
-
-    GtkWidget *file_menu = gtk_menu_new();
-    GtkWidget *file_item = gtk_menu_item_new_with_label("File");
-    gtk_menu_item_set_submenu(GTK_MENU_ITEM(file_item), file_menu);
-
-    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu),
-        menu_item_with_accel("New", GDK_KEY_n, GDK_CONTROL_MASK, action_new));
-    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu),
-        menu_item_with_accel("Open File...", GDK_KEY_o, GDK_CONTROL_MASK, action_open));
-    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu),
-        menu_item_with_accel("Open Folder...", GDK_KEY_o, GDK_CONTROL_MASK | GDK_SHIFT_MASK, action_open_folder));
-    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), gtk_separator_menu_item_new());
-    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu),
-        menu_item_with_accel("Save", GDK_KEY_s, GDK_CONTROL_MASK, action_save));
-    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu),
-        menu_item_with_accel("Save As...", GDK_KEY_s, GDK_CONTROL_MASK | GDK_SHIFT_MASK, action_save_as));
-    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), gtk_separator_menu_item_new());
-    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu),
-        menu_item_with_accel("Close Tab", GDK_KEY_w, GDK_CONTROL_MASK, action_close_tab));
-    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu),
-        menu_item_with_accel("Quit", GDK_KEY_q, GDK_CONTROL_MASK, action_quit));
-
-    GtkWidget *edit_menu = gtk_menu_new();
-    GtkWidget *edit_item = gtk_menu_item_new_with_label("Edit");
-    gtk_menu_item_set_submenu(GTK_MENU_ITEM(edit_item), edit_menu);
-    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
-        menu_item_with_accel("Undo", GDK_KEY_z, GDK_CONTROL_MASK, action_undo));
-    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
-        menu_item_with_accel("Redo", GDK_KEY_y, GDK_CONTROL_MASK, action_redo));
-    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu), gtk_separator_menu_item_new());
-    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
-        menu_item_with_accel("Find...", GDK_KEY_f, GDK_CONTROL_MASK, action_find));
-    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
-        menu_item_with_accel("Find Next", GDK_KEY_F3, 0, action_find_next));
-    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
-        menu_item_with_accel("Find Previous", GDK_KEY_F3, GDK_SHIFT_MASK, action_find_prev));
-    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu), gtk_separator_menu_item_new());
-    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
-        menu_item_with_accel("Settings...", GDK_KEY_comma, GDK_CONTROL_MASK, action_settings));
-
-    GtkWidget *view_menu = gtk_menu_new();
-    GtkWidget *view_item = gtk_menu_item_new_with_label("View");
-    gtk_menu_item_set_submenu(GTK_MENU_ITEM(view_item), view_menu);
-    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu),
-        menu_item_with_accel("Zoom In", GDK_KEY_plus, GDK_CONTROL_MASK, action_zoom_in));
-    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu),
-        menu_item_with_accel("Zoom Out", GDK_KEY_minus, GDK_CONTROL_MASK, action_zoom_out));
-    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu),
-        menu_item_with_accel("Zoom Reset", GDK_KEY_0, GDK_CONTROL_MASK, action_zoom_reset));
-    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu), gtk_separator_menu_item_new());
-    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu),
-        menu_item_with_accel("Fullscreen", GDK_KEY_F11, 0, action_fullscreen));
-
-    gtk_menu_shell_append(GTK_MENU_SHELL(menubar), file_item);
-    gtk_menu_shell_append(GTK_MENU_SHELL(menubar), edit_item);
-    gtk_menu_shell_append(GTK_MENU_SHELL(menubar), view_item);
-    return menubar;
-}
-
-int
-main(int argc, char *argv[])
-{
-    gtk_init(&argc, &argv);
-
-    load_config();
-    install_extra_languages();
-    apply_font_css();
-
-    /* Rewrite once so the file is created on first run and always carries
-     * every key, including ones added after the config was first written. */
-    save_config();
-
-    window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_title(GTK_WINDOW(window), "rezzedit");
-    gtk_window_set_default_size(GTK_WINDOW(window), 1000, 680);
-    g_signal_connect(window, "delete-event", G_CALLBACK(on_delete_event), NULL);
-    g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), NULL);
-    g_signal_connect(window, "window-state-event", G_CALLBACK(on_window_state), NULL);
-    g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
-
-    accel_group = gtk_accel_group_new();
-    gtk_window_add_accel_group(GTK_WINDOW(window), accel_group);
-
-    GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_container_add(GTK_CONTAINER(window), vbox);
-    gtk_box_pack_start(GTK_BOX(vbox), build_menu_bar(), FALSE, FALSE, 0);
-
-    GtkWidget *paned = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
-    gtk_box_pack_start(GTK_BOX(vbox), paned, TRUE, TRUE, 0);
-
-    /* Sidebar */
-    tree_store = gtk_tree_store_new(N_TREE_COLS, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_BOOLEAN);
-    file_tree = gtk_tree_view_new_with_model(GTK_TREE_MODEL(tree_store));
-    g_object_unref(tree_store);
-    gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(file_tree), FALSE);
-    GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
-    GtkTreeViewColumn *col = gtk_tree_view_column_new_with_attributes("Name", renderer, "text", COL_NAME, NULL);
-    gtk_tree_view_append_column(GTK_TREE_VIEW(file_tree), col);
-    g_signal_connect(file_tree, "row-expanded", G_CALLBACK(on_row_expanded), NULL);
-    g_signal_connect(file_tree, "row-activated", G_CALLBACK(on_tree_row_activated), NULL);
-
-    GtkWidget *sidebar_scroll = gtk_scrolled_window_new(NULL, NULL);
-    gtk_widget_set_size_request(sidebar_scroll, 220, -1);
-    gtk_container_add(GTK_CONTAINER(sidebar_scroll), file_tree);
-    gtk_paned_pack1(GTK_PANED(paned), sidebar_scroll, FALSE, TRUE);
-
-    /* Editor area */
-    notebook = gtk_notebook_new();
-    gtk_notebook_set_scrollable(GTK_NOTEBOOK(notebook), TRUE);
-    gtk_paned_pack2(GTK_PANED(paned), notebook, TRUE, TRUE);
-
-    const gchar *home = g_get_home_dir();
-    load_root(home ? home : "/");
-    new_tab(NULL);
-
-    gtk_widget_show_all(window);
-    gtk_main();
-
-    return 0;
-}
+    gtk_notebook_append_page(GTK_NOTE
