@@ -622,8 +622,6 @@ else
     cat << 'EOF'
 
 Run in qemu:
-sudo start.sh 
-or
 sudo start-gui.sh
 EOF
 fi
