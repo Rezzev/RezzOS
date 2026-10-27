@@ -1429,6 +1429,7 @@ build_settings_window(void)
     settings_notebook = gtk_notebook_new();
     gtk_container_add(GTK_CONTAINER(settings_window), settings_notebook);
 
+    /* --- Appearance --- */
     GtkWidget *grid = gtk_grid_new();
     gtk_grid_set_row_spacing(GTK_GRID(grid), 10);
     gtk_grid_set_column_spacing(GTK_GRID(grid), 12);
@@ -1475,4 +1476,427 @@ build_settings_window(void)
     g_signal_connect(dark_check, "toggled", G_CALLBACK(on_dark_toggled), NULL);
     gtk_grid_attach(GTK_GRID(grid), dark_check, 0, 3, 2, 1);
 
-    gtk_notebook_append_page(GTK_NOTE
+    gtk_notebook_append_page(GTK_NOTEBOOK(settings_notebook), grid,
+        gtk_label_new("Appearance"));
+
+    /* --- Search --- */
+    GtkWidget *sbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+    gtk_container_set_border_width(GTK_CONTAINER(sbox), 14);
+
+    search_entry = gtk_search_entry_new();
+    gtk_entry_set_placeholder_text(GTK_ENTRY(search_entry), "Search text");
+    g_signal_connect(search_entry, "activate", G_CALLBACK(on_search_activate), NULL);
+    gtk_box_pack_start(GTK_BOX(sbox), search_entry, FALSE, FALSE, 0);
+
+    GtkWidget *btn_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    GtkWidget *prev_btn = gtk_button_new_with_label("Previous");
+    GtkWidget *next_btn = gtk_button_new_with_label("Next");
+    g_signal_connect(prev_btn, "clicked", G_CALLBACK(on_search_prev), NULL);
+    g_signal_connect(next_btn, "clicked", G_CALLBACK(on_search_next), NULL);
+    gtk_box_pack_start(GTK_BOX(btn_row), prev_btn, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(btn_row), next_btn, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(sbox), btn_row, FALSE, FALSE, 0);
+
+    GtkWidget *wrap_check = gtk_check_button_new_with_label("Wrap around");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(wrap_check), settings.search_wrap);
+    g_signal_connect(wrap_check, "toggled", G_CALLBACK(on_search_wrap_toggled), NULL);
+    gtk_box_pack_start(GTK_BOX(sbox), wrap_check, FALSE, FALSE, 0);
+
+    GtkWidget *case_check = gtk_check_button_new_with_label("Match case");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(case_check), settings.search_case);
+    g_signal_connect(case_check, "toggled", G_CALLBACK(on_search_case_toggled), NULL);
+    gtk_box_pack_start(GTK_BOX(sbox), case_check, FALSE, FALSE, 0);
+
+    search_status = gtk_label_new("");
+    gtk_label_set_xalign(GTK_LABEL(search_status), 0.0);
+    gtk_box_pack_start(GTK_BOX(sbox), search_status, FALSE, FALSE, 0);
+
+    gtk_notebook_append_page(GTK_NOTEBOOK(settings_notebook), sbox,
+        gtk_label_new("Search"));
+}
+
+static void
+show_settings(gint page_index)
+{
+    if (!settings_window) build_settings_window();
+    gtk_widget_show_all(settings_window);
+    gtk_window_present(GTK_WINDOW(settings_window));
+    if (page_index >= 0)
+        gtk_notebook_set_current_page(GTK_NOTEBOOK(settings_notebook), page_index);
+    if (page_index == 1 && search_entry)
+        gtk_widget_grab_focus(search_entry);
+}
+
+/* ---------- sidebar show / hide ---------- */
+
+static void
+set_sidebar_visible(gboolean visible)
+{
+    settings.sidebar_visible = visible;
+    if (!paned_widget || !notebook || !sidebar_scroll) return;
+
+    if (visible) {
+        gtk_widget_set_no_show_all(paned_widget, FALSE);
+
+        if (gtk_widget_get_parent(notebook) != paned_widget) {
+            g_object_ref(notebook);
+            gtk_container_remove(GTK_CONTAINER(gtk_widget_get_parent(notebook)), notebook);
+            gtk_paned_pack2(GTK_PANED(paned_widget), notebook, TRUE, TRUE);
+            g_object_unref(notebook);
+        }
+
+        gtk_widget_show(sidebar_scroll);
+        gtk_widget_show(notebook);
+        gtk_widget_show(paned_widget);
+        gtk_paned_set_position(GTK_PANED(paned_widget), settings.sidebar_position);
+    } else {
+        if (gtk_widget_get_visible(paned_widget)) {
+            gint pos = gtk_paned_get_position(GTK_PANED(paned_widget));
+            if (pos > 0) settings.sidebar_position = pos;
+        }
+
+        if (gtk_widget_get_parent(notebook) == paned_widget) {
+            GtkWidget *parent = gtk_widget_get_parent(paned_widget);
+            g_object_ref(notebook);
+            gtk_container_remove(GTK_CONTAINER(paned_widget), notebook);
+            gtk_box_pack_start(GTK_BOX(parent), notebook, TRUE, TRUE, 0);
+            gtk_box_reorder_child(GTK_BOX(parent), notebook, 1);
+            g_object_unref(notebook);
+        }
+
+        gtk_widget_show(notebook);
+        gtk_widget_set_no_show_all(paned_widget, TRUE);
+        gtk_widget_hide(paned_widget);
+    }
+
+    if (sidebar_menu_item && sidebar_menu_handler_id) {
+        g_signal_handler_block(sidebar_menu_item, sidebar_menu_handler_id);
+        gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(sidebar_menu_item), visible);
+        g_signal_handler_unblock(sidebar_menu_item, sidebar_menu_handler_id);
+    }
+}
+
+static void
+on_sidebar_toggle(GtkCheckMenuItem *item, gpointer d)
+{
+    (void)d;
+    set_sidebar_visible(gtk_check_menu_item_get_active(item));
+}
+
+static void
+on_paned_position_changed(GObject *gobject, GParamSpec *pspec, gpointer data)
+{
+    (void)pspec; (void)data;
+    if (!settings.sidebar_visible) return;
+    gint pos = gtk_paned_get_position(GTK_PANED(gobject));
+    if (pos > 0) settings.sidebar_position = pos;
+}
+
+/* ---------- menu / hotkey actions ---------- */
+
+static void action_new(GtkMenuItem *m, gpointer d)   { (void)m; (void)d; new_tab(NULL); }
+
+static void
+action_open(GtkMenuItem *m, gpointer d)
+{
+    (void)m; (void)d;
+    GtkWidget *dlg = gtk_file_chooser_dialog_new("Open File", GTK_WINDOW(window),
+        GTK_FILE_CHOOSER_ACTION_OPEN,
+        "_Cancel", GTK_RESPONSE_CANCEL, "_Open", GTK_RESPONSE_ACCEPT, NULL);
+    if (current_root)
+        gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dlg), current_root);
+
+    if (gtk_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_ACCEPT) {
+        gchar *path = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dlg));
+        new_tab(path);
+        g_free(path);
+    }
+    gtk_widget_destroy(dlg);
+}
+
+static void
+action_open_folder(GtkMenuItem *m, gpointer d)
+{
+    (void)m; (void)d;
+    GtkWidget *dlg = gtk_file_chooser_dialog_new("Open Folder", GTK_WINDOW(window),
+        GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER,
+        "_Cancel", GTK_RESPONSE_CANCEL, "_Open", GTK_RESPONSE_ACCEPT, NULL);
+
+    if (gtk_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_ACCEPT) {
+        gchar *path = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dlg));
+        load_root(path);
+        g_free(path);
+    }
+    gtk_widget_destroy(dlg);
+}
+
+static void action_save(GtkMenuItem *m, gpointer d)    { (void)m; (void)d; save_tab(current_tab(), FALSE); }
+static void action_save_as(GtkMenuItem *m, gpointer d) { (void)m; (void)d; save_tab(current_tab(), TRUE); }
+
+static void
+action_close_tab(GtkMenuItem *m, gpointer d)
+{
+    (void)m; (void)d;
+    gint page = gtk_notebook_get_current_page(GTK_NOTEBOOK(notebook));
+    if (page >= 0)
+        close_tab_widget(gtk_notebook_get_nth_page(GTK_NOTEBOOK(notebook), page));
+}
+
+static void action_quit(GtkMenuItem *m, gpointer d) { (void)m; (void)d; gtk_widget_destroy(window); }
+
+static void
+action_undo(GtkMenuItem *m, gpointer d)
+{
+    (void)m; (void)d;
+    EditorTab *tab = current_tab();
+    if (tab && gtk_source_buffer_can_undo(tab->buffer))
+        gtk_source_buffer_undo(tab->buffer);
+}
+
+static void
+action_redo(GtkMenuItem *m, gpointer d)
+{
+    (void)m; (void)d;
+    EditorTab *tab = current_tab();
+    if (tab && gtk_source_buffer_can_redo(tab->buffer))
+        gtk_source_buffer_redo(tab->buffer);
+}
+
+static void
+sync_zoom_spin(void)
+{
+    if (zoom_spin)
+        gtk_spin_button_set_value(GTK_SPIN_BUTTON(zoom_spin), settings.font_size);
+    if (font_button)
+        gtk_font_chooser_set_font(GTK_FONT_CHOOSER(font_button),
+            settings.font_family ? settings.font_family : "Monospace");
+}
+
+static void
+action_zoom_in(GtkMenuItem *m, gpointer d)
+{
+    (void)m; (void)d;
+    if (settings.font_size >= 48) return;
+    settings.font_size++;
+    apply_style_to_all_tabs();
+    sync_zoom_spin();
+    save_config();
+}
+
+static void
+action_zoom_out(GtkMenuItem *m, gpointer d)
+{
+    (void)m; (void)d;
+    if (settings.font_size <= 6) return;
+    settings.font_size--;
+    apply_style_to_all_tabs();
+    sync_zoom_spin();
+    save_config();
+}
+
+static void
+action_zoom_reset(GtkMenuItem *m, gpointer d)
+{
+    (void)m; (void)d;
+    settings.font_size = 11;
+    apply_style_to_all_tabs();
+    sync_zoom_spin();
+    save_config();
+}
+
+static void action_find(GtkMenuItem *m, gpointer d)      { (void)m; (void)d; show_settings(1); }
+static void action_settings(GtkMenuItem *m, gpointer d)  { (void)m; (void)d; show_settings(0); }
+static void action_find_next(GtkMenuItem *m, gpointer d) { (void)m; (void)d; do_search(TRUE); }
+static void action_find_prev(GtkMenuItem *m, gpointer d) { (void)m; (void)d; do_search(FALSE); }
+
+static void
+action_fullscreen(GtkMenuItem *m, gpointer d)
+{
+    (void)m; (void)d;
+    toggle_fullscreen();
+}
+
+/* ---------- menu bar with accelerators ---------- */
+
+static GtkWidget *
+menu_item_with_accel(const char *label, guint key, GdkModifierType mods,
+                      void (*cb)(GtkMenuItem *, gpointer))
+{
+    GtkWidget *item = gtk_menu_item_new_with_label(label);
+    gtk_widget_add_accelerator(item, "activate", accel_group, key, mods, GTK_ACCEL_VISIBLE);
+    g_signal_connect(item, "activate", G_CALLBACK(cb), NULL);
+    return item;
+}
+
+static GtkWidget *
+menu_item_toggle(const char *label, guint key, GdkModifierType mods, gboolean active)
+{
+    GtkWidget *item = gtk_check_menu_item_new_with_label(label);
+    gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(item), active);
+    gtk_widget_add_accelerator(item, "activate", accel_group, key, mods, GTK_ACCEL_VISIBLE);
+    return item;
+}
+
+static GtkWidget *
+build_menu_bar(void)
+{
+    GtkWidget *menubar = gtk_menu_bar_new();
+
+    GtkWidget *file_menu = gtk_menu_new();
+    GtkWidget *file_item = gtk_menu_item_new_with_label("File");
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(file_item), file_menu);
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu),
+        menu_item_with_accel("New", GDK_KEY_n, GDK_CONTROL_MASK, action_new));
+    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu),
+        menu_item_with_accel("Open File...", GDK_KEY_o, GDK_CONTROL_MASK, action_open));
+    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu),
+        menu_item_with_accel("Open Folder...", GDK_KEY_o, GDK_CONTROL_MASK | GDK_SHIFT_MASK, action_open_folder));
+    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), gtk_separator_menu_item_new());
+    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu),
+        menu_item_with_accel("Save", GDK_KEY_s, GDK_CONTROL_MASK, action_save));
+    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu),
+        menu_item_with_accel("Save As...", GDK_KEY_s, GDK_CONTROL_MASK | GDK_SHIFT_MASK, action_save_as));
+    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), gtk_separator_menu_item_new());
+    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu),
+        menu_item_with_accel("Close Tab", GDK_KEY_w, GDK_CONTROL_MASK, action_close_tab));
+    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu),
+        menu_item_with_accel("Quit", GDK_KEY_q, GDK_CONTROL_MASK, action_quit));
+
+    GtkWidget *edit_menu = gtk_menu_new();
+    GtkWidget *edit_item = gtk_menu_item_new_with_label("Edit");
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(edit_item), edit_menu);
+    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
+        menu_item_with_accel("Undo", GDK_KEY_z, GDK_CONTROL_MASK, action_undo));
+    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
+        menu_item_with_accel("Redo", GDK_KEY_y, GDK_CONTROL_MASK, action_redo));
+    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu), gtk_separator_menu_item_new());
+    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
+        menu_item_with_accel("Find...", GDK_KEY_f, GDK_CONTROL_MASK, action_find));
+    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
+        menu_item_with_accel("Find Next", GDK_KEY_F3, 0, action_find_next));
+    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
+        menu_item_with_accel("Find Previous", GDK_KEY_F3, GDK_SHIFT_MASK, action_find_prev));
+    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu), gtk_separator_menu_item_new());
+    gtk_menu_shell_append(GTK_MENU_SHELL(edit_menu),
+        menu_item_with_accel("Settings...", GDK_KEY_comma, GDK_CONTROL_MASK, action_settings));
+
+    GtkWidget *view_menu = gtk_menu_new();
+    GtkWidget *view_item = gtk_menu_item_new_with_label("View");
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(view_item), view_menu);
+
+    sidebar_menu_item = menu_item_toggle("Show Sidebar", GDK_KEY_b,
+        GDK_CONTROL_MASK, settings.sidebar_visible);
+    sidebar_menu_handler_id = g_signal_connect(sidebar_menu_item, "toggled",
+        G_CALLBACK(on_sidebar_toggle), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu), sidebar_menu_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu), gtk_separator_menu_item_new());
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu),
+        menu_item_with_accel("Zoom In", GDK_KEY_plus, GDK_CONTROL_MASK, action_zoom_in));
+    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu),
+        menu_item_with_accel("Zoom Out", GDK_KEY_minus, GDK_CONTROL_MASK, action_zoom_out));
+    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu),
+        menu_item_with_accel("Zoom Reset", GDK_KEY_0, GDK_CONTROL_MASK, action_zoom_reset));
+    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu), gtk_separator_menu_item_new());
+    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu),
+        menu_item_with_accel("Fullscreen", GDK_KEY_F11, 0, action_fullscreen));
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(menubar), file_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menubar), edit_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menubar), view_item);
+    return menubar;
+}
+
+/* ---------- window close ---------- */
+
+static gboolean
+on_delete_event(GtkWidget *w, GdkEvent *e, gpointer d)
+{
+    (void)w; (void)e; (void)d;
+    gint n = gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook));
+    for (gint i = 0; i < n; i++) {
+        GtkWidget *scroll = gtk_notebook_get_nth_page(GTK_NOTEBOOK(notebook), i);
+        EditorTab *tab = g_object_get_data(G_OBJECT(scroll), "tab");
+        if (!confirm_discard(tab)) return TRUE;
+    }
+    if (paned_widget && settings.sidebar_visible) {
+        gint pos = gtk_paned_get_position(GTK_PANED(paned_widget));
+        if (pos > 0) settings.sidebar_position = pos;
+    }
+    save_config();
+    return FALSE;
+}
+
+/* ---------- main ---------- */
+
+int
+main(int argc, char *argv[])
+{
+    gtk_init(&argc, &argv);
+
+    load_config();
+    install_extra_languages();
+    apply_font_css();
+    save_config();
+
+    window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gtk_window_set_title(GTK_WINDOW(window), "rezzedit");
+    gtk_window_set_default_size(GTK_WINDOW(window), 1000, 680);
+    g_signal_connect(window, "delete-event", G_CALLBACK(on_delete_event), NULL);
+    g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), NULL);
+    g_signal_connect(window, "window-state-event", G_CALLBACK(on_window_state), NULL);
+    g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
+
+    accel_group = gtk_accel_group_new();
+    gtk_window_add_accel_group(GTK_WINDOW(window), accel_group);
+
+    GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_container_add(GTK_CONTAINER(window), vbox);
+    gtk_box_pack_start(GTK_BOX(vbox), build_menu_bar(), FALSE, FALSE, 0);
+
+    GtkWidget *content_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), content_box, TRUE, TRUE, 0);
+
+    paned_widget = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
+    gtk_box_pack_start(GTK_BOX(content_box), paned_widget, TRUE, TRUE, 0);
+    g_signal_connect(paned_widget, "notify::position",
+        G_CALLBACK(on_paned_position_changed), NULL);
+
+    /* Sidebar */
+    tree_store = gtk_tree_store_new(N_TREE_COLS, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_BOOLEAN);
+    file_tree = gtk_tree_view_new_with_model(GTK_TREE_MODEL(tree_store));
+    g_object_unref(tree_store);
+    gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(file_tree), FALSE);
+    GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
+    GtkTreeViewColumn *col = gtk_tree_view_column_new_with_attributes("Name", renderer, "text", COL_NAME, NULL);
+    gtk_tree_view_append_column(GTK_TREE_VIEW(file_tree), col);
+    g_signal_connect(file_tree, "row-expanded", G_CALLBACK(on_row_expanded), NULL);
+    g_signal_connect(file_tree, "row-activated", G_CALLBACK(on_tree_row_activated), NULL);
+
+    sidebar_scroll = gtk_scrolled_window_new(NULL, NULL);
+    gtk_widget_set_size_request(sidebar_scroll, 220, -1);
+    gtk_container_add(GTK_CONTAINER(sidebar_scroll), file_tree);
+    gtk_paned_pack1(GTK_PANED(paned_widget), sidebar_scroll, FALSE, TRUE);
+
+    /* Editor area */
+    notebook = gtk_notebook_new();
+    gtk_notebook_set_scrollable(GTK_NOTEBOOK(notebook), TRUE);
+    gtk_paned_pack2(GTK_PANED(paned_widget), notebook, TRUE, TRUE);
+
+    const gchar *home = g_get_home_dir();
+    load_root(home ? home : "/");
+    new_tab(NULL);
+
+    gtk_paned_set_position(GTK_PANED(paned_widget), settings.sidebar_position);
+
+    gtk_widget_show_all(window);
+
+    if (!settings.sidebar_visible) {
+        set_sidebar_visible(FALSE);
+    }
+
+    gtk_main();
+
+    return 0;
+}
