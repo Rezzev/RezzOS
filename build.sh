@@ -330,9 +330,9 @@ cp -a "$REPO_DIR/etc/"* "$ROOTFS_DIR/etc/" 2>/dev/null || true
 #
 # Errors are no longer swallowed. If this stops compiling, that is worth
 # knowing at build time rather than shipping a console font that never applies.
-if [ -f "$REPO_DIR/usr/bin/setconsolefont.c" ]; then
+if [ -f "$REPO_DIR/src/setconsolefont.c" ]; then
     log "Compiling setconsolefont"
-    gcc -O2 -static "$REPO_DIR/usr/bin/setconsolefont.c" \
+    gcc -O2 -static "$REPO_DIR/src/setconsolefont.c" \
         -o "$ROOTFS_DIR/usr/bin/setconsolefont"
     chmod +x "$ROOTFS_DIR/usr/bin/setconsolefont"
 fi
@@ -348,10 +348,10 @@ fi
 #
 # Needs webkit2gtk-dev and gtk+3.0-dev on the build host:
 #   apk add gtk+3.0-dev webkit2gtk-dev pkgconfig
-if [ -f "$REPO_DIR/usr/bin/rezzbrowser.c" ]; then
+if [ -f "$REPO_DIR/src/rezzbrowser.c" ]; then
     if pkg-config --exists gtk+-3.0 webkit2gtk-4.1 2>/dev/null; then
         log "Compiling rezzbrowser"
-        gcc -O2 "$REPO_DIR/usr/bin/rezzbrowser.c" \
+        gcc -O2 "$REPO_DIR/src/rezzbrowser.c" \
             $(pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.1) \
             -o "$ROOTFS_DIR/usr/bin/rezzbrowser"
         chmod +x "$ROOTFS_DIR/usr/bin/rezzbrowser"
@@ -368,10 +368,10 @@ fi
 #
 # Needs gtk+3.0-dev and pkgconfig on the build host:
 #   apk add gtk+3.0-dev pkgconfig
-if [ -f "$REPO_DIR/usr/bin/rezzconfig.c" ]; then
+if [ -f "$REPO_DIR/src/rezzconfig.c" ]; then
     if pkg-config --exists gtk+-3.0 2>/dev/null; then
         log "Compiling rezzconfig"
-        gcc -O2 -Wall -Wextra "$REPO_DIR/usr/bin/rezzconfig.c" \
+        gcc -O2 -Wall -Wextra "$REPO_DIR/src/rezzconfig.c" \
             $(pkg-config --cflags --libs gtk+-3.0) \
             -o "$ROOTFS_DIR/usr/bin/rezzconfig"
         chmod +x "$ROOTFS_DIR/usr/bin/rezzconfig"
@@ -388,10 +388,10 @@ fi
 #
 # Needs gtk+3.0-dev and pkgconfig on the build host:
 #   apk add gtk+3.0-dev pkgconfig
-if [ -f "$REPO_DIR/usr/bin/rezzinstall.c" ]; then
+if [ -f "$REPO_DIR/src/rezzinstall.c" ]; then
     if pkg-config --exists gtk+-3.0 2>/dev/null; then
         log "Compiling rezzinstall"
-        gcc -O2 -Wall -Wextra "$REPO_DIR/usr/bin/rezzinstall.c" \
+        gcc -O2 -Wall -Wextra "$REPO_DIR/src/rezzinstall.c" \
             $(pkg-config --cflags --libs gtk+-3.0) \
             -o "$ROOTFS_DIR/usr/bin/rezzinstall"
         chmod +x "$ROOTFS_DIR/usr/bin/rezzinstall"
@@ -403,10 +403,10 @@ fi
 # Compile rsv-gui
 # Needs gtk+3.0-dev and pkgconfig on the build host:
 #   apk add gtk+3.0-dev pkgconfig
-if [ -f "$REPO_DIR/usr/bin/rsv-gui.c" ]; then
+if [ -f "$REPO_DIR/src/rsv-gui.c" ]; then
     if pkg-config --exists gtk+-3.0 2>/dev/null; then
         log "Compiling rsv-gui"
-        gcc -O2 -Wall -Wextra "$REPO_DIR/usr/bin/rsv-gui.c" \
+        gcc -O2 -Wall -Wextra "$REPO_DIR/src/rsv-gui.c" \
             $(pkg-config --cflags --libs gtk+-3.0) \
             -o "$ROOTFS_DIR/usr/bin/rsv-gui"
         chmod +x "$ROOTFS_DIR/usr/bin/rsv-gui.c"
@@ -416,10 +416,10 @@ if [ -f "$REPO_DIR/usr/bin/rsv-gui.c" ]; then
 fi
 
 # Compile editor
-if [ -f "$REPO_DIR/usr/bin/edit.c" ]; then
+if [ -f "$REPO_DIR/src/edit.c" ]; then
     if pkg-config --exists gtk+-3.0 gtksourceview-3.0 2>/dev/null; then
         log "Compiling edit"
-        gcc -O2 -Wall -Wextra "$REPO_DIR/usr/bin/edit.c" \
+        gcc -O2 -Wall -Wextra "$REPO_DIR/src/edit.c" \
             $(pkg-config --cflags --libs gtk+-3.0 gtksourceview-3.0) \
             -o "$ROOTFS_DIR/usr/bin/edit"
         chmod +x "$ROOTFS_DIR/usr/bin/edit"
@@ -428,10 +428,10 @@ if [ -f "$REPO_DIR/usr/bin/edit.c" ]; then
     fi
 fi
 
-if [ -f "$REPO_DIR/usr/bin/rtop-gui.c" ]; then
+if [ -f "$REPO_DIR/src/rtop-gui.c" ]; then
     if pkg-config --exists gtk+-3.0 2>/dev/null; then
         log "Compiling rtop"
-        gcc -O2 -Wall -Wextra "$REPO_DIR/usr/bin/rtop-gui.c" \
+        gcc -O2 -Wall -Wextra "$REPO_DIR/src/rtop-gui.c" \
             $(pkg-config --cflags --libs gtk+-3.0 gtksourceview-3.0) \
             -o "$ROOTFS_DIR/usr/bin/rtopg"
         chmod +x "$ROOTFS_DIR/usr/bin/rtopg"
@@ -440,10 +440,10 @@ if [ -f "$REPO_DIR/usr/bin/rtop-gui.c" ]; then
     fi
 fi
 
-if [ -f "$REPO_DIR/usr/bin/rezzabout.c" ]; then
+if [ -f "$REPO_DIR/src/rezzabout.c" ]; then
     if pkg-config --exists gtk+-3.0 2>/dev/null; then
         log "Compiling rezzabout"
-        gcc -O2 -Wall -Wextra "$REPO_DIR/usr/bin/rezzabout.c" \
+        gcc -O2 -Wall -Wextra "$REPO_DIR/src/rezzabout.c" \
             $(pkg-config --cflags --libs gtk+-3.0) \
             -o "$ROOTFS_DIR/usr/bin/rezzabout"
         chmod +x "$ROOTFS_DIR/usr/bin/rezzabout"
@@ -451,10 +451,10 @@ if [ -f "$REPO_DIR/usr/bin/rezzabout.c" ]; then
         echo "Skipping about system: install gtk+3.0-dev pkgconfig to build it" >&2
     fi
 fi
-if [ -f "$REPO_DIR/usr/bin/rcomp.c" ]; then
+if [ -f "$REPO_DIR/src/rcomp.c" ]; then
     if pkg-config --exists gtk+-3.0 2>/dev/null; then
         log "Compiling rcomp"
-        gcc -O2 -Wall -Wextra "$REPO_DIR/usr/bin/rcomp.c" \
+        gcc -O2 -Wall -Wextra "$REPO_DIR/src/rcomp.c" \
             $(pkg-config --cflags --libs gtk+-3.0) \
             -lX11 -lXcomposite -lXdamage -lXfixes -lXrender \
             -o "$ROOTFS_DIR/usr/bin/rcomp"
