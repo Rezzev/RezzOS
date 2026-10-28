@@ -16,7 +16,7 @@
 #include <gtk/gtk.h>
 
 /* ====================== EDIT THESE ====================== */
-#define RELEASE_VERSION "1.7.4 (2026-24-10)" /* Строка должна быть в кавычках */
+#define RELEASE_VERSION "1.7.5 (2026-30-10)" /* Строка должна быть в кавычках */
 #define TELEGRAM_URL    "https://t.me/Losk149" /* Добавьте вашу ссылку в кавычках */
 #define GITHUB_URL      "https://github.com/Rezzev/RezzOS" /* Добавьте вашу ссылку в кавычках */
 
