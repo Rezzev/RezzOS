@@ -409,7 +409,7 @@ if [ -f "$REPO_DIR/src/rsv-gui.c" ]; then
         gcc -O2 -Wall -Wextra "$REPO_DIR/src/rsv-gui.c" \
             $(pkg-config --cflags --libs gtk+-3.0) \
             -o "$ROOTFS_DIR/usr/bin/rsv-gui"
-        chmod +x "$ROOTFS_DIR/usr/bin/rsv-gui.c"
+        chmod +x "$ROOTFS_DIR/usr/bin/rsv-gui"
     else
         echo "Skipping rsv-gui: install gtk+3.0-dev pkgconfig to build it" >&2
     fi
