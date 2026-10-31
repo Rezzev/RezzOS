@@ -2,21 +2,23 @@
 <JWM>
   <!-- Start Menu (Left Click) -->
   <IconPath>/usr/share/icons/RezzOS</IconPath>
-
-  <!-- Desktop Context Menu (Right Click) -->
-  <RootMenu onroot="3">
-    <Program label="Create File...">create_file.sh</Program>
-    <Program label="Create Folder...">create_folder.sh</Program>
-    <Separator/>
+<RootMenu onroot="3">
+  <Program label="Create File...">create_file.sh</Program>
+  <Program label="Create Folder...">create_folder.sh</Program>
+  <Separator/>
+  <Menu label="Programs">
     <Program label="Terminal">st</Program>
-    <Program label="Configuration">rezzconfig</Program>
     <Program label="Code Editor">edit</Program>
     <Program label="Browser">rezzbrowser</Program>
-    <Separator/>
-    <Program label="Install on disk">rezzinstall</Program>
-    <Program label="About System">rezzabout</Program>
     <Program label="Rtop">rtopg</Program>
-  </RootMenu>
+    <Program label="Rsv">rsv-gui</Program>
+  </Menu>
+  <Separator/>
+  <Program label="Configuration">rezzconfig</Program>
+  <Program label="Install on disk">rezzinstall</Program>
+  <Program label="About System">rezzabout</Program>
+</RootMenu>
+
 
   <!-- Options for program interfaces. -->
   <Tray x="0" y="1" autohide="off">
