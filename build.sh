@@ -464,6 +464,12 @@ if [ -f "$REPO_DIR/src/rcomp.c" ]; then
     fi
 fi
 
+if [ -f "$REPO_DIR/src/apk.c" ]; then
+    log "Compiling apk"
+    gcc -O2 -static "$REPO_DIR/src/apk.c" \
+        -o "$ROOTFS_DIR/usr/bin/apk"
+    chmod +x "$ROOTFS_DIR/usr/bin/apk"
+fi
 
 step "Downloading rezz-utils"
 REZZVIEW_URL="https://github.com/neko-qt/rezzview/releases/download/1.1.0/rezzview-musl"
