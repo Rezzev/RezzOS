@@ -31,6 +31,7 @@
 #define ARCH        "x86_64"
 #define REPO_BASE   "https://dl-cdn.alpinelinux.org/alpine/" ALPINE_VER
 #define BAR_WIDTH   30
+#define DL_LOG      "/tmp/apk_wget.log"
 
 #define C_BLUE   "\033[0;34m"
 #define C_GREEN  "\033[0;32m"
@@ -292,6 +293,25 @@ static void draw_bar(long cur, long total)
     fflush(stdout);
 }
 
+static void print_wget_error(void)
+{
+    char *log = read_file(DL_LOG);
+    if (!log)
+        return;
+    /* последняя непустая "строка" (wget рисует прогресс через \r) */
+    char *last = NULL;
+    for (char *l = strtok(log, "\n"); l; l = strtok(NULL, "\n")) {
+        char *cr = strrchr(l, '\r');
+        if (cr)
+            l = cr + 1;
+        if (*l)
+            last = l;
+    }
+    if (last)
+        printf(C_RED "wget: %s" C_NC "\n", last);
+    free(log);
+}
+
 static bool download_file(const char *url, const char *output)
 {
     long total = 0;
@@ -314,13 +334,14 @@ static bool download_file(const char *url, const char *output)
     if (pid < 0)
         return false;
     if (pid == 0) {
-        int fd = open("/dev/null", O_WRONLY);
+        int fd = open(DL_LOG, O_WRONLY | O_CREAT | O_TRUNC, 0644);
         if (fd >= 0) {
             dup2(fd, 1);
             dup2(fd, 2);
             close(fd);
         }
         execlp("wget", "wget", "--no-check-certificate", url, "-O", output, (char *)NULL);
+        dprintf(2, "cannot execute wget: %s\n", strerror(errno));
         _exit(127);
     }
 
@@ -352,6 +373,7 @@ static bool download_file(const char *url, const char *output)
     }
 
     printf("\n");
+    print_wget_error();
     unlink(output);
     return false;
 }
@@ -675,9 +697,14 @@ static void update_index(void)
 
         bool ok = false;
         if (download_file(url, gz)) {
-            char *tarv[] = { "tar", "-xzf", gz, "-C", CACHE_DIR, "APKINDEX", NULL };
-            run(tarv, true);
-            ok = rename(raw, dst) == 0;
+            char *tarv[] = { "tar", "-xzf", gz, "-C", CACHE_DIR, NULL };
+            int trc = run(tarv, false);
+            if (rename(raw, dst) == 0) {
+                ok = true;
+            } else {
+                printf(C_RED "tar exit code %d, no APKINDEX extracted (%s)" C_NC "\n",
+                       trc, strerror(errno));
+            }
         }
         printf(ok ? C_GREEN "OK" C_NC "\n" : C_RED "FAILED" C_NC "\n");
     }
