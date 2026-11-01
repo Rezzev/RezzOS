@@ -164,13 +164,13 @@ cp "$REPO_DIR/bzImage" boot/ 2>/dev/null || true
 chmod +x init
 
 step "Downloading musl"
-if [ ! -f "$CACHE_DIR/musl-1.2.5-r3.apk" ]; then
-    wget -q "$ALPINE_MAIN/musl-1.2.5-r3.apk" -O "$CACHE_DIR/musl-1.2.5-r3.apk"
+if [ ! -f "$CACHE_DIR/musl-1.2.6-r6.apk" ]; then
+    wget -q "$ALPINE_MAIN/musl-1.2.6-r3.apk" -O "$CACHE_DIR/musl-1.2.6-r6.apk"
 fi
 mkdir -p /tmp/m
 cd /tmp/m
 rm -rf ./*
-tar -xzf "$CACHE_DIR/musl-1.2.5-r3.apk"
+tar -xzf "$CACHE_DIR/musl-1.2.6-r6.apk"
 cp lib/ld-musl-x86_64.so.1 "$ROOTFS_DIR/lib/"
 cp -r lib/* "$ROOTFS_DIR/lib/"
 [ -d usr/lib ] && cp -r usr/lib/* "$ROOTFS_DIR/usr/lib/" || true
