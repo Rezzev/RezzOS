@@ -74,7 +74,7 @@ This launches the system inside QEMU with a graphical interface, assuming it has
 ## Links
 
 - Main repository: [open](https://github.com/Rezzev/RezzOS)
-- Package repository: [open](https://github.com/Rezzev/RezzOS-Packages)
+
 
 ---
 
