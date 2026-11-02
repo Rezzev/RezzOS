@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <ftw.h>
 #include <limits.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -351,6 +352,10 @@ static bool download_file(const char *url, const char *output)
         pid_t r = waitpid(pid, &st, WNOHANG);
         if (r == pid) {
             ok = WIFEXITED(st) && WEXITSTATUS(st) == 0;
+            break;
+        }
+        if (r < 0 && errno == ECHILD) {
+            ok = file_size(output) > 0;   /* статус потерян, судим по файлу */
             break;
         }
         if (r < 0 && errno != EINTR)
@@ -1211,6 +1216,9 @@ static void usage(void)
 
 int main(int argc, char **argv)
 {
+    /* если родитель оставил SIGCHLD в SIG_IGN, waitpid() вернёт ECHILD */
+    signal(SIGCHLD, SIG_DFL);
+
     /* Где лежит список - решает факт монтирования диска, а не наличие каталога
      * (на свежеотформатированном диске каталога ещё нет). */
     char *mounts = read_file("/proc/mounts");
