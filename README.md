@@ -44,7 +44,6 @@ RezzOS supports both Alpine repositories and a custom package repository.
 
 ```bash
 apk update    # from the Alpine repository
-pkg update    # from the RezzOS repository
 ```
 
 This setup provides a lightweight package management approach with compatibility and flexibility.
