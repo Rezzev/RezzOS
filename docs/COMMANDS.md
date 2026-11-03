@@ -6,16 +6,7 @@
 | `hibernate` | Suspend system state to disk/RAM |
 | `shutdown [opts] [time]` | Multi-purpose system shutdown utility (`-h`, `-r`, `-z`, `now`) |
 
-## Package Manager
-| Command | Description |
-|---------|----------|
-| `pkg update` | Refresh package indexes |
-| `pkg install <name>` | Install package |
-| `pkg search <name>` | Search for packages |
-| `pkg list` | List installed packages |
-| `pkg upgrade` | Upgrade all packages |
-| `pkg remove <name>` | Remove package |
-| `pkg info <name>` | Package information |
+
 
 ## Services (runit)
 | Command | Description |
