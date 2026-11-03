@@ -336,6 +336,13 @@ if [ ! -f /usr/share/glib-2.0/schemas/gschemas.compiled ]; then
     fi
 fi
 
+if [ -x /usr/sbin/update-ca-certificates ]; then
+    echo "Updating CA certificates..."
+    /usr/sbin/update-ca-certificates
+elif [ -x /usr/bin/update-ca-certificates ]; then
+    echo "Updating CA certificates..."
+    /usr/bin/update-ca-certificates
+
 clear
 echo ""
 
