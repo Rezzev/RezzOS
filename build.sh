@@ -492,6 +492,10 @@ fi
 tar -xzf "$APK_FILE" -C "$CACHE_DIR" sbin/apk.static
 cp -f "$CACHE_DIR/sbin/apk.static" "$ROOTFS_DIR/usr/bin/apk"
 chmod +x "$ROOTFS_DIR/usr/bin/apk"
+# config repo
+mkdir -p "$ROOTFS_DIR/etc/apk"
+echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/main" > "$ROOTFS_DIR/etc/apk/repositories"
+echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/community" >> "$ROOTFS_DIR/etc/apk/repositories"
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/usr/share/udhcpc/default.script" 2>/dev/null || true
