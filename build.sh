@@ -467,14 +467,8 @@ if [ -f "$REPO_DIR/src/rcomp.c" ]; then
     fi
 fi
 
-if [ -f "$REPO_DIR/src/apk.c" ]; then
-    log "Compiling apk"
-    gcc -O2 -static "$REPO_DIR/src/apk.c" \
-        -o "$ROOTFS_DIR/usr/bin/apk"
-    chmod +x "$ROOTFS_DIR/usr/bin/apk"
-fi
 
-step "Downloading rezz-utils"
+step "Downloading rezz-utils and dbin"
 REZZVIEW_URL="https://github.com/neko-qt/rezzview/releases/download/1.1.0/rezzview-musl"
 if [ ! -f "$CACHE_DIR/rezzview-musl" ]; then
     wget -q "$REZZVIEW_URL" -O "$CACHE_DIR/rezzview-musl" || { echo "Failed to download rezzview"; exit 1; }
@@ -489,6 +483,12 @@ fi
 cp -f "$CACHE_DIR/rtop" "$ROOTFS_DIR/usr/bin/rtop"
 chmod +x "$ROOTFS_DIR/usr/bin/rtop"
 
+DBIN_URL="https://github.com/xplshn/dbin/releases/download/1.7/dbin_amd64"
+if [ ! -f "$CACHE_DIR/dbin" ]; then
+    wget -q "$DBIN_URL" -O "$CACHE_DIR/dbin" || { echo "Failed to download dbin"; exit 1; }
+fi
+cp -f "$CACHE_DIR/dbin" "$ROOTFS_DIR/usr/bin/dbin"
+chmod +x "$ROOTFS_DIR/usr/bin/dbin"
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/usr/share/udhcpc/default.script" 2>/dev/null || true
