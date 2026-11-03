@@ -302,7 +302,7 @@ if [ -f sbin/apk.static ]; then
     fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted update
 
     # 3. Устанавливаем нужные пакеты (флаг --initdb здесь уже не нужен, база создана)
-    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm zenity adwaita-icon-theme menu-cache gvfs mesa-dri-gallium webkit2gtk-4.1 gtk+3.0 gcc
+    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm zenity adwaita-icon-theme menu-cache gvfs mesa-dri-gallium webkit2gtk-4.1 gtk+3.0
 fi
 
 # Restore custom busybox and remove conflicting Alpine busybox symlinks for runit
@@ -468,7 +468,7 @@ if [ -f "$REPO_DIR/src/rcomp.c" ]; then
 fi
 
 
-step "Downloading rezz-utils and dbin"
+step "Downloading rezz-utils and apk"
 REZZVIEW_URL="https://github.com/neko-qt/rezzview/releases/download/1.1.0/rezzview-musl"
 if [ ! -f "$CACHE_DIR/rezzview-musl" ]; then
     wget -q "$REZZVIEW_URL" -O "$CACHE_DIR/rezzview-musl" || { echo "Failed to download rezzview"; exit 1; }
@@ -485,6 +485,7 @@ chmod +x "$ROOTFS_DIR/usr/bin/rtop"
 
 APK_URL="https://dl-cdn.alpinelinux.org/alpine/latest-stable/main/x86_64/apk-tools-static-3.0.8-r0.apk"
 APK_FILE="$CACHE_DIR/apk-tools-static-3.0.8-r0.apk"
+
 if [ ! -f "$APK_FILE" ]; then
     echo "Downloading apk-tools-static..."
     wget -q "$APK_URL" -O "$APK_FILE" || { echo "Failed to download apk"; exit 1; }
@@ -495,13 +496,17 @@ tar -xzf "$APK_FILE" -C "$CACHE_DIR" sbin/apk.static
 cp -f "$CACHE_DIR/sbin/apk.static" "$ROOTFS_DIR/usr/bin/apk"
 chmod +x "$ROOTFS_DIR/usr/bin/apk"
 
- # Настраиваем конфиги apk
+# Настраиваем конфиги apk (создаем папку на всякий случай)
+mkdir -p "$ROOTFS_DIR/etc/apk"
 echo "x86_64" > "$ROOTFS_DIR/etc/apk/arch"
 echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/main" > "$ROOTFS_DIR/etc/apk/repositories"
 echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/community" >> "$ROOTFS_DIR/etc/apk/repositories"
 
-# Инициализируем базу данных (без скачивания пакетов)
-"$ROOTFS_DIR/usr/bin/apk" --root "$ROOTFS_DIR" --initdb --allow-untrusted update
+"$ROOTFS_DIR/usr/bin/apk" --root "$ROOTFS_DIR" --allow-untrusted update
+
+# 2. Устанавливаем пакеты (вот здесь --initdb уместен, он создаст базу, если её нет)
+# Если ты пока не хочешь ставить пакеты, просто закомментируй эту строку!
+"$ROOTFS_DIR/usr/bin/apk" --root "$ROOTFS_DIR" add --initdb --allow-untrusted alpine-keys
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/usr/share/udhcpc/default.script" 2>/dev/null || true
