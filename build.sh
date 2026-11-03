@@ -486,16 +486,22 @@ chmod +x "$ROOTFS_DIR/usr/bin/rtop"
 APK_URL="https://dl-cdn.alpinelinux.org/alpine/latest-stable/main/x86_64/apk-tools-static-3.0.8-r0.apk"
 APK_FILE="$CACHE_DIR/apk-tools-static-3.0.8-r0.apk"
 if [ ! -f "$APK_FILE" ]; then
-    echo "download apk-tools-static..."
+    echo "Downloading apk-tools-static..."
     wget -q "$APK_URL" -O "$APK_FILE" || { echo "Failed to download apk"; exit 1; }
 fi
+
+# Распаковываем и копируем в RezzOS
 tar -xzf "$APK_FILE" -C "$CACHE_DIR" sbin/apk.static
 cp -f "$CACHE_DIR/sbin/apk.static" "$ROOTFS_DIR/usr/bin/apk"
 chmod +x "$ROOTFS_DIR/usr/bin/apk"
-# config repo
-mkdir -p "$ROOTFS_DIR/etc/apk"
+
+ # Настраиваем конфиги apk
+echo "x86_64" > "$ROOTFS_DIR/etc/apk/arch"
 echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/main" > "$ROOTFS_DIR/etc/apk/repositories"
 echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/community" >> "$ROOTFS_DIR/etc/apk/repositories"
+
+# Инициализируем базу данных (без скачивания пакетов)
+"$ROOTFS_DIR/usr/bin/apk" --root "$ROOTFS_DIR" --initdb --allow-untrusted update
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/usr/share/udhcpc/default.script" 2>/dev/null || true
