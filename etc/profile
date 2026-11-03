@@ -17,8 +17,7 @@ export HISTFILE="${HOME:-/root}/.bash_history"
 export HISTSIZE=10000
 export HISTFILESIZE=20000
 export HISTCONTROL=ignoreboth:erasedups
-# Dbin dir
-export DBIN_INSTALL_DIR=/usr/local/bin
+
 
 # Colors for ls, grep, diff
 alias ls='ls --color=auto'
