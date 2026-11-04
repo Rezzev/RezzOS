@@ -502,11 +502,11 @@ echo "x86_64" > "$ROOTFS_DIR/etc/apk/arch"
 echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/main" > "$ROOTFS_DIR/etc/apk/repositories"
 echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/community" >> "$ROOTFS_DIR/etc/apk/repositories"
 
+# Обновляем индексы (в apk v3 база данных создается автоматически, если ее нет)
 "$ROOTFS_DIR/usr/bin/apk" --root "$ROOTFS_DIR" --allow-untrusted update
 
-# 2. Устанавливаем пакеты (вот здесь --initdb уместен, он создаст базу, если её нет)
-# Если ты пока не хочешь ставить пакеты, просто закомментируй эту строку!
-"$ROOTFS_DIR/usr/bin/apk" --root "$ROOTFS_DIR" add --initdb --allow-untrusted alpine-keys
+# Устанавливаем ключи (убрали --initdb, так как в apk v3 его больше нет)
+"$ROOTFS_DIR/usr/bin/apk" --root "$ROOTFS_DIR" add --allow-untrusted alpine-keys
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/usr/share/udhcpc/default.script" 2>/dev/null || true
