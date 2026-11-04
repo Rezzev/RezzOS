@@ -342,6 +342,7 @@ if [ -x /usr/sbin/update-ca-certificates ]; then
 elif [ -x /usr/bin/update-ca-certificates ]; then
     echo "Updating CA certificates..."
     /usr/bin/update-ca-certificates
+fi
 
 clear
 echo ""
