@@ -340,29 +340,6 @@ if [ -f "$REPO_DIR/src/setconsolefont.c" ]; then
     chmod +x "$ROOTFS_DIR/usr/bin/setconsolefont"
 fi
 
-# Compile rezzbrowser (minimal GTK3 + WebKitGTK browser).
-#
-# Unlike setconsolefont, this links dynamically against gtk+3.0 and
-# webkit2gtk-4.0 — GTK does not support meaningful static linking. That
-# means the binary's dynamic dependencies have to match what apk.static just
-# installed into ROOTFS_DIR (the "webkit2gtk gtk+3.0" packages added above).
-# Building on this host works because the host and rootfs are pulled from
-# the same Alpine branch, so the .so versions line up.
-#
-# Needs webkit2gtk-dev and gtk+3.0-dev on the build host:
-#   apk add gtk+3.0-dev webkit2gtk-dev pkgconfig
-if [ -f "$REPO_DIR/src/rezzbrowser.c" ]; then
-    if pkg-config --exists gtk+-3.0 webkit2gtk-4.1 2>/dev/null; then
-        log "Compiling rezzbrowser"
-        gcc -O2 "$REPO_DIR/src/rezzbrowser.c" \
-            $(pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.1) \
-            -o "$ROOTFS_DIR/usr/bin/rezzbrowser"
-        chmod +x "$ROOTFS_DIR/usr/bin/rezzbrowser"
-    else
-        echo "Skipping rezzbrowser: install gtk+3.0-dev webkit2gtk-dev pkgconfig to build it" >&2
-    fi
-fi
-
 # Compile rezzconfig (GTK3 control-center — replaces the old shell text
 # menu entirely: network, hostname, font, keyboard, swap, services,
 # users, packages, install, power, all in one binary). Same linking
