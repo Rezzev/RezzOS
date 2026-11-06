@@ -302,7 +302,7 @@ if [ -f sbin/apk.static ]; then
     fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted update
 
     # 3. Устанавливаем нужные пакеты (флаг --initdb здесь уже не нужен, база создана)
-    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm zenity adwaita-icon-theme menu-cache gvfs mesa-dri-gallium webkit2gtk-4.1 gtk+3.0
+    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm zenity adwaita-icon-theme menu-cache gvfs mesa-dri-gallium webkit2gtk-4.1 gtk+3.0 gcc
 fi
 
 # Restore custom busybox and remove conflicting Alpine busybox symlinks for runit
