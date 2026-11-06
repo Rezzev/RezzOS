@@ -4,4 +4,4 @@ export PATH=/sbin:/bin:/usr/bin:/usr/sbin
 export HOME=/root
 cd /root
 
-exec /sbin/getty 115200 tty1 linux
+exec /bin/bash --rcfile /root/.bashrc
