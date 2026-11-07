@@ -8,8 +8,6 @@
   <Separator/>
   <Menu label="Programs">
     <Program label="Terminal">st</Program>
-    <Program label="Code Editor">edit</Program>
-    <Program label="Browser">rezzbrowser</Program>
     <Program label="Rtop">rtopg</Program>
     <Program label="Rsv">rsv-gui</Program>
   </Menu>
