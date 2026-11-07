@@ -395,19 +395,6 @@ if [ -f "$REPO_DIR/src/rsv-gui.c" ]; then
     fi
 fi
 
-# Compile editor
-if [ -f "$REPO_DIR/src/edit.c" ]; then
-    if pkg-config --exists gtk+-3.0 gtksourceview-3.0 2>/dev/null; then
-        log "Compiling edit"
-        gcc -O2 -Wall -Wextra "$REPO_DIR/src/edit.c" \
-            $(pkg-config --cflags --libs gtk+-3.0 gtksourceview-3.0) \
-            -o "$ROOTFS_DIR/usr/bin/edit"
-        chmod +x "$ROOTFS_DIR/usr/bin/edit"
-    else
-        echo "Skipping rezzeditor: install gtk+3.0-dev, gtksourceview-dev, and pkgconfig to build it" >&2
-    fi
-fi
-
 if [ -f "$REPO_DIR/src/rtop-gui.c" ]; then
     if pkg-config --exists gtk+-3.0 2>/dev/null; then
         log "Compiling rtop"
