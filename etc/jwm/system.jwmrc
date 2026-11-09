@@ -11,23 +11,6 @@
     <Clock format="%d.%m.%Y %H:%M"/>
   </Tray>
 
-  <!-- Visual Styles  -->
-  <WindowStyle>
-    <Font>monospace-10</Font>
-    <Width>1</Width>
-    <Height>20</Height>
-    <Corner>0</Corner>
-    <Opacity>1.0</Opacity>
-    <Foreground>#000000</Foreground>
-    <Background>#FFFFEA</Background>
-    <Outline>#000000</Outline>
-    <Active>
-      <Foreground>#000000</Foreground>
-      <Background>#99CCFF</Background>
-      <Outline>#0000AA</Outline>
-    </Active>
-  </WindowStyle>
-
   <TrayStyle group="false" list="desktop">
     <Opacity>1.0</Opacity>
     <Font>monospace-10</Font>
@@ -88,10 +71,10 @@
   <Key mask="A" key="Tab">nextstacked</Key>
   
   <!-- Закрытие окна по Win + Q -->
-  <Key mask="W" key="q">close</Key>
+  <Key mask="4" key="q">close</Key>
   
   <!-- Запуск Rofi по Win + D -->
-  <Key mask="W" key="d">exec:rofi -show drun</Key>
+  <Key mask="4" key="d">exec:rofi -show drun</Key>
   
   <Key mask="A" key="F1">root:3</Key>
   <Key mask="A" key="F2">window</Key>
