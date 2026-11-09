@@ -302,7 +302,7 @@ if [ -f sbin/apk.static ]; then
     fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted update
 
     # 3. Устанавливаем нужные пакеты (флаг --initdb здесь уже не нужен, база создана)
-    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm zenity adwaita-icon-theme menu-cache gvfs mesa-dri-gallium webkit2gtk-4.1 gtk+3.0 gcc
+    fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add pcmanfm zenity menu-cache gvfs mesa-dri-gallium gtk+3.0 gcc
 fi
 
 # Restore custom busybox and remove conflicting Alpine busybox symlinks for runit
@@ -360,64 +360,6 @@ if [ -f "$REPO_DIR/src/rezzconfig.c" ]; then
     fi
 fi
 
-# Compile rezzinstall (GTK3 installer wizard).
-#
-# The binary itself demands root at *runtime* (it partitions/formats disks),
-# but building it does not need root — only a GTK3 dev environment on the
-# build host, same as rezzconfig/rezzbrowser above.
-#
-# Needs gtk+3.0-dev and pkgconfig on the build host:
-#   apk add gtk+3.0-dev pkgconfig
-if [ -f "$REPO_DIR/src/rezzinstall.c" ]; then
-    if pkg-config --exists gtk+-3.0 2>/dev/null; then
-        log "Compiling rezzinstall"
-        gcc -O2 -Wall -Wextra "$REPO_DIR/src/rezzinstall.c" \
-            $(pkg-config --cflags --libs gtk+-3.0) \
-            -o "$ROOTFS_DIR/usr/bin/rezzinstall"
-        chmod +x "$ROOTFS_DIR/usr/bin/rezzinstall"
-    else
-        echo "Skipping rezzinstall: install gtk+3.0-dev pkgconfig to build it" >&2
-    fi
-fi
-
-# Compile rsv-gui
-# Needs gtk+3.0-dev and pkgconfig on the build host:
-#   apk add gtk+3.0-dev pkgconfig
-if [ -f "$REPO_DIR/src/rsv-gui.c" ]; then
-    if pkg-config --exists gtk+-3.0 2>/dev/null; then
-        log "Compiling rsv-gui"
-        gcc -O2 -Wall -Wextra "$REPO_DIR/src/rsv-gui.c" \
-            $(pkg-config --cflags --libs gtk+-3.0) \
-            -o "$ROOTFS_DIR/usr/bin/rsv-gui"
-        chmod +x "$ROOTFS_DIR/usr/bin/rsv-gui"
-    else
-        echo "Skipping rsv-gui: install gtk+3.0-dev pkgconfig to build it" >&2
-    fi
-fi
-
-if [ -f "$REPO_DIR/src/rtop-gui.c" ]; then
-    if pkg-config --exists gtk+-3.0 2>/dev/null; then
-        log "Compiling rtop"
-        gcc -O2 -Wall -Wextra "$REPO_DIR/src/rtop-gui.c" \
-            $(pkg-config --cflags --libs gtk+-3.0 gtksourceview-3.0) \
-            -o "$ROOTFS_DIR/usr/bin/rtopg"
-        chmod +x "$ROOTFS_DIR/usr/bin/rtopg"
-    else
-        echo "Skipping rtop and pkgconfig to build it" >&2
-    fi
-fi
-
-if [ -f "$REPO_DIR/src/rezzabout.c" ]; then
-    if pkg-config --exists gtk+-3.0 2>/dev/null; then
-        log "Compiling rezzabout"
-        gcc -O2 -Wall -Wextra "$REPO_DIR/src/rezzabout.c" \
-            $(pkg-config --cflags --libs gtk+-3.0) \
-            -o "$ROOTFS_DIR/usr/bin/rezzabout"
-        chmod +x "$ROOTFS_DIR/usr/bin/rezzabout"
-    else
-        echo "Skipping about system: install gtk+3.0-dev pkgconfig to build it" >&2
-    fi
-fi
 if [ -f "$REPO_DIR/src/rcomp.c" ]; then
     if pkg-config --exists gtk+-3.0 2>/dev/null; then
         log "Compiling rcomp"
