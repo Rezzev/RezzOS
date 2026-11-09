@@ -3,7 +3,10 @@
   Improved, polished, and translated English version
 -->
 
+
 # RezzOS
+<img width="640" height="380" alt="image" src="https://github.com/user-attachments/assets/8b01fbb6-60cd-436a-a3d8-a16b4e6892fd" />
+
 
 A minimalist Linux distribution built around the Linux 6.6.40 kernel and BusyBox, designed for simplicity, portability, and a lightweight system footprint.
 
