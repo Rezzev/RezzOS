@@ -118,5 +118,6 @@
   <Key mask="A" key="Up">udesktop</Key>
   <Key mask="A" key="Down">ddesktop</Key>
   <Key mask="CA" key="t">exec:st</Key>
+  <Key mask="W" key="d">exec:rofi -show drun</Key>
   <Mouse context="window" modifier="A" button="1">move</Mouse>
 </JWM>
