@@ -86,76 +86,16 @@
     <Background>#FFFFFF</Background> <!-- Белый фон подсказок -->
   </PopupStyle>
 
-  <!-- Rules for Applications (Icons on Taskbar and Window Titles) -->
-  <!-- Terminal (st) -->
-  <Group>
-    <Class>st-256color</Class>
-    <Class>st</Class>
-    <Class>St</Class>
-    <Option>icon:terminal.png</Option>
-  </Group>
-
-  <!-- Browser (rezzbrowser) -->
-  <Group>
-    <Class>rezzbrowser</Class>
-    <Class>Rezzbrowser</Class>
-    <Option>icon:browser.png</Option>
-  </Group>
-
-  <!-- File Manager (PCManFM) -->
-  <Group>
-    <Class>pcmanfm</Class>
-    <Class>Pcmanfm</Class>
-    <Class>PCManFM</Class>
-    <Option>icon:folder.png</Option>
-  </Group>
-
-  <!-- Text Editor (edit) -->
-  <Group>
-    <Class>edit</Class>
-    <Class>Edit</Class>
-    <Option>icon:notepad.png</Option>
-  </Group>
-
-  <!-- System Monitor (rtopg) -->
-  <Group>
-    <Class>rtopg</Class>
-    <Class>Rtopg</Class>
-    <Option>icon:monitor.png</Option>
-  </Group>
-
-  <!-- Image Viewer (rezzview) -->
-  <Group>
-    <Class>rezzview</Class>
-    <Class>Rezzview</Class>
-    <Option>icon:view.png</Option>
-  </Group>
-
-  <!-- Service Manager (rsv-gui) -->
-  <Group>
-    <Class>rsv-gui</Class>
-    <Class>Rsv-gui</Class>
-    <Option>icon:manager.png</Option>
-  </Group>
-
-  <!-- Settings Configuration (rezzconfig) -->
-  <Group>
-    <Class>rezzconfig</Class>
-    <Class>Rezzconfig</Class>
-    <Option>icon:settings.png</Option>
-  </Group>
-
-  <!-- OS Installer (rezzinstall) -->
-  <Group>
-    <Class>rezzinstall</Class>
-    <Class>Rezzinstall</Class>
-    <Option>icon:install.png</Option>
-  </Group>
-
   <!-- Virtual Desktops -->
   <Desktops width="4" height="1">
     <Background type="solid">#FFFFFF</Background>
   </Desktops>
+
+  <Group>
+    <Class>*</Class>
+    <Option>noborder</Option>
+    <Option>notitle</Option>
+  </Group>
 
   <!-- Key bindings -->
   <Key key="Up">up</Key>
@@ -169,7 +109,7 @@
   <Key key="Return">select</Key>
   <Key key="Escape">escape</Key>
   <Key mask="A" key="Tab">nextstacked</Key>
-  <Key mask="A" key="F4">close</Key>
+  <Key mask="W" key="q">close</Key>
   <Key mask="A" key="F1">root:3</Key>
   <Key mask="A" key="F2">window</Key>
   <Key mask="A" key="F10">maximize</Key>
@@ -178,4 +118,5 @@
   <Key mask="A" key="Up">udesktop</Key>
   <Key mask="A" key="Down">ddesktop</Key>
   <Key mask="CA" key="t">exec:st</Key>
+  <Mouse context="window" modifier="A" button="1">move</Mouse>
 </JWM>
