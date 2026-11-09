@@ -119,4 +119,5 @@
   <Key mask="A" key="Down">ddesktop</Key>
   <Key mask="CA" key="t">exec:st</Key>
   <Mouse context="window" modifier="A" button="1">move</Mouse>
+  <Key mask="W" key="d">exec:rofi -show drun</Key>
 </JWM>
