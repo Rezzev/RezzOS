@@ -392,6 +392,10 @@ chmod +x "$ROOTFS_DIR/usr/bin/rtop"
 APK_URL="https://dl-cdn.alpinelinux.org/alpine/latest-stable/main/x86_64/apk-tools-static-3.0.8-r0.apk"
 APK_FILE="$CACHE_DIR/apk-tools-static-3.0.8-r0.apk"
 
+# 1. Скачиваем apk-tools-static для конкретной версии Alpine
+APK_URL="https://dl-cdn.alpinelinux.org/alpine/v3.20/main/x86_64/apk-tools-static-2.14.4-r1.apk"
+APK_FILE="$CACHE_DIR/apk-tools-static-2.14.4-r1.apk"
+
 if [ ! -f "$APK_FILE" ]; then
     echo "Downloading apk-tools-static..."
     wget -q "$APK_URL" -O "$APK_FILE" || { echo "Failed to download apk"; exit 1; }
@@ -402,17 +406,22 @@ tar -xzf "$APK_FILE" -C "$CACHE_DIR" sbin/apk.static
 cp -f "$CACHE_DIR/sbin/apk.static" "$ROOTFS_DIR/usr/bin/apk"
 chmod +x "$ROOTFS_DIR/usr/bin/apk"
 
-# Настраиваем конфиги apk (создаем папку на всякий случай)
+# 2. Настраиваем конфиги apk, используя версию v3.20
 mkdir -p "$ROOTFS_DIR/etc/apk"
 echo "x86_64" > "$ROOTFS_DIR/etc/apk/arch"
-echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/main" > "$ROOTFS_DIR/etc/apk/repositories"
-echo "https://dl-cdn.alpinelinux.org/alpine/latest-stable/community" >> "$ROOTFS_DIR/etc/apk/repositories"
+echo "https://dl-cdn.alpinelinux.org/alpine/v3.20/main" > "$ROOTFS_DIR/etc/apk/repositories"
+echo "https://dl-cdn.alpinelinux.org/alpine/v3.20/community" >> "$ROOTFS_DIR/etc/apk/repositories"
 
-# Обновляем индексы (в apk v3 база данных создается автоматически, если ее нет)
-"$ROOTFS_DIR/usr/bin/apk" --root "$ROOTFS_DIR" --allow-untrusted update
+# 3. Обновляем индексы (с явным указанием репозитория)
+"$ROOTFS_DIR/usr/bin/apk" --root "$ROOTFS_DIR" --arch x86_64 \
+    -X https://dl-cdn.alpinelinux.org/alpine/v3.20/main \
+    -X https://dl-cdn.alpinelinux.org/alpine/v3.20/community \
+    --allow-untrusted update
 
-# Устанавливаем ключи (убрали --initdb, так как в apk v3 его больше нет)
-"$ROOTFS_DIR/usr/bin/apk" --root "$ROOTFS_DIR" add --allow-untrusted alpine-keys
+# 4. Устанавливаем ключи
+"$ROOTFS_DIR/usr/bin/apk" --root "$ROOTFS_DIR" --arch x86_64 \
+    -X https://dl-cdn.alpinelinux.org/alpine/v3.20/main \
+    --allow-untrusted add alpine-keys
 
 chmod +x "$ROOTFS_DIR/usr/bin/"* 2>/dev/null || true
 chmod +x "$ROOTFS_DIR/usr/share/udhcpc/default.script" 2>/dev/null || true
