@@ -498,13 +498,8 @@ cd "$ROOTFS_DIR"
 find . | cpio -o -H newc --owner 0:0 | gzip > "$REPO_DIR/rootfs.cpio.gz"
 cd "$REPO_DIR"
 
-if [ ! -f "$REPO_DIR/disk.qcow2" ]; then
-    step "Creating disk.qcow2"
-    truncate -s 5G "$REPO_DIR/tmp_disk.raw"
-    mkfs.ext4 -F "$REPO_DIR/tmp_disk.raw"
-    qemu-img convert -f raw -O qcow2 "$REPO_DIR/tmp_disk.raw" "$REPO_DIR/disk.qcow2"
-    # 4. Удаляем временный файл
-    rm "$REPO_DIR/tmp_disk.raw"
+if [ ! -f "$REPO_DIR/disk.img" ]; then
+    qemu-img create -f raw disk.img 5G
 fi
 
 
