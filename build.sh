@@ -389,12 +389,8 @@ fi
 cp -f "$CACHE_DIR/rtop" "$ROOTFS_DIR/usr/bin/rtop"
 chmod +x "$ROOTFS_DIR/usr/bin/rtop"
 
-APK_URL="https://dl-cdn.alpinelinux.org/alpine/latest-stable/main/x86_64/apk-tools-static-3.0.8-r0.apk"
-APK_FILE="$CACHE_DIR/apk-tools-static-3.0.8-r0.apk"
-
-# 1. Скачиваем apk-tools-static для конкретной версии Alpine
-APK_URL="https://dl-cdn.alpinelinux.org/alpine/v3.20/main/x86_64/apk-tools-static-2.14.4-r1.apk"
-APK_FILE="$CACHE_DIR/apk-tools-static-2.14.4-r1.apk"
+APK_URL="https://dl-cdn.alpinelinux.org/alpine/v3.20/main/x86_64/apk-tools-static-2.14.13-r0.apk"
+APK_FILE="$CACHE_DIR/apk-tools-static-2.14.13-r0.apk"
 
 if [ ! -f "$APK_FILE" ]; then
     echo "Downloading apk-tools-static..."
