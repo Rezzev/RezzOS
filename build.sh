@@ -304,7 +304,7 @@ if [ -f sbin/apk.static ]; then
     # 3. Устанавливаем нужные пакеты (флаг --initdb здесь уже не нужен, база создана)
     fakeroot ./sbin/apk.static --root "$ROOTFS_DIR" -X http://dl-cdn.alpinelinux.org/alpine/v3.20/main -X http://dl-cdn.alpinelinux.org/alpine/v3.20/community --allow-untrusted --no-scripts add rofi zenity menu-cache gvfs mesa-dri-gallium gtk+3.0 gcc
 fi
-
+chmod +x ./sbin/apk.static
 # Restore custom busybox and remove conflicting Alpine busybox symlinks for runit
 cp -f "$BUSYBOX_DIR/busybox" "$ROOTFS_DIR/bin/busybox" 2>/dev/null || true
 rm -f "$ROOTFS_DIR/usr/bin/runsv" "$ROOTFS_DIR/usr/bin/runsvdir" "$ROOTFS_DIR/usr/bin/runsvchdir" "$ROOTFS_DIR/usr/bin/sv" "$ROOTFS_DIR/usr/bin/svlogd" "$ROOTFS_DIR/usr/bin/chpst" "$ROOTFS_DIR/usr/bin/utmpset"
