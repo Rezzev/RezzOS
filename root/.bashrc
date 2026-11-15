@@ -1,23 +1,19 @@
+# Если оболочка запущена не в интерактивном режиме, прекращаем выполнение скрипта
+case $- in
+    *i*) ;;
+      *) return;;
+esac
+
 export TERM="${TERM:-linux}"
 export INPUTRC=/etc/inputrc
 export HISTFILE=/root/.bash_history
 export HISTSIZE=10000
 export HISTFILESIZE=10000
+
 shopt -s histappend 2>/dev/null || true
-PROMPT_COMMAND="history -a 2>/dev/null; $PROMPT_COMMAND"
+PROMPT_COMMAND="history -a 2>/dev/null${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
 
 PS1='\[\e[1;34m\]\u\[\e[0m\]@\h:\w\$> '
+
 alias ll='ls -la'
 alias ..='cd ..'
-
-# Uncomment the line below to automatically start the graphical interface on login
-# [[ -z $DISPLAY && $(tty) == /dev/tty1 ]] && exec startx
-
-if [ -z "$DISPLAY" ] && [ -z "$TMUX" ] && [ -t 0 ] && [ "$TERM" != "dumb" ] && [ -z "$SSH_CLIENT" ] && [ -z "$SSH_TTY" ] && command -v tmux >/dev/null 2>&1; then
-    mkdir -p /dev/pts
-    mount -t devpts devpts /dev/pts 2>/dev/null || true
-    exec tmux new-session -A -s rezzos /bin/bash --rcfile /root/.bashrc
-fi
-
-clear
-
