@@ -4,6 +4,7 @@ mount -t sysfs sysfs /sys
 mount -t devtmpfs dev /dev
 mkdir -p /dev/pts
 mount -t devpts devpts /dev/pts -o mode=0620,ptmxmode=0666 2>/dev/null || mount -t devpts devpts /dev/pts 2>/dev/null || true
+ln -sf /dev/pts/ptmx /dev/ptmx
 
 # Boot mode. A kernel-mounted real root shows up in /proc/mounts as /dev/<node>
 root_src=$(awk '$2=="/" {print $1; exit}' /proc/mounts 2>/dev/null)
