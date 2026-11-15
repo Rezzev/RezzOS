@@ -494,8 +494,8 @@ cd "$ROOTFS_DIR"
 find . | cpio -o -H newc --owner 0:0 | gzip > "$REPO_DIR/rootfs.cpio.gz"
 cd "$REPO_DIR"
 
-if [ ! -f "$REPO_DIR/disk.img" ]; then
-    qemu-img create -f raw disk.img 5G
+if [ ! -f "$REPO_DIR/disk.qcow2" ]; then
+    qemu-img create -f qcow2 disk.qcow2 5G
 fi
 
 
