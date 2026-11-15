@@ -963,9 +963,9 @@ typedef struct {
 static void
 stream_closed(GIOChannel *ch, StreamCtx *ctx)
 {
+    g_io_channel_shutdown(ch, FALSE, NULL);
     if (ctx->refcounted)
         g_io_channel_unref(ch);
-    g_io_channel_shutdown(ch, FALSE, NULL);
     g_free(ctx);
 }
 
