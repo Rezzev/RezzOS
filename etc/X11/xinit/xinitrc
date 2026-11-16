@@ -23,4 +23,4 @@ if command -v setxkbmap >/dev/null 2>&1; then
     fi
 fi
 rcomp &
-exec jwm -f /etc/jwm/system.jwmrc
+exec jwm -f /etc/system.jwmrc
