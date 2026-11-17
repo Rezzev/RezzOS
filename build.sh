@@ -374,6 +374,20 @@ if [ -f "$REPO_DIR/src/rcomp.c" ]; then
 fi
 
 
+if [ -f "$REPO_DIR/src/rezzinstall.c" ]; then
+    if pkg-config --exists gtk+-3.0 2>/dev/null; then
+        log "Compiling installer"
+        gcc -O2 -Wall -Wextra "$REPO_DIR/src/rinstall.c" \
+            $(pkg-config --cflags --libs gtk+-3.0) \
+            -lX11 -lXcomposite -lXdamage -lXfixes -lXrender \
+            -o "$ROOTFS_DIR/usr/bin/installer"
+        chmod +x "$ROOTFS_DIR/usr/bin/installer"
+    else
+        echo "Skipping Rcomp" >&2
+    fi
+fi
+
+
 step "Downloading rezz-utils and apk"
 REZZVIEW_URL="https://github.com/neko-qt/rezzview/releases/download/1.1.0/rezzview-musl"
 if [ ! -f "$CACHE_DIR/rezzview-musl" ]; then
