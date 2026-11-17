@@ -549,12 +549,8 @@ if [ -f "$REPO_DIR/rezzos.iso" ]; then
     ls -la rezzos.iso
 fi
 
-if [ -f "$REPO_DIR/start.sh" ]; then
-    echo "Run: ./start.sh"
-else
-    cat << 'EOF'
+cat << 'EOF'
 
 Run in qemu:
-sudo start-gui.sh
+sudo ./start-gui.sh
 EOF
-fi
