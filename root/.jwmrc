@@ -2,28 +2,6 @@
 <JWM>
 
   <!-- Options for program interfaces. -->
-  <Tray x="0" y="1" autohide="off">
-    <TrayButton label="_">showdesktop</TrayButton>
-    <Spacer width="2"/>
-    <Pager labeled="false"/>
-    <TaskList maxwidth="40"/>
-    <Dock/>
-    <Clock format="%d.%m.%Y %H:%M"/>
-  </Tray>
-
-  <TrayStyle group="false" list="desktop">
-    <Opacity>1.0</Opacity>
-    <Font>monospace-10</Font>
-    <Outline>#000000</Outline> <!-- Черная рамка панели -->
-    <Foreground>#000000</Foreground> <!-- Черный текст часов и окон -->
-    <Background>#FFFFFF</Background> <!-- Белый фон панели -->
-    <Active>
-      <Outline>#000000</Outline>
-      <Foreground>#FFFFFF</Foreground> <!-- Белый текст активного окна на панели -->
-      <Background>#000000</Background> <!-- Черный фон активного окна на панели -->
-    </Active>
-  </TrayStyle>
-
   <PagerStyle>
     <Outline>#000000</Outline> <!-- Черная рамка переключателя -->
     <Foreground>#000000</Foreground>
