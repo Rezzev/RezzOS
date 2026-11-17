@@ -1,144 +1,74 @@
 <?xml version="1.0"?>
 <JWM>
-    <!-- Start Menu (Left Click) -->
-    <IconPath>/usr/share/icons/RezzOS</IconPath>
-    <RootMenu onroot="1">
-        <Program icon="terminal.png" label="Terminal">st</Program>
-        <Program icon="browser.png" label="Links browser">links -g duckduckgo.com</Program>
-        <Program icon="folder.png" label="File Manager">pcmanfm -n</Program>
-        <Program icon="Rutils.png" label="Notepad">rezzpad</Program>
-        <Program icon="Rutils.png" label="Image viewer">rezzview</Program>
-        <Program icon="Rutils.png" label="Task Manager">st -e rtop</Program>
-        <Separator/>
-        <Program icon="Rutils.png" label="Control Center">st -e rezzconfig</Program>
-        <Program icon="Rutils.png" label="Keyboard Layout">st -e rezzkeymap</Program>
-        <Program icon="Rutils.png" label="Install RezzOS to Disk">st -e rezzinstall</Program>
-        <Separator/>
-        <Menu icon="/usr/share/icons/RezzOS/info.png" label="Power">
-            <Program label="Suspend">sh -c 'zenity --info --title="RezzOS" --text="Suspending..." --timeout=2 &amp; suspend'</Program>
-            <Program label="Hibernate">sh -c 'zenity --info --title="RezzOS" --text="Hibernating..." --timeout=3 &amp; hibernate'</Program>
-            <Program label="Reboot">sh -c 'zenity --info --title="RezzOS" --text="Rebooting..." --timeout=5 &amp; reboot'</Program>
-            <Program label="Shutdown">sh -c 'zenity --info --title="RezzOS" --text="Shutting down..." --timeout=5 &amp; poweroff'</Program>
-            <Separator/>
-            <Restart label="Restart JWM"/>
-            <Exit label="Log Out of GUI" confirm="true"/>
-        </Menu>
-    </RootMenu>
 
-    <!-- Desktop Context Menu (Right Click) -->
-    <RootMenu onroot="3">
-        <Program label="Create File...">create_file.sh</Program>
-        <Program label="Create Folder...">create_folder.sh</Program>
-        <Separator/>
-        <Program label="Open File Manager Here">pcmanfm -n</Program>
-        <Program label="Open Terminal Here">st</Program>
-        <Separator/>
-        <Program label="System Info">sysinfo.sh</Program>
-    </RootMenu>
+  <!-- Options for program interfaces. -->
+  <PagerStyle>
+    <Outline>#000000</Outline> <!-- Черная рамка переключателя -->
+    <Foreground>#000000</Foreground>
+    <Background>#FFFFFF</Background> <!-- Белый фон неактивных столов -->
+    <Text>#000000</Text>
+    <Active>
+      <Foreground>#FFFFFF</Foreground>
+      <Background>#000000</Background> <!-- Черный фон активного стола -->
+    </Active>
+  </PagerStyle>
 
-    <!-- Options for program interfaces. -->
-    <Tray x="0" y="0" autohide="off">
-        <TrayButton icon="menu.png" label="Menu">root:1</TrayButton>
-        <Spacer width="2"/>
-        <TrayButton label="_">showdesktop</TrayButton>
-        <Spacer width="2"/>
-        <Pager labeled="true"/>
-        <TaskList maxwidth="256"/>
-        <Dock/>
-        <Clock format="%d.%m.%Y %H:%M"></Clock>
-    </Tray>
+  <MenuStyle>
+    <Font>monospace-13</Font>
+    <Foreground>#000000</Foreground> <!-- Черный текст в меню по ПКМ -->
+    <Background>#FFFFFF</Background> <!-- Белый фон меню -->
+    <Outline>#000000</Outline> <!-- Черная рамка меню -->
+    <Active>
+      <Foreground>#FFFFFF</Foreground> <!-- Белый текст выбранного пункта -->
+      <Background>#000000</Background> <!-- Черный фон выбранного пункта -->
+    </Active>
+  </MenuStyle>
 
-    <!-- Visual Styles (Breeze Dark) -->
-    <WindowStyle>
-        <Font>Noto NotoSans-11:bold</Font>
-        <Width>4</Width>
-        <Height>21</Height>
-        <Corner>3</Corner>
-        <Foreground>#BDC3C7</Foreground>
-        <Background>#232629</Background>
-        <Outline>#1a1c1f</Outline>
-        <Opacity>1</Opacity>
-        <Active>
-            <Foreground>#FCFCFC</Foreground>
-            <Background>#31363B</Background>
-            <Outline>#3DAEE9</Outline>
-            <Opacity>1</Opacity>
-        </Active>
-    </WindowStyle>
-    
-    <TrayStyle group="true" list="all">
-        <Font>NotoSans-11</Font>
-        <Background>#232629</Background>
-        <Foreground>#FCFCFC</Foreground>
-        <Outline>#1a1c1f</Outline>
-        <Opacity>0.95</Opacity>
-    </TrayStyle>
-    
-    <TaskListStyle>
-      <Font>NotoSans-11</Font>
-      <Active>
-        <Foreground>#FCFCFC</Foreground>
-        <Background>#31363B</Background>
-      </Active>
-      <Foreground>#BDC3C7</Foreground>
-      <Background>#232629</Background>
-    </TaskListStyle>
-    
-    <PagerStyle>
-        <Outline>#1a1c1f</Outline>
-        <Foreground>#31363B</Foreground>
-        <Background>#232629</Background>
-        <Text>#BDC3C7</Text>
-        <Active>
-            <Foreground>#FCFCFC</Foreground>
-            <Background>#3DAEE9</Background>
-        </Active>
-    </PagerStyle>
-    
-    <MenuStyle>
-        <Font>NotoSans-11</Font>
-        <Foreground>#FCFCFC</Foreground>
-        <Background>#31363B</Background>
-        <Outline>#1a1c1f</Outline>
-        <Active>
-            <Foreground>#FCFCFC</Foreground>
-            <Background>#3DAEE9</Background>
-        </Active>
-        <Opacity>0.95</Opacity>
-    </MenuStyle>
-    
-    <PopupStyle>
-        <Font>NotoSans-11</Font>
-        <Foreground>#FCFCFC</Foreground>
-        <Background>#232629</Background>
-    </PopupStyle>
+  <PopupStyle>
+    <Font>monospace-12</Font>
+    <Foreground>#000000</Foreground> <!-- Черный текст подсказок -->
+    <Background>#FFFFFF</Background> <!-- Белый фон подсказок -->
+  </PopupStyle>
 
-    <!-- Virtual Desktops -->
-    <Desktops width="4" height="1">
-        <Background type="solid">#1e2227</Background>
-    </Desktops>
+  <!-- Virtual Desktops -->
+  <Desktops width="4" height="1">
+    <Background type="solid">#FFFFFF</Background>
+  </Desktops>
 
-    <!-- Key bindings -->
-    <Key key="Up">up</Key>
-    <Key key="Down">down</Key>
-    <Key key="Right">right</Key>
-    <Key key="Left">left</Key>
-    <Key key="h">left</Key>
-    <Key key="j">down</Key>
-    <Key key="k">up</Key>
-    <Key key="l">right</Key>
-    <Key key="Return">select</Key>
-    <Key key="Escape">escape</Key>
+  <!-- Key bindings -->
+  <Key key="Up">up</Key>
+  <Key key="Down">down</Key>
+  <Key key="Right">right</Key>
+  <Key key="Left">left</Key>
+  <Key key="h">left</Key>
+  <Key key="j">down</Key>
+  <Key key="k">up</Key>
+  <Key key="l">right</Key>
+  <Key key="Return">select</Key>
+  <Key key="Escape">escape</Key>
+  <Key mask="A" key="Tab">nextstacked</Key>
+  
+  <!-- Закрытие окна по Win + Q -->
+  <Key mask="4" key="q">close</Key>
+  
+  <!-- Запуск Rofi по Win + D -->
+  <Key mask="4" key="d">exec:rofi -show drun</Key>
+  
+  <Key mask="A" key="F1">root:3</Key>
+  <Key mask="A" key="F2">window</Key>
+  <Key mask="A" key="F10">maximize</Key>
+  <Key mask="A" key="Right">rdesktop</Key>
+  <Key mask="A" key="Left">ldesktop</Key>
+  <Key mask="A" key="Up">udesktop</Key>
+  <Key mask="A" key="Down">ddesktop</Key>
+  <Key mask="CA" key="t">exec:st</Key>
+  
+  <Mouse context="window" modifier="A" button="1">move</Mouse>
 
-    <Key mask="A" key="Tab">nextstacked</Key>
-    <Key mask="A" key="F4">close</Key>
-    <Key mask="A" key="F1">root:3</Key>
-    <Key mask="A" key="F2">window</Key>
-    <Key mask="A" key="F10">maximize</Key>
-    <Key mask="A" key="Right">rdesktop</Key>
-    <Key mask="A" key="Left">ldesktop</Key>
-    <Key mask="A" key="Up">udesktop</Key>
-    <Key mask="A" key="Down">ddesktop</Key>
-    <Key mask="CA" key="t">exec:st</Key>
+  <!-- Отключение рамок для ВСЕХ окон -->
+  <Group>
+      <Class>*</Class>
+      <Option>noborder</Option>
+      <Option>notitle</Option>
+  </Group>
 </JWM>
-
