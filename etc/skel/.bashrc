@@ -1,23 +1,19 @@
+# Если оболочка запущена не в интерактивном режиме, прекращаем выполнение скрипта
+case $- in
+    *i*) ;;
+      *) return;;
+esac
+
 export TERM="${TERM:-linux}"
 export INPUTRC=/etc/inputrc
-export HISTFILE="$HOME/.bash_history"
+export HISTFILE=/root/.bash_history
 export HISTSIZE=10000
 export HISTFILESIZE=10000
+
 shopt -s histappend 2>/dev/null || true
-PROMPT_COMMAND="history -a 2>/dev/null; $PROMPT_COMMAND"
+PROMPT_COMMAND="history -a 2>/dev/null${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+
+PS1='\[\e[1;34m\]\u\[\e[0m\]@\h:\w\$> '
 
 alias ll='ls -la'
 alias ..='cd ..'
-
-# Launch tmux only if interactive, not already in tmux, and tmux works
-if [ -z "$TMUX" ] && [ -t 0 ] && [ "$TERM" != "dumb" ] && [ -z "$SSH_CLIENT" ] && [ -z "$SSH_TTY" ] && command -v tmux >/dev/null 2>&1; then
-    mkdir -p /dev/pts
-    mount -t devpts devpts /dev/pts 2>/dev/null || true
-    # Use && to only exec if tmux test passes; fallback to plain shell on failure
-    tmux has-session -t rezzos 2>/dev/null && exec tmux attach-session -t rezzos
-    tmux new-session -d -s rezzos 2>/dev/null && exec tmux attach-session -t rezzos
-    # If tmux failed, continue with normal shell below
-fi
-
-clear
-printf "Welcome to \e[0;37mRezz\e[0;34mOS\e[0m!\n"
