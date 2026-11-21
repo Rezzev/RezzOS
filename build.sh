@@ -156,7 +156,7 @@ cp -rf --remove-destination usr "$ROOTFS_DIR/"
 cp -f init "$ROOTFS_DIR/"
 
 cd "$ROOTFS_DIR"
-mkdir -p dev proc sys tmp mnt/disk var/log lib usr/lib usr/share/terminfo
+mkdir -p dev proc sys tmp mnt/disk var/log var/lib/lightdm var/log/lightdm run/lightdm lib usr/lib usr/share/terminfo
 mkdir -p etc/runit/runsvdir/default
 mkdir -p boot
 rm -f boot/rootfs.cpio.gz
@@ -379,11 +379,22 @@ if [ -f "$REPO_DIR/src/rezzinstall.c" ]; then
         log "Compiling installer"
         gcc -O2 -Wall -Wextra "$REPO_DIR/src/rezzinstall.c" \
             $(pkg-config --cflags --libs gtk+-3.0) \
-            -lX11 -lXcomposite -lXdamage -lXfixes -lXrender \
-            -o "$ROOTFS_DIR/usr/bin/installer"
-        chmod +x "$ROOTFS_DIR/usr/bin/installer"
+            -o "$ROOTFS_DIR/usr/bin/rezzinstall"
+        chmod +x "$ROOTFS_DIR/usr/bin/rezzinstall"
+        ln -sf rezzinstall "$ROOTFS_DIR/usr/bin/installer" 2>/dev/null || true
     else
-        echo "Skipping Rcomp" >&2
+        echo "Skipping installer: install gtk+3.0-dev pkgconfig to build it" >&2
+    fi
+fi
+
+if [ -f "$REPO_DIR/src/rezzabout.c" ]; then
+    if pkg-config --exists gtk+-3.0 2>/dev/null; then
+        log "Compiling rezzabout"
+        gcc -O2 -Wall -Wextra "$REPO_DIR/src/rezzabout.c" \
+            $(pkg-config --cflags --libs gtk+-3.0) \
+            -o "$ROOTFS_DIR/usr/bin/rezzabout"
+        chmod +x "$ROOTFS_DIR/usr/bin/rezzabout"
+        ln -sf rezzabout "$ROOTFS_DIR/usr/bin/about" 2>/dev/null || true
     fi
 fi
 
