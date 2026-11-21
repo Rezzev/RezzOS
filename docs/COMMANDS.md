@@ -25,8 +25,8 @@
 ## System & Setup
 | Command | Description                                                                                   |
 |---------|-----------------------------------------------------------------------------------------------|
-| `rezzinstall` / `install-rezzos` | Interactive TUI installer to install RezzOS onto disk/SSD with initial setup                  |
-| `rezzconfig` / `config` | Interactive TUI control center & system configuration                                         |
+| `rezzinstall` / `install-rezzos` | Graphical GTK3 installer to install RezzOS onto disk/SSD with initial setup                  |
+| `rezzconfig` / `config` | Graphical GTK3 control center & system configuration                                         |
 | `rezzkeymap [set\|ru\|us]` | Keyboard & language layout switcher (RU/EN, toggle hotkeys)                                   |
 | `rezzuser` | User management utility (add, remove, passwd, lock, groups)                                   |
 | `rezzfetch` | System info banner & specs                                                                    |

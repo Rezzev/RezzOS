@@ -12,8 +12,14 @@ if [ -f "target-disk.qcow2" ]; then
     EXTRA_DRIVE="-drive file=target-disk.qcow2,format=qcow2,if=virtio"
 fi
 
+ENABLE_KVM=""
+if [ -e /dev/kvm ]; then
+    ENABLE_KVM="-enable-kvm -cpu host"
+fi
+
 echo "Starting RezzOS in GUI mode (Font: $FONT)..."
 qemu-system-x86_64 \
+    $ENABLE_KVM \
     -kernel bzImage \
     -initrd rootfs.cpio.gz \
     -append "console=tty1 root=/dev/ram0 init=/init resume=/dev/vda fbcon=font:$FONT random.trust_cpu=on" \

@@ -13,3 +13,4 @@ disk:x:6:
 cdrom:x:11:
 tape:x:26:
 kvm:x:36:
+lightdm:x:103:

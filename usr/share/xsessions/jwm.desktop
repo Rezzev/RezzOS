@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=JWM
+Comment=Joe's Window Manager
+Exec=jwm -f /etc/system.jwmrc
+Type=Application
