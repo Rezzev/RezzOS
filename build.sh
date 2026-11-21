@@ -377,7 +377,7 @@ fi
 if [ -f "$REPO_DIR/src/rezzinstall.c" ]; then
     if pkg-config --exists gtk+-3.0 2>/dev/null; then
         log "Compiling installer"
-        gcc -O2 -Wall -Wextra "$REPO_DIR/src/rinstall.c" \
+        gcc -O2 -Wall -Wextra "$REPO_DIR/src/rezzinstall.c" \
             $(pkg-config --cflags --libs gtk+-3.0) \
             -lX11 -lXcomposite -lXdamage -lXfixes -lXrender \
             -o "$ROOTFS_DIR/usr/bin/installer"
