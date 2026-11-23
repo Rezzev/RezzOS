@@ -1,6 +1,7 @@
 import questionary
 import os
 import subprocess
+import shutil
 from pathlib import Path
 
 repo = Path(__file__).resolve().parent
@@ -64,6 +65,7 @@ def kernel_use():
 
 
     if which_kernel_use == "Select my kernel":
+        questionary.print("Enter the full path!And kernel name must be: |bzImage|", style="bold fg:ansired")
         print("Specify the path to your kernel:")
         kernel_path = input("Enter:")
         copy_kernel = subprocess.run(["cp", kernel_path, repo], capture_output=True, text=True, check=True)
@@ -74,18 +76,55 @@ def kernel_use():
         print("Download RezzOS kernel from github...")
         download_kernel = subprocess.run(["wget", "-P", repo, kernel_175], capture_output=True, text=True, check=True)
         print(download_kernel.stdout)
+
+# set terminal
+def get_linux_terminal():
+    env_term = os.environ.get("TERMINAL")
+    if env_term and shutil.which(env_term):
+        return env_term
+
+
+    terminals = [
+        "x-terminal-emulator",
+        "gnome-terminal",
+        "konsole",
+        "xfce4-terminal",
+        "mate-terminal",
+        "lxterminal",
+        "alacritty",
+        "kitty",
+        "terminator",
+        "xterm"
+    ]
+
+    for term in terminals:
+        if shutil.which(term):
+            return term
+
+    return None
+
 # build
-def start_build():
+def start_build(repo: Path):
+    terminal = get_linux_terminal()
+    if not terminal:
+        print("Not found terminal")
+        return
     confirm_build = questionary.confirm("Start build?").ask()
     if confirm_build:
-        start = subprocess.run(["bash", "build.sh"], shell=True, capture_output=True, text=True, check=True)
-        print(start.stdout)
+        script_path = str(repo / "build.sh")
+        flag = "-e" if terminal in ("konsole", "xterm", "alacritty", "lxterminal") else "--"
 
-start_vote = questionary.confirm("Start build script?").ask()
-print("Weclome to build script for RezzOS")
+        subprocess.Popen([terminal, flag, "bash", script_path])
+# weclome
+def welcome():
+    os.system("clear")
+    questionary.print(" Welcome to buid script! \n Here you can configure your system even before \n the ISO is built—include the necessary packages, \n your own kernel, and more.")
+    start_vote = questionary.confirm("Start build script?").ask()
+
 ## LAUNCH FUNCTIONS
+welcome()
 add_pkgs()
 setup_dependencies()
 binary_use()
 kernel_use()
-start_build()
+start_build(repo)
