@@ -156,7 +156,7 @@ cp -rf --remove-destination usr "$ROOTFS_DIR/"
 cp -f init "$ROOTFS_DIR/"
 
 cd "$ROOTFS_DIR"
-mkdir -p dev proc sys tmp mnt/disk var/log var/lib/lightdm var/log/lightdm run/lightdm lib usr/lib usr/share/terminfo
+mkdir -p dev proc sys tmp mnt/disk var/log lib usr/lib usr/share/terminfo
 mkdir -p etc/runit/runsvdir/default
 mkdir -p boot
 rm -f boot/rootfs.cpio.gz
