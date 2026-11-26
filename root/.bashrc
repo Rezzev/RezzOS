@@ -9,6 +9,7 @@ export INPUTRC=/etc/inputrc
 export HISTFILE=/root/.bash_history
 export HISTSIZE=10000
 export HISTFILESIZE=10000
+export COLORTERM=truecolor
 
 shopt -s histappend 2>/dev/null || true
 PROMPT_COMMAND="history -a 2>/dev/null${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
