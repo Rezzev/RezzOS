@@ -51,6 +51,12 @@ apk update    # from the Alpine repository
 
 This setup provides a lightweight package management approach with compatibility and flexibility.
 
+### Key binds
+*super+d* - rofi
+*super+q* or *alt-f4* - close window
+*PrintSC* - screenshot
+
+
 ### Minimalistic design
 
 The system is built with a small footprint in mind, making it suitable for resource-constrained environments, custom builds, and users who prefer a clean and stripped-down Linux experience.
