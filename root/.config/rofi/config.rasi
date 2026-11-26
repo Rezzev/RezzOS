@@ -1,1 +1,1 @@
-@theme = "android_notification"
+@theme "android_notification"
