@@ -122,9 +122,12 @@ def welcome():
     start_vote = questionary.confirm("Start build script?").ask()
 
 ## LAUNCH FUNCTIONS
-welcome()
-add_pkgs()
-setup_dependencies()
-binary_use()
-kernel_use()
-start_build(repo)
+try:
+    welcome()
+    add_pkgs()
+    setup_dependencies()
+    binary_use()
+    kernel_use()
+    start_build(repo)
+except Exception as e:
+    print(f"Error{e}")
