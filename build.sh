@@ -162,7 +162,7 @@ mkdir -p boot
 rm -f boot/rootfs.cpio.gz
 cp "$REPO_DIR/bzImage" boot/ 2>/dev/null || true
 chmod +x init
-chmod +x sbin/apk.static
+
 
 step "Downloading musl"
 MUSL_APK="musl-1.2.5-r4.apk"
