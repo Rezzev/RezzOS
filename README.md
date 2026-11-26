@@ -52,9 +52,13 @@ apk update    # from the Alpine repository
 This setup provides a lightweight package management approach with compatibility and flexibility.
 
 ### Key binds
-*super+d* - rofi
-*super+q* or *alt-f4* - close window
-*PrintSC* - screenshot
+
+
+**super+d** - rofi
+
+**super+q** or **alt-f4** - close window
+
+**PrintSC** - screenshot
 
 
 ### Minimalistic design
