@@ -297,7 +297,7 @@ static const char backend_script[] =
 "chmod 755 \"$TARGET_MOUNT/home/$CFG_USERNAME\"\n"
 "\n"
 "if [ \"$FW\" = \"uefi\" ]; then\n"
-"    ROOT_ID=$(sfdisk -d \"$CHOSEN_DISK\" 2>/dev/null | awk -v d=\"$ROOT_PART:\" '$1 == d { for (i = 1; i <= NF; i++) if ($i ~ /^uuid=/) { sub(\"uuid=\", \"\", $i); print $i; exit } }')\n"
+"    ROOT_ID=$(sfdisk -d \"$CHOSEN_DISK\" 2>/dev/null | awk -v d=\"$ROOT_PART\" '$1 == d { for (i = 1; i <= NF; i++) if ($i ~ /^uuid=/) { sub(\"uuid=\", \"\", $i); sub(\",\", \"\", $i); print $i; exit } }')\n"
 "    [ -n \"$ROOT_ID\" ] || die \"cannot read GPT PARTUUID of $ROOT_PART\"\n"
 "else\n"
 "    HEX=$(dd if=\"$CHOSEN_DISK\" bs=1 skip=440 count=4 2>/dev/null | od -An -tx1 | tr -d '[:space:]')\n"
@@ -619,7 +619,7 @@ static void populate_disks(void) {
 static void populate_partitions(GtkComboBoxText *combo, gboolean include_none) {
     gtk_combo_box_text_remove_all(combo);
     if (include_none) gtk_combo_box_text_append(combo, "NONE", "(Не использовать)");
-    
+
     FILE *fp = fopen("/proc/partitions", "r");
     if (!fp) return;
     char line[256];
