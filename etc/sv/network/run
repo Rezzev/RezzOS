@@ -1,20 +1,2 @@
-#!/bin/sh
-exec 2>&1
-ip link set lo up
-
-# первый подходящий проводной интерфейс
-IF=""
-for i in /sys/class/net/*; do
-  n=${i##*/}
-  case "$n" in
-    lo|wl*|docker*|veth*|br*) continue ;;
-  esac
-  IF=$n
-  break
-done
-[ -n "$IF" ] || { echo "network: no interface"; sleep 10; exit 1; }
-
-echo "network: using $IF"
-ip addr flush dev "$IF"
-ip link set "$IF" up
-exec udhcpc -f -i "$IF" -s /usr/share/udhcpc/default.script
+echo "Network service active"
+exec sleep 999999
