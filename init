@@ -127,10 +127,33 @@ done
 
 fi
 
+# ---------------------------------------------------------------------------
 # Network - DHCP for real hardware, static config for a persisted setting.
-for i in 1 2 3 4 5 6 7 8 9 10; do
-    [ -d /sys/class/net/eth0 ] && break
+# ---------------------------------------------------------------------------
+
+# Pick the first wired interface instead of hardcoding eth0: on real hardware
+# the NIC can be enp3s0, eno1 and so on. Wi-Fi and virtual devices are skipped
+# (dhcpcd/iwd handle Wi-Fi). Prints nothing when there is no candidate.
+detect_netif() {
+    for n in /sys/class/net/*; do
+        n=${n##*/}
+        case "$n" in
+            lo|wl*|docker*|veth*|br*|virbr*|sit*|tun*|tap*|dummy*|bond*) continue ;;
+        esac
+        echo "$n"
+        return 0
+    done
+    return 1
+}
+
+# Wait (up to ~8 s) for the NIC driver to register an interface.
+NETIF=""
+i=0
+while [ "$i" -lt 40 ]; do
+    NETIF=$(detect_netif)
+    [ -n "$NETIF" ] && break
     sleep 0.2
+    i=$((i + 1))
 done
 
 ifconfig lo 127.0.0.1 up
@@ -144,39 +167,54 @@ if [ -f /mnt/disk/etc/network.conf ]; then
     # shellcheck disable=SC1090,SC1091
     . /etc/network.conf 2>/dev/null || true
     [ -n "${IP:-}" ] && STATIC_SRC=1
+    # A saved IFACE wins over autodetection.
+    [ -n "${IFACE:-}" ] && NETIF="$IFACE"
 fi
 
-if [ -n "$STATIC_SRC" ]; then
-    ifconfig "${IFACE:-eth0}" up
+if [ -z "$NETIF" ]; then
+    echo "network: no wired interface found, skipping" > /var/log/network.log
+elif [ -n "$STATIC_SRC" ]; then
+    ifconfig "$NETIF" up
     sleep 0.2
-    ifconfig "${IFACE:-eth0}" "$IP" netmask "${MASK:-255.255.255.0}" up
+    ifconfig "$NETIF" "$IP" netmask "${MASK:-255.255.255.0}" up
     [ -n "${GW:-}" ] && route add default gw "$GW" 2>/dev/null || true
     : > /etc/resolv.conf
     for ns in $DNS; do
         echo "nameserver $ns" >> /etc/resolv.conf
     done
 else
-    ifconfig eth0 up
+    ip link set "$NETIF" up 2>/dev/null || ifconfig "$NETIF" up
     sleep 0.2
 
-    # Start DHCP in the background (-b keeps the client alive to renew the
-    # lease once it has one) and give it a bounded window to obtain an address.
-    # The old `timeout 15 udhcpc` ran synchronously and then exited, so the
-    # lease was never renewed and a long live session silently lost the network
-    # when it expired.
-    udhcpc -b -i eth0 -t 5 -s /usr/share/udhcpc/default.script 2>/dev/null
-
-    for i in 1 2 3 4 5 6 7 8 9 10; do
-        ifconfig eth0 | grep -q "inet " && break
+    # A real NIC needs a few seconds to negotiate the link after "up".
+    # DHCP discovers sent before that are lost, so wait for carrier (max 10 s).
+    i=0
+    while [ "$i" -lt 10 ]; do
+        [ "$(cat /sys/class/net/$NETIF/carrier 2>/dev/null)" = 1 ] && break
         sleep 1
+        i=$((i + 1))
     done
 
-    # Static fallback only where it means anything: QEMU's user-net always
-    # hands out 10.0.2.15/10.0.2.2. On real hardware the fixed address is just
-    # a router-only subnet that goes nowhere, so do not apply it there.
-    if ! ifconfig eth0 | grep -q "inet "; then
-        if [ -d /sys/bus/virtio/devices ]; then
-            ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up
+    # Start DHCP in the background (-b keeps the client alive to renew the
+    # lease once it has one). Output goes to a log so failures are visible.
+    udhcpc -b -i "$NETIF" -t 5 -s /usr/share/udhcpc/default.script \
+        > /var/log/udhcpc.log 2>&1
+
+    # Give it a bounded window (20 s) to obtain an address.
+    i=0
+    while [ "$i" -lt 20 ]; do
+        ip -4 addr show dev "$NETIF" 2>/dev/null | grep -q "inet " && break
+        sleep 1
+        i=$((i + 1))
+    done
+
+    # Static fallback only inside QEMU: its user-net always hands out
+    # 10.0.2.15/10.0.2.2. /sys/bus/virtio/devices exists on any kernel with
+    # virtio support, so test that it actually contains a device. On real
+    # hardware the fixed address is a subnet that goes nowhere: don't apply it.
+    if ! ip -4 addr show dev "$NETIF" 2>/dev/null | grep -q "inet "; then
+        if [ -n "$(ls -A /sys/bus/virtio/devices 2>/dev/null)" ]; then
+            ifconfig "$NETIF" 10.0.2.15 netmask 255.255.255.0 up
             route add default gw 10.0.2.2 2>/dev/null || true
         fi
     fi
@@ -349,5 +387,3 @@ clear
 echo ""
 
 exec runsvdir /etc/runit/runsvdir/default
-
-
