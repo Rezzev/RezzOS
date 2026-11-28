@@ -1,20 +1,21 @@
 #!/bin/sh
-RESOLV_CONF="/etc/resolv.conf"
 [ -n "$1" ] || exit 1
-
-NETMASK=""
-[ -n "$subnet" ] && NETMASK="netmask $subnet"
-
 case "$1" in
-    deconfig)
-        ifconfig $interface 0.0.0.0
-        ;;
-    renew|bound)
-        ifconfig $interface $ip $NETMASK
-        [ -n "$router" ] && route add default gw $router
-        > "$RESOLV_CONF"
-        for i in $dns; do
-            echo "nameserver $i" >> "$RESOLV_CONF"
-        done
-        ;;
+  deconfig)
+    ip addr flush dev "$interface"
+    ip link set "$interface" up
+    ;;
+  renew|bound)
+    ip addr flush dev "$interface"
+    ip addr add "$ip/${mask:-24}" dev "$interface"
+    while ip route del default 2>/dev/null; do :; done
+    for r in $router; do
+      ip route add default via "$r" dev "$interface"
+    done
+    : > /etc/resolv.conf
+    for d in $dns; do
+      echo "nameserver $d" >> /etc/resolv.conf
+    done
+    ;;
 esac
+exit 0
